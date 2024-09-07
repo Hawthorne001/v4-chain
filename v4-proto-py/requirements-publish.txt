@@ -3,3 +3,6 @@ grpcio-tools>=1.54
 grpcio>=1.54
 poetry>=1.5.1
 twine>=4.0.2
+requests>=2.32.2 # not directly required, pinned by Snyk to avoid a vulnerability
+setuptools>=70.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
