@@ -2,7 +2,6 @@ package keeper_test
 
 import (
 	"fmt"
-	"sort"
 	"testing"
 	"time"
 
@@ -39,7 +38,7 @@ func createPartiallyFilledStatefulOrderInState(
 	order types.Order,
 	timestamp time.Time,
 ) {
-	k.MustAddOrderToStatefulOrdersTimeSlice(
+	k.AddStatefulOrderIdExpiration(
 		ctx,
 		timestamp,
 		order.OrderId,
@@ -167,18 +166,14 @@ func TestMustTriggerConditionalOrder(t *testing.T) {
 		return orderPlacement, true
 	}
 
-	triggeredConditionalOrderMemStore := ks.ClobKeeper.GetTriggeredConditionalOrderPlacementMemStore(ks.Ctx)
 	triggeredConditionalOrderStore := ks.ClobKeeper.GetTriggeredConditionalOrderPlacementStore(ks.Ctx)
-	untriggeredConditionalOrderMemStore := ks.ClobKeeper.GetUntriggeredConditionalOrderPlacementMemStore(ks.Ctx)
 	untriggeredConditionalOrderStore := ks.ClobKeeper.GetUntriggeredConditionalOrderPlacementStore(ks.Ctx)
 
-	// Verify that the triggered conditional order does not exist in untriggered memstore/store
+	// Verify that the triggered conditional order does not exist in untriggered store
 	_, found = getOrderFromStore(conditionalOrder.OrderId, untriggeredConditionalOrderStore)
 	require.False(t, found)
-	_, found = getOrderFromStore(conditionalOrder.OrderId, untriggeredConditionalOrderMemStore)
-	require.False(t, found)
 
-	// Verify that the triggered conditional order does exist in triggered memstore/store
+	// Verify that the triggered conditional order does exist in triggered store
 	longTermOrderPlacement, found = getOrderFromStore(conditionalOrder.OrderId, triggeredConditionalOrderStore)
 	require.True(t, found)
 	require.Equal(
@@ -191,8 +186,6 @@ func TestMustTriggerConditionalOrder(t *testing.T) {
 		uint32(0),
 		longTermOrderPlacement.PlacementIndex.BlockHeight,
 	)
-	_, found = getOrderFromStore(conditionalOrder.OrderId, triggeredConditionalOrderMemStore)
-	require.True(t, found)
 	require.Equal(
 		t,
 		conditionalOrder,
@@ -211,24 +204,18 @@ func TestMustTriggerConditionalOrder(t *testing.T) {
 	traceDecoder.RequireKeyPrefixWrittenInSequence(
 		t,
 		[]string{
-			// Write the order to untriggered state and memStore and increment the stateful order
+			// Write the order to untriggered state and increment the stateful order
 			// count.
 			types.NextStatefulOrderBlockTransactionIndexKey,
-			types.UntriggeredConditionalOrderKeyPrefix +
-				orderToStringId(conditionalOrder),
 			types.UntriggeredConditionalOrderKeyPrefix +
 				orderToStringId(conditionalOrder),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(conditionalOrder),
 			types.NextStatefulOrderBlockTransactionIndexKey,
-			// Write to triggered state and memstore
+			// Write to triggered state
 			types.TriggeredConditionalOrderKeyPrefix +
 				orderToStringId(conditionalOrder),
-			types.TriggeredConditionalOrderKeyPrefix +
-				orderToStringId(conditionalOrder),
-			// Delete from state and memstore
-			types.UntriggeredConditionalOrderKeyPrefix +
-				orderToStringId(conditionalOrder),
+			// Delete from state
 			types.UntriggeredConditionalOrderKeyPrefix +
 				orderToStringId(conditionalOrder),
 		},
@@ -338,92 +325,68 @@ func TestGetSetDeleteLongTermOrderState(t *testing.T) {
 	traceDecoder.RequireKeyPrefixWrittenInSequence(
 		t,
 		[]string{
-			// Delete the order from state and memStore and decrement the stateful order count.
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-			types.StatefulOrderCountPrefix +
-				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-			// Write the order to state and memStore and increment the stateful order count.
-			types.NextStatefulOrderBlockTransactionIndexKey,
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
+			// Delete the order from state and decrement the stateful order count.
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-			// Delete the order from state and memStore and decrement the stateful order count.
+			// Write the order to state and increment the stateful order count.
+			types.NextStatefulOrderBlockTransactionIndexKey,
 			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
+				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
+			types.StatefulOrderCountPrefix +
+				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
+			// Delete the order from state and decrement the stateful order count.
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-			// Write the order to state and memStore and increment the stateful order count.
+			// Write the order to state and increment the stateful order count.
 			types.NextStatefulOrderBlockTransactionIndexKey,
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-			// Delete the order from state and memStore and decrement the stateful order count.
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
+			// Delete the order from state and decrement the stateful order count.
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
-			// Write the order to state and memStore and increment the stateful order count.
+			// Write the order to state and increment the stateful order count.
 			types.NextStatefulOrderBlockTransactionIndexKey,
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
-			// Delete the order from state and memStore and decrement the stateful order count.
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
+			// Delete the order from state and decrement the stateful order count.
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-			// Delete the order from state and memStore and decrement the stateful order count.
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
+			// Delete the order from state and decrement the stateful order count.
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-			// Delete the order from state and memStore and decrement the stateful order count.
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
+			// Delete the order from state and decrement the stateful order count.
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
-			// Write the order to state and memStore and increment the stateful order count.
+			// Write the order to state and increment the stateful order count.
 			types.NextStatefulOrderBlockTransactionIndexKey,
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-			// Write the order to state and memStore and increment the stateful order count.
+			// Write the order to state and increment the stateful order count.
 			types.NextStatefulOrderBlockTransactionIndexKey,
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-			// Write the order to state and memStore and increment the stateful order count.
+			// Write the order to state and increment the stateful order count.
 			types.NextStatefulOrderBlockTransactionIndexKey,
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10),
 			types.StatefulOrderCountPrefix +
@@ -490,24 +453,18 @@ func TestGetSetDeleteLongTermOrderState_Replacements(t *testing.T) {
 	traceDecoder.RequireKeyPrefixWrittenInSequence(
 		t,
 		[]string{
-			// Write the order to state and memStore and increment the stateful order count.
+			// Write the order to state and increment the stateful order count.
 			types.NextStatefulOrderBlockTransactionIndexKey,
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
 			types.StatefulOrderCountPrefix +
 				orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-			// Write the order to state and memStore. We should not expect the stateful order
+			// Write the order to state. We should not expect the stateful order
 			// count to change since this is a replacement.
 			types.NextStatefulOrderBlockTransactionIndexKey,
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-			// Delete the order from state and memStore and decrement the stateful order count.
-			types.LongTermOrderPlacementKeyPrefix +
-				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
+			// Delete the order from state and decrement the stateful order count.
 			types.LongTermOrderPlacementKeyPrefix +
 				orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
 			types.StatefulOrderCountPrefix +
@@ -516,88 +473,18 @@ func TestGetSetDeleteLongTermOrderState_Replacements(t *testing.T) {
 	)
 }
 
-func TestLongTermOrderState_ShortTermOrderPanics(t *testing.T) {
-	// Setup keeper state and test parameters.
-	memClob := memclob.NewMemClobPriceTimePriority(false)
-	ks := keepertest.NewClobKeepersTestContext(t, memClob, &mocks.BankKeeper{}, &mocks.IndexerEventManager{})
-	shortTermOrder := constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20
-	errorString := fmt.Sprintf(
-		"MustBeStatefulOrder: called with non-stateful order ID (%+v)",
-		shortTermOrder.OrderId,
-	)
-
-	require.PanicsWithValue(
-		t,
-		errorString,
-		func() {
-			ks.ClobKeeper.SetLongTermOrderPlacement(
-				ks.Ctx,
-				shortTermOrder,
-				0,
-			)
-		},
-	)
-
-	require.PanicsWithValue(
-		t,
-		errorString,
-		func() {
-			ks.ClobKeeper.GetLongTermOrderPlacement(
-				ks.Ctx,
-				shortTermOrder.OrderId,
-			)
-		},
-	)
-
-	require.PanicsWithValue(
-		t,
-		errorString,
-		func() {
-			ks.ClobKeeper.DeleteLongTermOrderPlacement(
-				ks.Ctx,
-				shortTermOrder.OrderId,
-			)
-		},
-	)
-
-	require.PanicsWithValue(
-		t,
-		errorString,
-		func() {
-			ks.ClobKeeper.MustAddOrderToStatefulOrdersTimeSlice(
-				ks.Ctx,
-				constants.Time_21st_Feb_2021,
-				shortTermOrder.OrderId,
-			)
-		},
-	)
-
-	require.PanicsWithValue(
-		t,
-		errorString,
-		func() {
-			ks.ClobKeeper.MustRemoveStatefulOrder(
-				ks.Ctx,
-				shortTermOrder.OrderId,
-			)
-		},
-	)
-}
-
-func TestGetAddAndRemoveStatefulOrderTimeSlice(t *testing.T) {
+func TestGetAddAndRemoveStatefulOrderExpirations(t *testing.T) {
 	tests := map[string]struct {
 		// Setup.
 		setup func(ctx sdk.Context, k keeper.Keeper)
 
 		// Expectations.
-		expectedMultiStoreWrites []string
-		expectedTimeSlices       map[time.Time][]types.OrderId
-		expectedRemovedOrders    []types.OrderId
+		expectedTimeSlices    map[time.Time][]types.OrderId
+		expectedRemovedOrders []types.OrderId
 	}{
 		"Can read an empty state": {
 			setup: func(ctx sdk.Context, k keeper.Keeper) {},
 
-			expectedMultiStoreWrites: []string{},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.Time_21st_Feb_2021: {},
 			},
@@ -623,59 +510,11 @@ func TestGetAddAndRemoveStatefulOrderTimeSlice(t *testing.T) {
 					constants.Time_21st_Feb_2021,
 				)
 			},
-
-			expectedMultiStoreWrites: []string{
-				// Add first order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				// Set first stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				// Place the first stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				// Add second order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				// Set second stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				// Place the second stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				// Add third order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				// Set third stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				// Place the third stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-			},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.Time_21st_Feb_2021: {
 					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15.OrderId,
-					constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15.OrderId,
 					constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10.OrderId,
+					constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15.OrderId,
 				},
 			},
 		},
@@ -707,80 +546,6 @@ func TestGetAddAndRemoveStatefulOrderTimeSlice(t *testing.T) {
 					ctx,
 					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15.OrderId,
 				)
-			},
-
-			expectedMultiStoreWrites: []string{
-				// Add first order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:15.000000000",
-				// Set first stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				// Place the first stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				// Add second order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:30.000000000",
-				// Set second stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				// Place the second stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				// Add third order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:15.000000000",
-				// Set third stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				// Place the third stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				// Remove first order from stateful order slice, which removes the fill amount, stateful
-				// order placement from state and memStore, and decrement the stateful order count.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:30.000000000",
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				// Remove second order from stateful order slice, which removes the fill amount, stateful
-				// order placement from state and memStore, and decrement the stateful order count.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:15.000000000",
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
 			},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.TimeFifteen: {
@@ -837,122 +602,15 @@ func TestGetAddAndRemoveStatefulOrderTimeSlice(t *testing.T) {
 					constants.Time_21st_Feb_2021,
 				)
 			},
-
-			expectedMultiStoreWrites: []string{
-				// Add first order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				// Set first stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				// Place the first stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				// Add second order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.00000000",
-				// Set second stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				// Place the second stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				// Add third order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				// Place the third stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				// Add fourth order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				// Set fourth stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				// Place the fourth stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				// Add fifth order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				// Set fifth stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				// Place the fifth stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				// Add sixth order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				// Set sixth stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				// Place the sixth stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				// Add seventh order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				// Set seventh stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-				// Place the seventh stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-			},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.Time_21st_Feb_2021: {
+					constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10.OrderId,
+					constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25.OrderId,
 					constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20.OrderId,
 					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20.OrderId,
-					constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25.OrderId,
-					constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15.OrderId,
 					constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10.OrderId,
 					constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10.OrderId,
-					constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10.OrderId,
+					constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15.OrderId,
 				},
 			},
 		},
@@ -978,92 +636,6 @@ func TestGetAddAndRemoveStatefulOrderTimeSlice(t *testing.T) {
 					)
 				}
 			},
-			expectedMultiStoreWrites: []string{
-				// Add first order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:15.000000000",
-				// Set first stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				// Place the first stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				// Add second order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:10.000000000",
-				// Set second stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				// Place the second stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				// Add third order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:15.000000000",
-				// Set third stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				// Place the third stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				// Remove first order from stateful order slice, which removes the fill amount, stateful
-				// order placement from state and memStore, and decrement the stateful order count.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:15.000000000",
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				// Remove second order from stateful order slice, which removes the fill amount, stateful
-				// order placement from state and memStore, and decrement the stateful order count.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:10.000000000",
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				// Remove third order from stateful order slice, which removes the fill amount, stateful
-				// order placement from state and memStore, and decrement the stateful order count.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:15.000000000",
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15),
-			},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.TimeTen:     {},
 				constants.TimeFifteen: {},
@@ -1077,13 +649,13 @@ func TestGetAddAndRemoveStatefulOrderTimeSlice(t *testing.T) {
 		"Can add and remove order IDs from multiple time slices": {
 			setup: func(ctx sdk.Context, k keeper.Keeper) {
 				orders := []types.Order{
-					constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20,
-					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20,
 					constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25,
-					constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15,
-					constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10,
 					constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10,
+					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20,
 					constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10,
+					constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10,
+					constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15,
+					constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20,
 				}
 				for _, order := range orders {
 					createPartiallyFilledStatefulOrderInState(
@@ -1096,150 +668,12 @@ func TestGetAddAndRemoveStatefulOrderTimeSlice(t *testing.T) {
 				// Remove an order from two of the timestamps.
 				k.MustRemoveStatefulOrder(
 					ctx,
-					orders[6].OrderId,
+					constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10.OrderId,
 				)
 				k.MustRemoveStatefulOrder(
 					ctx,
-					orders[2].OrderId,
+					constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25.OrderId,
 				)
-			},
-
-			expectedMultiStoreWrites: []string{
-				// Add first order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:15.000000000",
-				// Set first stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				// Place the first stateful order in state and memStore and increment the stateful
-				// order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20),
-				// Add second order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:20.000000000",
-				// Set second stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-				// Place the second stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20),
-				// Add third order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:25.000000000",
-				// Set third stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				// Place the third stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				// Add fourth order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:15.000000000",
-				// Set fourth stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				// Place the fourth stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTBT15_StopLoss15),
-				// Add fifth order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:30.000000000",
-				// Set fifth stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				// Place the fifth stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.UntriggeredConditionalOrderKeyPrefix +
-					orderToStringId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTBT30_TakeProfit10),
-				// Add sixth order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:10.000000000",
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				// Place the sixth stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10),
-				// Add seventh order to stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:10.000000000",
-				// Set seventh stateful order fill amount to a non-zero value in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				// Place the seventh stateful order in state and memStore and increment the stateful order count.
-				types.NextStatefulOrderBlockTransactionIndexKey,
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				// Remove seventh order from stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:10.000000000",
-				// Remove seventh stateful order fill amount in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				// Remove the seventh stateful order placement from state and memStore and decrement the stateful
-				// order count.
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10),
-				// Remove third order from stateful order slice.
-				types.StatefulOrdersTimeSlicePrefix + "1970-01-01T00:00:25.000000000",
-				// Remove third stateful order fill amount in state.
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				types.OrderAmountFilledKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				// Remove the third stateful order placement from state and memStore and decrement the stateful
-				// order count.
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				types.LongTermOrderPlacementKeyPrefix +
-					orderToStringId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
-				types.StatefulOrderCountPrefix +
-					orderToStringSubaccountId(constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25),
 			},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.TimeFifteen: {
@@ -1265,19 +699,11 @@ func TestGetAddAndRemoveStatefulOrderTimeSlice(t *testing.T) {
 			memClob := memclob.NewMemClobPriceTimePriority(false)
 			ks := keepertest.NewClobKeepersTestContext(t, memClob, &mocks.BankKeeper{}, &mocks.IndexerEventManager{})
 
-			// Set the tracer on the multistore to verify the performed writes are correct.
-			traceDecoder := &tracer.TraceDecoder{}
-			ks.Ctx.MultiStore().SetTracer(traceDecoder)
-
 			tc.setup(ks.Ctx, *ks.ClobKeeper)
-
-			// Verify the writes were done in the expected order.
-			traceDecoder.RequireKeyPrefixWrittenInSequence(t, tc.expectedMultiStoreWrites)
 
 			// Verify the state is correct.
 			for goodTilTime, expectedOrderIds := range tc.expectedTimeSlices {
-				orderIds := ks.ClobKeeper.GetStatefulOrdersTimeSlice(ks.Ctx, goodTilTime)
-				sort.Sort(types.SortedOrders(expectedOrderIds))
+				orderIds := ks.ClobKeeper.GetStatefulOrderIdExpirations(ks.Ctx, goodTilTime)
 				require.Equal(
 					t,
 					expectedOrderIds,
@@ -1303,7 +729,7 @@ func TestGetAddAndRemoveStatefulOrderTimeSlice(t *testing.T) {
 	}
 }
 
-func TestRemoveExpiredStatefulOrdersTimeSlices(t *testing.T) {
+func TestRemoveExpiredStatefulOrders(t *testing.T) {
 	tests := map[string]struct {
 		// Setup.
 		timeSlicesToOrderIds map[time.Time][]types.OrderId
@@ -1311,10 +737,8 @@ func TestRemoveExpiredStatefulOrdersTimeSlices(t *testing.T) {
 		// Parameters.
 		blockTime time.Time
 
-		// Expectations.
-		expectedMultiStoreWrites []string
-		expectedTimeSlices       map[time.Time][]types.OrderId
-		expectedExpiredOrderIds  []types.OrderId
+		expectedTimeSlices      map[time.Time][]types.OrderId
+		expectedExpiredOrderIds []types.OrderId
 	}{
 		"Can delete an empty state": {
 			timeSlicesToOrderIds: map[time.Time][]types.OrderId{
@@ -1323,7 +747,6 @@ func TestRemoveExpiredStatefulOrdersTimeSlices(t *testing.T) {
 
 			blockTime: constants.Time_21st_Feb_2021,
 
-			expectedMultiStoreWrites: []string{},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.Time_21st_Feb_2021: {},
 			},
@@ -1345,12 +768,6 @@ func TestRemoveExpiredStatefulOrdersTimeSlices(t *testing.T) {
 			},
 
 			blockTime: constants.Time_21st_Feb_2021.Add(1_000_000_000_000),
-
-			expectedMultiStoreWrites: []string{
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000001",
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000077",
-			},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.Time_21st_Feb_2021: {},
 			},
@@ -1369,29 +786,23 @@ func TestRemoveExpiredStatefulOrdersTimeSlices(t *testing.T) {
 					constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTB15.OrderId,
 				},
 				constants.Time_21st_Feb_2021.Add(1): {
-					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20.OrderId,
 					constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTB30.OrderId,
 				},
 				constants.Time_21st_Feb_2021.Add(77): {
 					constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10.OrderId,
+					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20.OrderId,
 				},
 			},
 
 			blockTime: constants.Time_21st_Feb_2021.Add(77),
-
-			expectedMultiStoreWrites: []string{
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000001",
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000077",
-			},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.Time_21st_Feb_2021: {},
 			},
 			expectedExpiredOrderIds: []types.OrderId{
 				constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20.OrderId,
 				constants.ConditionalOrder_Alice_Num1_Id0_Clob0_Sell5_Price10_GTB15.OrderId,
-				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20.OrderId,
 				constants.ConditionalOrder_Alice_Num1_Id1_Clob0_Sell50_Price5_GTB30.OrderId,
+				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT20.OrderId,
 				constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10.OrderId,
 			},
 		},
@@ -1411,11 +822,6 @@ func TestRemoveExpiredStatefulOrdersTimeSlices(t *testing.T) {
 			},
 
 			blockTime: constants.Time_21st_Feb_2021.Add(76),
-
-			expectedMultiStoreWrites: []string{
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000000",
-				types.StatefulOrdersTimeSlicePrefix + "2021-02-21T00:00:00.000000001",
-			},
 			expectedTimeSlices: map[time.Time][]types.OrderId{
 				constants.Time_21st_Feb_2021.Add(77): {
 					constants.LongTermOrder_Alice_Num1_Id1_Clob0_Sell25_Price30_GTBT10.OrderId,
@@ -1439,26 +845,19 @@ func TestRemoveExpiredStatefulOrdersTimeSlices(t *testing.T) {
 			// Create all order IDs in state.
 			for timestamp, orderIds := range tc.timeSlicesToOrderIds {
 				for _, orderId := range orderIds {
-					ks.ClobKeeper.MustAddOrderToStatefulOrdersTimeSlice(ks.Ctx, timestamp, orderId)
+					ks.ClobKeeper.AddStatefulOrderIdExpiration(ks.Ctx, timestamp, orderId)
 				}
 			}
 
-			// Set the tracer on the multistore to verify the performed writes are correct.
-			traceDecoder := &tracer.TraceDecoder{}
-			ks.Ctx.MultiStore().SetTracer(traceDecoder)
-
 			// Run the test.
-			expiredOrderIds := ks.ClobKeeper.RemoveExpiredStatefulOrdersTimeSlices(ks.Ctx, tc.blockTime)
+			expiredOrderIds := ks.ClobKeeper.RemoveExpiredStatefulOrders(ks.Ctx, tc.blockTime)
 
 			// Verify the correct orders were expired.
 			require.Equal(t, tc.expectedExpiredOrderIds, expiredOrderIds)
 
-			// Verify the writes were done in the expected order.
-			traceDecoder.RequireKeyPrefixWrittenInSequence(t, tc.expectedMultiStoreWrites)
-
 			// Verify the state is correct.
 			for goodTilTime, expectedOrderIds := range tc.expectedTimeSlices {
-				orderIds := ks.ClobKeeper.GetStatefulOrdersTimeSlice(ks.Ctx, goodTilTime)
+				orderIds := ks.ClobKeeper.RemoveExpiredStatefulOrders(ks.Ctx, goodTilTime)
 				require.Equal(
 					t,
 					expectedOrderIds,
@@ -1469,31 +868,6 @@ func TestRemoveExpiredStatefulOrdersTimeSlices(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestAddOrderToStatefulOrdersTimeSlice_PanicsIfAlreadyExists(t *testing.T) {
-	// Setup keeper state and test parameters.
-	memClob := memclob.NewMemClobPriceTimePriority(false)
-	ks := keepertest.NewClobKeepersTestContext(t, memClob, &mocks.BankKeeper{}, &mocks.IndexerEventManager{})
-
-	order := constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15
-	goodTilTime := constants.Time_21st_Feb_2021
-	createPartiallyFilledStatefulOrderInState(ks.Ctx, *ks.ClobKeeper, order, goodTilTime)
-	require.PanicsWithValue(
-		t,
-		fmt.Sprintf(
-			"MustAddOrderToStatefulOrdersTimeSlice: order ID %v is already contained in state for time %v",
-			order.OrderId,
-			goodTilTime,
-		),
-		func() {
-			ks.ClobKeeper.MustAddOrderToStatefulOrdersTimeSlice(
-				ks.Ctx,
-				goodTilTime,
-				order.OrderId,
-			)
-		},
-	)
 }
 
 func TestRemoveLongTermOrder_PanicsIfNotFound(t *testing.T) {

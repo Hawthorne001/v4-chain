@@ -8,7 +8,6 @@ import {
 import {
   IndexerTendermintEvent,
   IndexerTendermintEvent_BlockEvent,
-  Timestamp,
   OrderFillEventV1,
   MarketEventV1,
   SubaccountUpdateEventV1,
@@ -18,21 +17,22 @@ import {
   FundingEventV1,
   AssetCreateEventV1,
   PerpetualMarketCreateEventV1,
+  PerpetualMarketCreateEventV2,
   LiquidityTierUpsertEventV1,
+  LiquidityTierUpsertEventV2,
   UpdatePerpetualEventV1,
+  UpdatePerpetualEventV2,
   UpdateClobPairEventV1,
   SubaccountMessage,
   DeleveragingEventV1,
   TradingRewardsEventV1,
+  RegisterAffiliateEventV1,
+  UpsertVaultEventV1,
 } from '@dydxprotocol-indexer/v4-protos';
 import Big from 'big.js';
 import _ from 'lodash';
 import { DateTime } from 'luxon';
 
-import {
-  MILLIS_IN_NANOS,
-  SECONDS_IN_MILLIS,
-} from '../constants';
 import {
   AnnotatedSubaccountMessage,
   DydxIndexerSubtypes,
@@ -68,15 +68,6 @@ export function convertToSubaccountMessage(
     ['orderId', 'isFill', 'subaccountMessageContents'],
   );
   return subaccountMessage;
-}
-
-export function protoTimestampToDate(
-  protoTime: Timestamp,
-): Date {
-  const timeInMillis: number = Number(protoTime.seconds) * SECONDS_IN_MILLIS +
-    Math.floor(protoTime.nanos / MILLIS_IN_NANOS);
-
-  return new Date(timeInMillis);
 }
 
 export function dateToDateTime(
@@ -164,31 +155,74 @@ export function indexerTendermintEventToEventProtoWithType(
       };
     }
     case (DydxIndexerSubtypes.PERPETUAL_MARKET.toString()): {
-      return {
-        type: DydxIndexerSubtypes.PERPETUAL_MARKET,
-        eventProto: PerpetualMarketCreateEventV1.decode(eventDataBinary),
-        indexerTendermintEvent: event,
-        version,
-        blockEventIndex,
-      };
+      if (version === 1) {
+        return {
+          type: DydxIndexerSubtypes.PERPETUAL_MARKET,
+          eventProto: PerpetualMarketCreateEventV1.decode(eventDataBinary),
+          indexerTendermintEvent: event,
+          version,
+          blockEventIndex,
+        };
+      } else if (version === 2) {
+        return {
+          type: DydxIndexerSubtypes.PERPETUAL_MARKET,
+          eventProto: PerpetualMarketCreateEventV2.decode(eventDataBinary),
+          indexerTendermintEvent: event,
+          version,
+          blockEventIndex,
+        };
+      } else {
+        const message: string = `Invalid version for perpetual market event: ${version}`;
+        logger.error({
+          at: 'helpers#indexerTendermintEventToEventWithType',
+          message,
+        });
+        return undefined;
+      }
     }
     case (DydxIndexerSubtypes.LIQUIDITY_TIER.toString()): {
+      if (version === 1) {
+        return {
+          type: DydxIndexerSubtypes.LIQUIDITY_TIER,
+          eventProto: LiquidityTierUpsertEventV1.decode(eventDataBinary),
+          indexerTendermintEvent: event,
+          version,
+          blockEventIndex,
+        };
+      }
       return {
         type: DydxIndexerSubtypes.LIQUIDITY_TIER,
-        eventProto: LiquidityTierUpsertEventV1.decode(eventDataBinary),
+        eventProto: LiquidityTierUpsertEventV2.decode(eventDataBinary),
         indexerTendermintEvent: event,
         version,
         blockEventIndex,
       };
     }
     case (DydxIndexerSubtypes.UPDATE_PERPETUAL.toString()): {
-      return {
-        type: DydxIndexerSubtypes.UPDATE_PERPETUAL,
-        eventProto: UpdatePerpetualEventV1.decode(eventDataBinary),
-        indexerTendermintEvent: event,
-        version,
-        blockEventIndex,
-      };
+      if (version === 1) {
+        return {
+          type: DydxIndexerSubtypes.UPDATE_PERPETUAL,
+          eventProto: UpdatePerpetualEventV1.decode(eventDataBinary),
+          indexerTendermintEvent: event,
+          version,
+          blockEventIndex,
+        };
+      } else if (version === 2) {
+        return {
+          type: DydxIndexerSubtypes.UPDATE_PERPETUAL,
+          eventProto: UpdatePerpetualEventV2.decode(eventDataBinary),
+          indexerTendermintEvent: event,
+          version,
+          blockEventIndex,
+        };
+      } else {
+        const message: string = `Invalid version for update perpetual event: ${version}`;
+        logger.error({
+          at: 'helpers#indexerTendermintEventToEventWithType',
+          message,
+        });
+        return undefined;
+      }
     }
     case (DydxIndexerSubtypes.UPDATE_CLOB_PAIR.toString()): {
       return {
@@ -212,6 +246,24 @@ export function indexerTendermintEventToEventProtoWithType(
       return {
         type: DydxIndexerSubtypes.TRADING_REWARD,
         eventProto: TradingRewardsEventV1.decode(eventDataBinary),
+        indexerTendermintEvent: event,
+        version,
+        blockEventIndex,
+      };
+    }
+    case (DydxIndexerSubtypes.REGISTER_AFFILIATE.toString()): {
+      return {
+        type: DydxIndexerSubtypes.REGISTER_AFFILIATE,
+        eventProto: RegisterAffiliateEventV1.decode(eventDataBinary),
+        indexerTendermintEvent: event,
+        version,
+        blockEventIndex,
+      };
+    }
+    case (DydxIndexerSubtypes.UPSERT_VAULT.toString()): {
+      return {
+        type: DydxIndexerSubtypes.UPSERT_VAULT,
+        eventProto: UpsertVaultEventV1.decode(eventDataBinary),
         indexerTendermintEvent: event,
         version,
         blockEventIndex,

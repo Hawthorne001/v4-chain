@@ -14,9 +14,11 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/indexer/indexer_manager"
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
 	"github.com/dydxprotocol/v4-chain/protocol/mocks"
-	streaming "github.com/dydxprotocol/v4-chain/protocol/streaming/grpc"
+	streaming "github.com/dydxprotocol/v4-chain/protocol/streaming"
 	clobtest "github.com/dydxprotocol/v4-chain/protocol/testutil/clob"
 	"github.com/dydxprotocol/v4-chain/protocol/testutil/constants"
+	accountpluskeeper "github.com/dydxprotocol/v4-chain/protocol/x/accountplus/keeper"
+	affiliateskeeper "github.com/dydxprotocol/v4-chain/protocol/x/affiliates/keeper"
 	asskeeper "github.com/dydxprotocol/v4-chain/protocol/x/assets/keeper"
 	blocktimekeeper "github.com/dydxprotocol/v4-chain/protocol/x/blocktime/keeper"
 	"github.com/dydxprotocol/v4-chain/protocol/x/clob/flags"
@@ -31,12 +33,15 @@ import (
 	statskeeper "github.com/dydxprotocol/v4-chain/protocol/x/stats/keeper"
 	subkeeper "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/keeper"
 	satypes "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
+	vaultkeeper "github.com/dydxprotocol/v4-chain/protocol/x/vault/keeper"
+	marketmapkeeper "github.com/skip-mev/slinky/x/marketmap/keeper"
 	"github.com/stretchr/testify/require"
 )
 
 type ClobKeepersTestContext struct {
 	Ctx               sdk.Context
 	ClobKeeper        *keeper.Keeper
+	MarketMapKeeper   *marketmapkeeper.Keeper
 	PricesKeeper      *priceskeeper.Keeper
 	AssetsKeeper      *asskeeper.Keeper
 	BlockTimeKeeper   *blocktimekeeper.Keeper
@@ -45,6 +50,9 @@ type ClobKeepersTestContext struct {
 	StatsKeeper       *statskeeper.Keeper
 	RewardsKeeper     *rewardskeeper.Keeper
 	SubaccountsKeeper *subkeeper.Keeper
+	AffiliatesKeeper  *affiliateskeeper.Keeper
+	VaultKeeper       *vaultkeeper.Keeper
+	AccountPlusKeeper *accountpluskeeper.Keeper
 	StoreKey          storetypes.StoreKey
 	MemKey            storetypes.StoreKey
 	Cdc               *codec.ProtoCodec
@@ -79,10 +87,64 @@ func NewClobKeepersTestContextWithUninitializedMemStore(
 		indexerEventsTransientStoreKey storetypes.StoreKey,
 	) []GenesisInitializer {
 		// Define necessary keepers here for unit tests
-		ks.PricesKeeper, _, _, _, mockTimeProvider = createPricesKeeper(stateStore, db, cdc, indexerEventsTransientStoreKey)
+
+		epochsKeeper, _ := createEpochsKeeper(stateStore, db, cdc)
+		accountsKeeper, _ := createAccountKeeper(
+			stateStore,
+			db,
+			cdc,
+			registry,
+		)
+		ks.AccountPlusKeeper, _, _ = createAccountPlusKeeper(
+			stateStore,
+			db,
+			cdc,
+		)
+
+		stakingKeeper, _ := createStakingKeeper(
+			stateStore,
+			db,
+			cdc,
+			accountsKeeper,
+			bankKeeper,
+		)
+		ks.StatsKeeper, _ = createStatsKeeper(
+			stateStore,
+			epochsKeeper,
+			db,
+			cdc,
+			stakingKeeper,
+		)
+		ks.AffiliatesKeeper, _ = createAffiliatesKeeper(stateStore, db, cdc, ks.StatsKeeper,
+			indexerEventsTransientStoreKey, true)
+		ks.VaultKeeper, _ = createVaultKeeper(
+			stateStore,
+			db,
+			cdc,
+			indexerEventsTransientStoreKey,
+		)
+		ks.FeeTiersKeeper, _ = createFeeTiersKeeper(
+			stateStore,
+			ks.StatsKeeper,
+			ks.VaultKeeper,
+			ks.AffiliatesKeeper,
+			db,
+			cdc,
+		)
+		revShareKeeper, _, _ := createRevShareKeeper(stateStore, db, cdc, ks.AffiliatesKeeper, ks.FeeTiersKeeper)
+		ks.FeeTiersKeeper.SetRevShareKeeper(revShareKeeper)
+		ks.AffiliatesKeeper.SetFeetiersKeeper(ks.FeeTiersKeeper)
+		ks.MarketMapKeeper, _ = createMarketMapKeeper(stateStore, db, cdc)
+		ks.PricesKeeper, _, _, mockTimeProvider = createPricesKeeper(
+			stateStore,
+			db,
+			cdc,
+			indexerEventsTransientStoreKey,
+			revShareKeeper,
+			ks.MarketMapKeeper,
+		)
 		// Mock time provider response for market creation.
 		mockTimeProvider.On("Now").Return(constants.TimeT)
-		epochsKeeper, _ := createEpochsKeeper(stateStore, db, cdc)
 		ks.PerpetualsKeeper, _ = createPerpetualsKeeper(
 			stateStore,
 			db,
@@ -100,18 +162,6 @@ func NewClobKeepersTestContextWithUninitializedMemStore(
 			true,
 		)
 		ks.BlockTimeKeeper, _ = createBlockTimeKeeper(stateStore, db, cdc)
-		ks.StatsKeeper, _ = createStatsKeeper(
-			stateStore,
-			epochsKeeper,
-			db,
-			cdc,
-		)
-		ks.FeeTiersKeeper, _ = createFeeTiersKeeper(
-			stateStore,
-			ks.StatsKeeper,
-			db,
-			cdc,
-		)
 		ks.RewardsKeeper, _ = createRewardsKeeper(
 			stateStore,
 			ks.AssetsKeeper,
@@ -146,13 +196,17 @@ func NewClobKeepersTestContextWithUninitializedMemStore(
 			ks.PricesKeeper,
 			ks.StatsKeeper,
 			ks.RewardsKeeper,
+			ks.AffiliatesKeeper,
 			ks.SubaccountsKeeper,
+			revShareKeeper,
+			ks.AccountPlusKeeper,
 			indexerEventManager,
 			indexerEventsTransientStoreKey,
 		)
 		ks.Cdc = cdc
 
 		return []GenesisInitializer{
+			ks.MarketMapKeeper,
 			ks.PricesKeeper,
 			ks.PerpetualsKeeper,
 			ks.AssetsKeeper,
@@ -183,7 +237,10 @@ func createClobKeeper(
 	pricesKeeper *priceskeeper.Keeper,
 	statsKeeper *statskeeper.Keeper,
 	rewardsKeeper types.RewardsKeeper,
+	affiliatesKeeper types.AffiliatesKeeper,
 	saKeeper *subkeeper.Keeper,
+	revShareKeeper types.RevShareKeeper,
+	accountplusKeeper types.AccountPlusKeeper,
 	indexerEventManager indexer_manager.IndexerEventManager,
 	indexerEventsTransientStoreKey storetypes.StoreKey,
 ) (*keeper.Keeper, storetypes.StoreKey, storetypes.StoreKey) {
@@ -214,13 +271,15 @@ func createClobKeeper(
 		pricesKeeper,
 		statsKeeper,
 		rewardsKeeper,
+		affiliatesKeeper,
+		accountplusKeeper,
 		indexerEventManager,
 		streaming.NewNoopGrpcStreamingManager(),
 		constants.TestEncodingCfg.TxConfig.TxDecoder(),
 		flags.GetDefaultClobFlags(),
-		rate_limit.NewNoOpRateLimiter[*types.MsgPlaceOrder](),
-		rate_limit.NewNoOpRateLimiter[*types.MsgCancelOrder](),
+		rate_limit.NewNoOpRateLimiter[sdk.Msg](),
 		liquidationtypes.NewDaemonLiquidationInfo(),
+		revShareKeeper,
 	)
 	k.SetAnteHandler(constants.EmptyAnteHandler)
 
@@ -228,13 +287,13 @@ func createClobKeeper(
 }
 
 func CreateTestClobPairs(
-	t *testing.T,
+	t testing.TB,
 	ctx sdk.Context,
 	clobKeeper *keeper.Keeper,
 	clobPairs []types.ClobPair,
 ) {
 	for _, clobPair := range clobPairs {
-		_, err := clobKeeper.CreatePerpetualClobPair(
+		_, err := clobKeeper.CreatePerpetualClobPairAndMemStructs(
 			ctx,
 			clobPair.Id,
 			clobPair.MustGetPerpetualId(),
@@ -248,7 +307,7 @@ func CreateTestClobPairs(
 }
 
 func CreateNClobPair(
-	t *testing.T,
+	t testing.TB,
 	keeper *keeper.Keeper,
 	perpKeeper *perpkeeper.Keeper,
 	pricesKeeper *priceskeeper.Keeper,
@@ -288,11 +347,12 @@ func CreateNClobPair(
 					items[i].SubticksPerTick,
 					items[i].StepBaseQuantums,
 					perps[i].Params.LiquidityTier,
+					perps[i].Params.MarketType,
 				),
 			),
 		).Return()
 
-		_, err := keeper.CreatePerpetualClobPair(
+		_, err := keeper.CreatePerpetualClobPairAndMemStructs(
 			ctx,
 			items[i].Id,
 			clobtest.MustPerpetualId(items[i]),

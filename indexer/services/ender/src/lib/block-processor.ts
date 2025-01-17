@@ -1,9 +1,11 @@
 /* eslint-disable max-len */
 import { logger, stats, STATS_NO_SAMPLING } from '@dydxprotocol-indexer/base';
+import { BLOCK_HEIGHT_WEBSOCKET_MESSAGE_VERSION, KafkaTopics } from '@dydxprotocol-indexer/kafka';
 import {
   storeHelpers,
 } from '@dydxprotocol-indexer/postgres';
 import {
+  BlockHeightMessage,
   IndexerTendermintBlock,
   IndexerTendermintEvent,
 } from '@dydxprotocol-indexer/v4-protos';
@@ -16,23 +18,26 @@ import { Handler } from '../handlers/handler';
 import { AssetValidator } from '../validators/asset-validator';
 import { DeleveragingValidator } from '../validators/deleveraging-validator';
 import { FundingValidator } from '../validators/funding-validator';
-import { LiquidityTierValidator } from '../validators/liquidity-tier-validator';
+import { LiquidityTierValidatorV2, LiquidityTierValidator } from '../validators/liquidity-tier-validator';
 import { MarketValidator } from '../validators/market-validator';
 import { OrderFillValidator } from '../validators/order-fill-validator';
 import { PerpetualMarketValidator } from '../validators/perpetual-market-validator';
+import { RegisterAffiliateValidator } from '../validators/register-affiliate-validator';
 import { StatefulOrderValidator } from '../validators/stateful-order-validator';
 import { SubaccountUpdateValidator } from '../validators/subaccount-update-validator';
 import { TradingRewardsValidator } from '../validators/trading-rewards-validator';
 import { TransferValidator } from '../validators/transfer-validator';
 import { UpdateClobPairValidator } from '../validators/update-clob-pair-validator';
 import { UpdatePerpetualValidator } from '../validators/update-perpetual-validator';
+import { UpsertVaultValidator } from '../validators/upsert-vault-validator';
 import { Validator, ValidatorInitializer } from '../validators/validator';
 import { BatchedHandlers } from './batched-handlers';
 import { indexerTendermintEventToEventProtoWithType, indexerTendermintEventToTransactionIndex } from './helper';
 import { KafkaPublisher } from './kafka-publisher';
 import { SyncHandlers, SYNCHRONOUS_SUBTYPES } from './sync-handlers';
 import {
-  DydxIndexerSubtypes, EventMessage, EventProtoWithTypeAndVersion, GroupedEvents,
+  ConsolidatedKafkaEvent,
+  DydxIndexerSubtypes, EventMessage, EventProtoWithTypeAndVersion, GroupedEvents, SKIPPED_EVENT_SUBTYPE,
 } from './types';
 
 const TXN_EVENT_SUBTYPE_VERSION_TO_VALIDATOR_MAPPING: Record<string, ValidatorInitializer> = {
@@ -43,15 +48,22 @@ const TXN_EVENT_SUBTYPE_VERSION_TO_VALIDATOR_MAPPING: Record<string, ValidatorIn
   [serializeSubtypeAndVersion(DydxIndexerSubtypes.STATEFUL_ORDER.toString(), 1)]: StatefulOrderValidator,
   [serializeSubtypeAndVersion(DydxIndexerSubtypes.ASSET.toString(), 1)]: AssetValidator,
   [serializeSubtypeAndVersion(DydxIndexerSubtypes.PERPETUAL_MARKET.toString(), 1)]: PerpetualMarketValidator,
+  [serializeSubtypeAndVersion(DydxIndexerSubtypes.PERPETUAL_MARKET.toString(), 2)]: PerpetualMarketValidator,
   [serializeSubtypeAndVersion(DydxIndexerSubtypes.LIQUIDITY_TIER.toString(), 1)]: LiquidityTierValidator,
   [serializeSubtypeAndVersion(DydxIndexerSubtypes.UPDATE_PERPETUAL.toString(), 1)]: UpdatePerpetualValidator,
+  [serializeSubtypeAndVersion(DydxIndexerSubtypes.UPDATE_PERPETUAL.toString(), 2)]: UpdatePerpetualValidator,
   [serializeSubtypeAndVersion(DydxIndexerSubtypes.UPDATE_CLOB_PAIR.toString(), 1)]: UpdateClobPairValidator,
   [serializeSubtypeAndVersion(DydxIndexerSubtypes.DELEVERAGING.toString(), 1)]: DeleveragingValidator,
+  [serializeSubtypeAndVersion(DydxIndexerSubtypes.LIQUIDITY_TIER.toString(), 2)]: LiquidityTierValidatorV2,
+  [serializeSubtypeAndVersion(DydxIndexerSubtypes.REGISTER_AFFILIATE.toString(), 1)]: RegisterAffiliateValidator,
+  [serializeSubtypeAndVersion(DydxIndexerSubtypes.UPSERT_VAULT.toString(), 1)]: UpsertVaultValidator,
 };
 
 const BLOCK_EVENT_SUBTYPE_VERSION_TO_VALIDATOR_MAPPING: Record<string, ValidatorInitializer> = {
   [serializeSubtypeAndVersion(DydxIndexerSubtypes.FUNDING.toString(), 1)]: FundingValidator,
   [serializeSubtypeAndVersion(DydxIndexerSubtypes.TRADING_REWARD.toString(), 1)]: TradingRewardsValidator,
+  [serializeSubtypeAndVersion(DydxIndexerSubtypes.STATEFUL_ORDER.toString(), 1)]: StatefulOrderValidator,
+  [serializeSubtypeAndVersion(DydxIndexerSubtypes.UPSERT_VAULT.toString(), 1)]: UpsertVaultValidator,
 };
 
 function serializeSubtypeAndVersion(
@@ -62,12 +74,12 @@ function serializeSubtypeAndVersion(
 }
 
 type DecodedIndexerTendermintBlock = Omit<IndexerTendermintBlock, 'events'> & {
-  events: DecodedIndexerTendermintEvent[];
+  events: DecodedIndexerTendermintEvent[],
 };
 
 type DecodedIndexerTendermintEvent = Omit<IndexerTendermintEvent, 'dataBytes'> & {
   /** Decoded tendermint event. */
-  dataBytes: object;
+  dataBytes: object,
 };
 
 export class BlockProcessor {
@@ -77,13 +89,16 @@ export class BlockProcessor {
   txId: number;
   batchedHandlers: BatchedHandlers;
   syncHandlers: SyncHandlers;
+  messageReceivedTimestamp: string;
 
   constructor(
     block: IndexerTendermintBlock,
     txId: number,
+    messageReceivedTimestamp: string,
   ) {
     this.block = block;
     this.txId = txId;
+    this.messageReceivedTimestamp = messageReceivedTimestamp;
     this.sqlBlock = {
       ...this.block,
       events: new Array(this.block.events.length),
@@ -184,6 +199,7 @@ export class BlockProcessor {
         eventProto.version,
       )
     ];
+
     if (Initializer === undefined) {
       const message: string = `cannot process subtype ${eventProto.type} and version ${eventProto.version}`;
       logger.error({
@@ -199,13 +215,29 @@ export class BlockProcessor {
       this.block,
       eventProto.blockEventIndex,
     );
-
     validator.validate();
     this.sqlEventPromises[eventProto.blockEventIndex] = validator.getEventForBlockProcessor();
-    const handlers: Handler<EventMessage>[] = validator.createHandlers(
+    let handlers: Handler<EventMessage>[] = validator.createHandlers(
       eventProto.indexerTendermintEvent,
       this.txId,
+      this.messageReceivedTimestamp,
     );
+
+    if (validator.shouldExcludeEvent()) {
+      // If the event should be excluded from being processed, set the subtype to a special value
+      // for skipped events.
+      this.block.events[eventProto.blockEventIndex] = {
+        ...this.block.events[eventProto.blockEventIndex],
+        subtype: SKIPPED_EVENT_SUBTYPE,
+      };
+      // Set handlers to empty array if event is to be skipped.
+      handlers = [];
+      logger.info({
+        at: 'onMessage#shouldExcludeEvent',
+        message: 'Excluded event from processing',
+        eventProto,
+      });
+    }
 
     _.map(handlers, (handler: Handler<EventMessage>) => {
       if (SYNCHRONOUS_SUBTYPES.includes(eventProto.type as DydxIndexerSubtypes)) {
@@ -214,6 +246,18 @@ export class BlockProcessor {
         this.batchedHandlers.addHandler(handler);
       }
     });
+  }
+
+  createBlockHeightMsg(): ConsolidatedKafkaEvent {
+    const message: BlockHeightMessage = {
+      blockHeight: String(this.block.height),
+      version: BLOCK_HEIGHT_WEBSOCKET_MESSAGE_VERSION,
+      time: this.block.time?.toISOString() ?? '',
+    };
+    return {
+      topic: KafkaTopics.TO_WEBSOCKETS_BLOCK_HEIGHT,
+      message,
+    };
   }
 
   private async processEvents(): Promise<KafkaPublisher> {
@@ -261,6 +305,9 @@ export class BlockProcessor {
         { success: success.toString() },
       );
     }
+
+    // Create a block message from the current block
+    kafkaPublisher.addEvent(this.createBlockHeightMsg());
 
     // in genesis, handle sync events first, then batched events.
     // in other blocks, handle batched events first, then sync events.

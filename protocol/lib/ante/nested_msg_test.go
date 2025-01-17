@@ -12,6 +12,7 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
 	"github.com/dydxprotocol/v4-chain/protocol/lib/ante"
 	testmsgs "github.com/dydxprotocol/v4-chain/protocol/testutil/msgs"
+	vaulttypes "github.com/dydxprotocol/v4-chain/protocol/x/vault/types"
 
 	"github.com/stretchr/testify/require"
 )
@@ -21,6 +22,7 @@ var (
 	invalidInnerMsgErr_AppInjected = fmt.Errorf("Invalid nested msg: app-injected msg type")
 	invalidInnerMsgErr_Nested      = fmt.Errorf("Invalid nested msg: double-nested msg type")
 	invalidInnerMsgErr_Dydx        = fmt.Errorf("Invalid nested msg for MsgExec: dydx msg type")
+	invalidInnerMsgErr_Slinky      = fmt.Errorf("Invalid nested msg for MsgExec: Slinky msg type")
 )
 
 func TestIsNestedMsg_Empty(t *testing.T) {
@@ -70,6 +72,12 @@ func TestIsDydxMsg_Invalid(t *testing.T) {
 		appmsgs.AppInjectedMsgSamples,
 		appmsgs.NormalMsgsDydxCustom,
 		appmsgs.InternalMsgSamplesDydxCustom,
+		map[string]sdk.Msg{
+			// nolint:staticcheck
+			"/dydxprotocol.vault.MsgSetVaultQuotingParams": &vaulttypes.MsgSetVaultQuotingParams{},
+			// nolint:staticcheck
+			"/dydxprotocol.vault.MsgUpdateParams": &vaulttypes.MsgUpdateParams{},
+		},
 	)
 	allMsgsMinusDydx := lib.MergeAllMapsMustHaveDistinctKeys(appmsgs.AllowMsgs, appmsgs.DisallowMsgs)
 	for key := range allDydxMsgs {
@@ -95,6 +103,36 @@ func TestIsDydxMsg_Valid(t *testing.T) {
 	for _, sampleMsg := range allNonNilSampleMsgs {
 		t.Run(sampleMsg.Name, func(t *testing.T) {
 			require.True(t, ante.IsDydxMsg(sampleMsg.Msg))
+		})
+	}
+}
+
+func TestIsSlinkyMsg_Invalid(t *testing.T) {
+	allSlinkyMsgs := lib.MergeAllMapsMustHaveDistinctKeys(
+		appmsgs.NormalMsgsSlinky,
+	)
+	allMsgsMinusSlinky := lib.MergeAllMapsMustHaveDistinctKeys(appmsgs.AllowMsgs, appmsgs.DisallowMsgs)
+	for key := range allSlinkyMsgs {
+		delete(allMsgsMinusSlinky, key)
+	}
+	allNonNilSampleMsgs := testmsgs.GetNonNilSampleMsgs(allMsgsMinusSlinky)
+
+	for _, sampleMsg := range allNonNilSampleMsgs {
+		t.Run(sampleMsg.Name, func(t *testing.T) {
+			require.False(t, ante.IsSlinkyMsg(sampleMsg.Msg))
+		})
+	}
+}
+
+func TestIsSlinkyMsg_Valid(t *testing.T) {
+	allSlinkyMsgs := lib.MergeAllMapsMustHaveDistinctKeys(
+		appmsgs.NormalMsgsSlinky,
+	)
+	allNonNilSampleMsgs := testmsgs.GetNonNilSampleMsgs(allSlinkyMsgs)
+
+	for _, sampleMsg := range allNonNilSampleMsgs {
+		t.Run(sampleMsg.Name, func(t *testing.T) {
+			require.True(t, ante.IsSlinkyMsg(sampleMsg.Msg))
 		})
 	}
 }
@@ -135,6 +173,10 @@ func TestValidateNestedMsg(t *testing.T) {
 		"Invalid MsgExec: dydx custom msg": {
 			msg:         &testmsgs.MsgExecWithDydxMessage,
 			expectedErr: invalidInnerMsgErr_Dydx,
+		},
+		"Invalid MsgExec: Slinky custom msg": {
+			msg:         &testmsgs.MsgExecWithSlinkyMessage,
+			expectedErr: invalidInnerMsgErr_Slinky,
 		},
 		"Valid: empty inner msg": {
 			msg:         testmsgs.MsgSubmitProposalWithEmptyInner,

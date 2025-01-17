@@ -1,8 +1,10 @@
 package keeper_test
 
 import (
-	"github.com/dydxprotocol/v4-chain/protocol/lib"
 	"testing"
+
+	"github.com/dydxprotocol/v4-chain/protocol/lib"
+	"github.com/dydxprotocol/v4-chain/protocol/lib/slinky"
 
 	"github.com/dydxprotocol/v4-chain/protocol/testutil/constants"
 	keepertest "github.com/dydxprotocol/v4-chain/protocol/testutil/keeper"
@@ -25,12 +27,25 @@ func TestUpdateMarketParam(t *testing.T) {
 		msg         *pricestypes.MsgUpdateMarketParam
 		expectedErr string
 	}{
-		"Succeeds: update all parameters except exponent": {
+		"Succeeds: update all parameters except exponent and pair": {
 			msg: &pricestypes.MsgUpdateMarketParam{
 				Authority: lib.GovModuleAddress.String(),
 				MarketParam: pricestypes.MarketParam{
 					Id:                 testMarketParam.Id,
-					Pair:               "PIKACHU-XXX",
+					Pair:               testMarketParam.Pair,
+					Exponent:           testMarketParam.Exponent,
+					MinExchanges:       72,
+					MinPriceChangePpm:  2_023,
+					ExchangeConfigJson: `{"exchanges":[{"exchangeName":"XYZ","ticker":"PIKACHU"}]}`,
+				},
+			},
+		},
+		"Succeeds: update pair name": {
+			msg: &pricestypes.MsgUpdateMarketParam{
+				Authority: lib.GovModuleAddress.String(),
+				MarketParam: pricestypes.MarketParam{
+					Id:                 testMarketParam.Id,
+					Pair:               "NEWMARKET-USD",
 					Exponent:           testMarketParam.Exponent,
 					MinExchanges:       72,
 					MinPriceChangePpm:  2_023,
@@ -65,20 +80,6 @@ func TestUpdateMarketParam(t *testing.T) {
 			},
 			expectedErr: "Pair cannot be empty",
 		},
-		"Failure: update to 0 min exchanges": {
-			msg: &pricestypes.MsgUpdateMarketParam{
-				Authority: lib.GovModuleAddress.String(),
-				MarketParam: pricestypes.MarketParam{
-					Id:                 testMarketParam.Id,
-					Pair:               testMarketParam.Pair,
-					Exponent:           testMarketParam.Exponent,
-					MinExchanges:       0, // invalid
-					MinPriceChangePpm:  testMarketParam.MinPriceChangePpm,
-					ExchangeConfigJson: testMarketParam.ExchangeConfigJson,
-				},
-			},
-			expectedErr: "Min exchanges must be greater than zero",
-		},
 		"Failure: update to 0 min price change ppm": {
 			msg: &pricestypes.MsgUpdateMarketParam{
 				Authority: lib.GovModuleAddress.String(),
@@ -93,33 +94,19 @@ func TestUpdateMarketParam(t *testing.T) {
 			},
 			expectedErr: "Invalid input",
 		},
-		"Failure: update to invalid exchange config json": {
+		"Failure: new pair name does not exist in marketmap": {
 			msg: &pricestypes.MsgUpdateMarketParam{
 				Authority: lib.GovModuleAddress.String(),
 				MarketParam: pricestypes.MarketParam{
 					Id:                 testMarketParam.Id,
-					Pair:               testMarketParam.Pair,
+					Pair:               "nonexistent-pair",
 					Exponent:           testMarketParam.Exponent,
-					MinExchanges:       testMarketParam.MinExchanges,
-					MinPriceChangePpm:  testMarketParam.MinPriceChangePpm,
-					ExchangeConfigJson: `{{"exchanges":[{"exchangeName":"XYZ","ticker":"PIKACHU"}]}`, // invalid json
-				},
-			},
-			expectedErr: "Invalid input",
-		},
-		"Failure: update market exponent": {
-			msg: &pricestypes.MsgUpdateMarketParam{
-				Authority: lib.GovModuleAddress.String(),
-				MarketParam: pricestypes.MarketParam{
-					Id:                 testMarketParam.Id,
-					Pair:               testMarketParam.Pair,
-					Exponent:           testMarketParam.Exponent + 1, // cannot be updated
 					MinExchanges:       testMarketParam.MinExchanges,
 					MinPriceChangePpm:  testMarketParam.MinPriceChangePpm,
 					ExchangeConfigJson: "{}",
 				},
 			},
-			expectedErr: "Market exponent cannot be updated",
+			expectedErr: "NONEXISTENT/PAIR: Ticker not found in market map",
 		},
 		"Failure: empty authority": {
 			msg: &pricestypes.MsgUpdateMarketParam{
@@ -143,11 +130,21 @@ func TestUpdateMarketParam(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctx, pricesKeeper, _, _, _, mockTimeProvider := keepertest.PricesKeepers(t)
+			ctx, pricesKeeper, _, _, mockTimeProvider, _, marketMapKeeper := keepertest.PricesKeepers(t)
 			mockTimeProvider.On("Now").Return(constants.TimeT)
 			msgServer := keeper.NewMsgServerImpl(pricesKeeper)
-			initialMarketParam, err := pricesKeeper.CreateMarket(ctx, testMarketParam, testMarketPrice)
+			initialMarketParam, err := keepertest.CreateTestMarket(t, ctx, pricesKeeper, testMarketParam, testMarketPrice)
 			require.NoError(t, err)
+
+			// Create new pair in marketmap if test is expected to succeed
+			if (initialMarketParam.Pair != tc.msg.MarketParam.Pair) && tc.expectedErr == "" {
+				keepertest.CreateMarketsInMarketMapFromParams(
+					t,
+					ctx,
+					marketMapKeeper,
+					[]pricestypes.MarketParam{tc.msg.MarketParam},
+				)
+			}
 
 			_, err = msgServer.UpdateMarketParam(ctx, tc.msg)
 			if tc.expectedErr != "" {
@@ -162,6 +159,21 @@ func TestUpdateMarketParam(t *testing.T) {
 				updatedMarketParam, exists := pricesKeeper.GetMarketParam(ctx, tc.msg.MarketParam.Id)
 				require.True(t, exists)
 				require.Equal(t, tc.msg.MarketParam, updatedMarketParam)
+
+				// If pair name changed, verify that old pair is disabled in the marketmap and new pair is enabled
+				if initialMarketParam.Pair != updatedMarketParam.Pair {
+					oldCp, err := slinky.MarketPairToCurrencyPair(initialMarketParam.Pair)
+					require.NoError(t, err)
+					oldMarket, err := marketMapKeeper.GetMarket(ctx, oldCp.String())
+					require.NoError(t, err)
+					require.False(t, oldMarket.Ticker.Enabled)
+
+					newCp, err := slinky.MarketPairToCurrencyPair(updatedMarketParam.Pair)
+					require.NoError(t, err)
+					market, err := marketMapKeeper.GetMarket(ctx, newCp.String())
+					require.NoError(t, err)
+					require.True(t, market.Ticker.Enabled)
+				}
 			}
 		})
 	}

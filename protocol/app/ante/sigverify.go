@@ -6,13 +6,10 @@ import (
 	errorsmod "cosmossdk.io/errors"
 	txsigning "cosmossdk.io/x/tx/signing"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
-	"github.com/cosmos/cosmos-sdk/telemetry"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	sdkante "github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
-	"github.com/dydxprotocol/v4-chain/protocol/lib/metrics"
-	gometrics "github.com/hashicorp/go-metrics"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -59,7 +56,8 @@ func (svd SigVerificationDecorator) AnteHandle(
 		return ctx, err
 	}
 
-	// check that signer length and signature length are the same
+	// Check that signer length and signature length are the same.
+	// The ordering of the sigs and signers have matching ordering (sigs[i] belongs to signers[i]).
 	if len(sigs) != len(signers) {
 		err := errorsmod.Wrapf(
 			sdkerrors.ErrUnauthorized,
@@ -70,10 +68,7 @@ func (svd SigVerificationDecorator) AnteHandle(
 		return ctx, err
 	}
 
-	// Sequence number validation can be skipped if the given transaction consists of
-	// only messages that use `GoodTilBlock` for replay protection.
-	skipSequenceValidation := ShouldSkipSequenceValidation(tx.GetMsgs())
-
+	// Iterate on sig and signer pairs.
 	for i, sig := range sigs {
 		acc, err := sdkante.GetSignerAcc(ctx, svd.ak, signers[i])
 		if err != nil {
@@ -84,28 +79,6 @@ func (svd SigVerificationDecorator) AnteHandle(
 		pubKey := acc.GetPubKey()
 		if !simulate && pubKey == nil {
 			return ctx, errorsmod.Wrap(sdkerrors.ErrInvalidPubKey, "pubkey on account is not set")
-		}
-
-		// Check account sequence number.
-		// Skip individual sequence number validation since this transaction use
-		// `GoodTilBlock` for replay protection.
-		if !skipSequenceValidation && sig.Sequence != acc.GetSequence() {
-			labels := make([]gometrics.Label, 0)
-			if len(tx.GetMsgs()) > 0 {
-				labels = append(
-					labels,
-					metrics.GetLabelForStringValue(metrics.MessageType, fmt.Sprintf("%T", tx.GetMsgs()[0])),
-				)
-			}
-			telemetry.IncrCounterWithLabels(
-				[]string{metrics.SequenceNumber, metrics.Invalid, metrics.Count},
-				1,
-				labels,
-			)
-			return ctx, errorsmod.Wrapf(
-				sdkerrors.ErrWrongSequence,
-				"account sequence mismatch, expected %d, got %d", acc.GetSequence(), sig.Sequence,
-			)
 		}
 
 		// retrieve signer data

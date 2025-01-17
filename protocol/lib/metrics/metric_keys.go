@@ -24,6 +24,11 @@ const (
 	GateWithdrawalsIfNegativeTncSubaccountSeen         = "gate_withdrawals_if_negative_tnc_subaccount_seen"
 	ChainOutageSeen                                    = "chain_outage_seen"
 	SubaccountCreatedCount                             = "subaccount_created_count"
+	ClobRateLimitPlaceOrderCount                       = "clob_rate_limit_place_order_count"
+	ClobRateLimitCancelOrderCount                      = "clob_rate_limit_cancel_order_count"
+	ClobRateLimitBatchCancelCount                      = "clob_rate_limit_batch_cancel_count"
+	StatsGetStakedAmountCacheHit                       = "stats_get_staked_amount_cache_hit"
+	StatsGetStakedAmountCacheMiss                      = "stats_get_staked_amount_cache_miss"
 
 	// Gauges
 	InsuranceFundBalance                      = "insurance_fund_balance"
@@ -32,6 +37,9 @@ const (
 	ClobConditionalOrderTriggered             = "clob_conditional_order_triggered"
 	ClobSubaccountsRequiringDeleveragingCount = "clob_subaccounts_requiring_deleveraging_count"
 	SendingProcessDepositToSubaccount         = "sending_process_deposit_to_subaccount"
+	RateLimitInsufficientWithdrawalAmount     = "rate_limit_insufficient_withdrawal_amount"
+	StatsGetStakedAmountLatencyCacheHit       = "stats_get_staked_amount_latency_cache_hit"
+	StatsGetStakedAmountLatencyCacheMiss      = "stats_get_staked_amount_latency_cache_miss"
 
 	// Samples
 	ClobDeleverageSubaccountTotalQuoteQuantumsDistribution         = "clob_deleverage_subaccount_total_quote_quantums_distribution"
@@ -44,6 +52,8 @@ const (
 	LiquidationsLiquidatableSubaccountIdsCount                     = "liquidations_liquidatable_subaccount_ids_count"
 	LiquidationsPercentFilledDistribution                          = "liquidations_percent_filled_distribution"
 	LiquidationsPlacePerpetualLiquidationQuoteQuantumsDistribution = "liquidations_place_perpetual_liquidation_quote_quantums_distribution"
+	RateLimitWithdrawalAmount                                      = "rate_limit_withdrawal_amount"
+	BlockTimeDistribution                                          = "block_time_dist"
 
 	// Measure Since
 	ClobOffsettingSubaccountPerpetualPosition         = "clob_offsetting_subaccount_perpetual_position"
@@ -58,4 +68,31 @@ const (
 	DaemonGetPerpetualsPaginatedLatency               = "daemon_get_perpetuals_paginated_latency"
 	MevLatency                                        = "mev_latency"
 	GateWithdrawalsIfNegativeTncSubaccountSeenLatency = "gate_withdrawals_if_negative_tnc_subaccount_seen_latency"
+
+	// Full node grpc
+	FullNodeGrpc                                  = "full_node_grpc"
+	GrpcSendOrderbookUpdatesLatency               = "grpc_send_orderbook_updates_latency"
+	GrpcSendOrderbookSnapshotLatency              = "grpc_send_orderbook_snapshot_latency"
+	GrpcSendSubaccountUpdateCount                 = "grpc_send_subaccount_update_count"
+	GrpcSendPriceUpdateCount                      = "grpc_send_price_update_count"
+	GrpcSendOrderbookFillsLatency                 = "grpc_send_orderbook_fills_latency"
+	GrpcAddUpdateToBufferCount                    = "grpc_add_update_to_buffer_count"
+	GrpcAddToSubscriptionChannelCount             = "grpc_add_to_subscription_channel_count"
+	GrpcSendResponseToSubscriberCount             = "grpc_send_response_to_subscriber_count"
+	GrpcStreamSubscriberCount                     = "grpc_stream_subscriber_count"
+	GrpcStreamNumUpdatesBuffered                  = "grpc_stream_num_updates_buffered"
+	GrpcFlushUpdatesLatency                       = "grpc_flush_updates_latency"
+	GrpcSubscriptionChannelLength                 = "grpc_subscription_channel_length"
+	GrpcStagedAllFinalizeBlockUpdatesCount        = "grpc_staged_all_finalize_block_updates_count"
+	GrpcStagedFillFinalizeBlockUpdatesCount       = "grpc_staged_finalize_block_fill_updates_count"
+	GrpcStagedSubaccountFinalizeBlockUpdatesCount = "grpc_staged_finalize_block_subaccount_updates_count"
+	SubscriptionId                                = "subscription_id"
+
+	EndBlocker    = "end_blocker"
+	EndBlockerLag = "end_blocker_lag"
+
+	// Account plus
+	AuthenticatorDecoratorAnteHandleLatency = "authenticator_decorator_ante_handle_latency"
+	MissingRegisteredAuthenticator          = "missing_registered_authenticator"
+	AuthenticatorTrackFailed                = "authenticator_track_failed"
 )

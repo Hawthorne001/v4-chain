@@ -1,6 +1,7 @@
 import { CandleMessage_Resolution, ClobPairStatus } from '@dydxprotocol-indexer/v4-protos';
 
 import config from './config';
+import AffiliateReferredUsersModel from './models/affiliate-referred-users-model';
 import AssetModel from './models/asset-model';
 import AssetPositionModel from './models/asset-position-model';
 import FillModel from './models/fill-model';
@@ -14,6 +15,7 @@ import PerpetualPositionModel from './models/perpetual-position-model';
 import SubaccountModel from './models/subaccount-model';
 import TradingRewardModel from './models/trading-reward-model';
 import TransferModel from './models/transfer-model';
+import VaultModel from './models/vault-model';
 import {
   APITimeInForce,
   CandleResolution,
@@ -88,6 +90,7 @@ export const TIME_IN_FORCE_TO_API_TIME_IN_FORCE: Record<TimeInForce, APITimeInFo
 
 // A list of models that have sqlToJsonConversions defined.
 export const SQL_TO_JSON_DEFINED_MODELS = [
+  AffiliateReferredUsersModel,
   AssetModel,
   AssetPositionModel,
   FillModel,
@@ -101,6 +104,7 @@ export const SQL_TO_JSON_DEFINED_MODELS = [
   SubaccountModel,
   TransferModel,
   TradingRewardModel,
+  VaultModel,
 ];
 
 export type SpecifiedClobPairStatus =
@@ -125,3 +129,8 @@ export const DEFAULT_POSTGRES_OPTIONS : Options = config.USE_READ_REPLICA
 export const MAX_PARENT_SUBACCOUNTS: number = 128;
 
 export const CHILD_SUBACCOUNT_MULTIPLIER: number = 1000;
+
+// From https://github.com/dydxprotocol/v4-chain/blob/protocol/v7.0.0-dev0/protocol/app/module_accounts_test.go#L41
+export const MEGAVAULT_MODULE_ADDRESS: string = 'dydx18tkxrnrkqc2t0lr3zxr5g6a4hdvqksylxqje4r';
+// Generated from the module address + subaccount number 0.
+export const MEGAVAULT_SUBACCOUNT_ID: string = 'c7169f81-0c80-54c5-a41f-9cbb6a538fdf';

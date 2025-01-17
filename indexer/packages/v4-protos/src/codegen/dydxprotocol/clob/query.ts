@@ -1,10 +1,15 @@
 import { PageRequest, PageRequestSDKType, PageResponse, PageResponseSDKType } from "../../cosmos/base/query/v1beta1/pagination";
 import { ValidatorMevMatches, ValidatorMevMatchesSDKType, MevNodeToNodeMetrics, MevNodeToNodeMetricsSDKType } from "./mev";
+import { OrderId, OrderIdSDKType, LongTermOrderPlacement, LongTermOrderPlacementSDKType, Order, OrderSDKType, StreamLiquidationOrder, StreamLiquidationOrderSDKType } from "./order";
+import { SubaccountId, SubaccountIdSDKType } from "../subaccounts/subaccount";
 import { ClobPair, ClobPairSDKType } from "./clob_pair";
 import { EquityTierLimitConfiguration, EquityTierLimitConfigurationSDKType } from "./equity_tier_limit_config";
 import { BlockRateLimitConfiguration, BlockRateLimitConfigurationSDKType } from "./block_rate_limit_config";
 import { LiquidationsConfig, LiquidationsConfigSDKType } from "./liquidations_config";
+import { StreamSubaccountUpdate, StreamSubaccountUpdateSDKType } from "../subaccounts/streaming";
+import { StreamPriceUpdate, StreamPriceUpdateSDKType } from "../prices/streaming";
 import { OffChainUpdateV1, OffChainUpdateV1SDKType } from "../indexer/off_chain_updates/off_chain_updates";
+import { ClobMatch, ClobMatchSDKType } from "./matches";
 import * as _m0 from "protobufjs/minimal";
 import { DeepPartial, Long } from "../../helpers";
 /** QueryGetClobPairRequest is request type for the ClobPair method. */
@@ -171,6 +176,48 @@ export interface QueryBlockRateLimitConfigurationResponse {
 export interface QueryBlockRateLimitConfigurationResponseSDKType {
   block_rate_limit_config?: BlockRateLimitConfigurationSDKType;
 }
+/** QueryStatefulOrderRequest is a request message for StatefulOrder. */
+
+export interface QueryStatefulOrderRequest {
+  /** Order id to query. */
+  orderId?: OrderId;
+}
+/** QueryStatefulOrderRequest is a request message for StatefulOrder. */
+
+export interface QueryStatefulOrderRequestSDKType {
+  /** Order id to query. */
+  order_id?: OrderIdSDKType;
+}
+/**
+ * QueryStatefulOrderResponse is a response message that contains the stateful
+ * order.
+ */
+
+export interface QueryStatefulOrderResponse {
+  /** Stateful order placement. */
+  orderPlacement?: LongTermOrderPlacement;
+  /** Fill amounts. */
+
+  fillAmount: Long;
+  /** Triggered status. */
+
+  triggered: boolean;
+}
+/**
+ * QueryStatefulOrderResponse is a response message that contains the stateful
+ * order.
+ */
+
+export interface QueryStatefulOrderResponseSDKType {
+  /** Stateful order placement. */
+  order_placement?: LongTermOrderPlacementSDKType;
+  /** Fill amounts. */
+
+  fill_amount: Long;
+  /** Triggered status. */
+
+  triggered: boolean;
+}
 /**
  * QueryLiquidationsConfigurationRequest is a request message for
  * LiquidationsConfiguration.
@@ -199,6 +246,24 @@ export interface QueryLiquidationsConfigurationResponse {
 export interface QueryLiquidationsConfigurationResponseSDKType {
   liquidations_config?: LiquidationsConfigSDKType;
 }
+/** QueryNextClobPairIdRequest is a request message for the next clob pair id */
+
+export interface QueryNextClobPairIdRequest {}
+/** QueryNextClobPairIdRequest is a request message for the next clob pair id */
+
+export interface QueryNextClobPairIdRequestSDKType {}
+/** QueryNextClobPairIdResponse is a response message for the next clob pair id */
+
+export interface QueryNextClobPairIdResponse {
+  /** QueryNextClobPairIdResponse is a response message for the next clob pair id */
+  nextClobPairId: number;
+}
+/** QueryNextClobPairIdResponse is a response message for the next clob pair id */
+
+export interface QueryNextClobPairIdResponseSDKType {
+  /** QueryNextClobPairIdResponse is a response message for the next clob pair id */
+  next_clob_pair_id: number;
+}
 /**
  * StreamOrderbookUpdatesRequest is a request message for the
  * StreamOrderbookUpdates method.
@@ -207,6 +272,12 @@ export interface QueryLiquidationsConfigurationResponseSDKType {
 export interface StreamOrderbookUpdatesRequest {
   /** Clob pair ids to stream orderbook updates for. */
   clobPairId: number[];
+  /** Subaccount ids to stream subaccount updates for. */
+
+  subaccountIds: SubaccountId[];
+  /** Market ids for price updates. */
+
+  marketIds: number[];
 }
 /**
  * StreamOrderbookUpdatesRequest is a request message for the
@@ -216,6 +287,12 @@ export interface StreamOrderbookUpdatesRequest {
 export interface StreamOrderbookUpdatesRequestSDKType {
   /** Clob pair ids to stream orderbook updates for. */
   clob_pair_id: number[];
+  /** Subaccount ids to stream subaccount updates for. */
+
+  subaccount_ids: SubaccountIdSDKType[];
+  /** Market ids for price updates. */
+
+  market_ids: number[];
 }
 /**
  * StreamOrderbookUpdatesResponse is a response message for the
@@ -223,16 +300,8 @@ export interface StreamOrderbookUpdatesRequestSDKType {
  */
 
 export interface StreamOrderbookUpdatesResponse {
-  /** Orderbook updates for the clob pair. */
-  updates: OffChainUpdateV1[];
-  /**
-   * Snapshot indicates if the response is from a snapshot of the orderbook.
-   * This is true for the initial response and false for all subsequent updates.
-   * Note that if the snapshot is true, then all previous entries should be
-   * discarded and the orderbook should be resynced.
-   */
-
-  snapshot: boolean;
+  /** Batch of updates for the clob pair. */
+  updates: StreamUpdate[];
 }
 /**
  * StreamOrderbookUpdatesResponse is a response message for the
@@ -240,16 +309,208 @@ export interface StreamOrderbookUpdatesResponse {
  */
 
 export interface StreamOrderbookUpdatesResponseSDKType {
-  /** Orderbook updates for the clob pair. */
-  updates: OffChainUpdateV1SDKType[];
+  /** Batch of updates for the clob pair. */
+  updates: StreamUpdateSDKType[];
+}
+/**
+ * StreamUpdate is an update that will be pushed through the
+ * GRPC stream.
+ */
+
+export interface StreamUpdate {
+  /** Block height of the update. */
+  blockHeight: number;
+  /** Exec mode of the update. */
+
+  execMode: number;
+  orderbookUpdate?: StreamOrderbookUpdate;
+  orderFill?: StreamOrderbookFill;
+  takerOrder?: StreamTakerOrder;
+  subaccountUpdate?: StreamSubaccountUpdate;
+  priceUpdate?: StreamPriceUpdate;
+}
+/**
+ * StreamUpdate is an update that will be pushed through the
+ * GRPC stream.
+ */
+
+export interface StreamUpdateSDKType {
+  /** Block height of the update. */
+  block_height: number;
+  /** Exec mode of the update. */
+
+  exec_mode: number;
+  orderbook_update?: StreamOrderbookUpdateSDKType;
+  order_fill?: StreamOrderbookFillSDKType;
+  taker_order?: StreamTakerOrderSDKType;
+  subaccount_update?: StreamSubaccountUpdateSDKType;
+  price_update?: StreamPriceUpdateSDKType;
+}
+/**
+ * StreamOrderbookUpdate provides information on an orderbook update. Used in
+ * the full node GRPC stream.
+ */
+
+export interface StreamOrderbookUpdate {
   /**
    * Snapshot indicates if the response is from a snapshot of the orderbook.
-   * This is true for the initial response and false for all subsequent updates.
-   * Note that if the snapshot is true, then all previous entries should be
+   * All updates should be ignored until snapshot is recieved.
+   * If the snapshot is true, then all previous entries should be
    * discarded and the orderbook should be resynced.
    */
-
   snapshot: boolean;
+  /**
+   * Orderbook updates for the clob pair. Can contain order place, removals,
+   * or updates.
+   */
+
+  updates: OffChainUpdateV1[];
+}
+/**
+ * StreamOrderbookUpdate provides information on an orderbook update. Used in
+ * the full node GRPC stream.
+ */
+
+export interface StreamOrderbookUpdateSDKType {
+  /**
+   * Snapshot indicates if the response is from a snapshot of the orderbook.
+   * All updates should be ignored until snapshot is recieved.
+   * If the snapshot is true, then all previous entries should be
+   * discarded and the orderbook should be resynced.
+   */
+  snapshot: boolean;
+  /**
+   * Orderbook updates for the clob pair. Can contain order place, removals,
+   * or updates.
+   */
+
+  updates: OffChainUpdateV1SDKType[];
+}
+/**
+ * StreamOrderbookFill provides information on an orderbook fill. Used in
+ * the full node GRPC stream.
+ */
+
+export interface StreamOrderbookFill {
+  /**
+   * Clob match. Provides information on which orders were matched
+   * and the type of order.
+   */
+  clobMatch?: ClobMatch;
+  /**
+   * All orders involved in the specified clob match. Used to look up
+   * price of a match through a given maker order id.
+   */
+
+  orders: Order[];
+  /** Resulting fill amounts for each order in the orders array. */
+
+  fillAmounts: Long[];
+}
+/**
+ * StreamOrderbookFill provides information on an orderbook fill. Used in
+ * the full node GRPC stream.
+ */
+
+export interface StreamOrderbookFillSDKType {
+  /**
+   * Clob match. Provides information on which orders were matched
+   * and the type of order.
+   */
+  clob_match?: ClobMatchSDKType;
+  /**
+   * All orders involved in the specified clob match. Used to look up
+   * price of a match through a given maker order id.
+   */
+
+  orders: OrderSDKType[];
+  /** Resulting fill amounts for each order in the orders array. */
+
+  fill_amounts: Long[];
+}
+/**
+ * StreamTakerOrder provides information on a taker order that was attempted
+ * to be matched on the orderbook.
+ * It is intended to be used only in full node streaming.
+ */
+
+export interface StreamTakerOrder {
+  order?: Order;
+  liquidationOrder?: StreamLiquidationOrder;
+  /**
+   * Information on the taker order after it is matched on the book,
+   * either successfully or unsuccessfully.
+   */
+
+  takerOrderStatus?: StreamTakerOrderStatus;
+}
+/**
+ * StreamTakerOrder provides information on a taker order that was attempted
+ * to be matched on the orderbook.
+ * It is intended to be used only in full node streaming.
+ */
+
+export interface StreamTakerOrderSDKType {
+  order?: OrderSDKType;
+  liquidation_order?: StreamLiquidationOrderSDKType;
+  /**
+   * Information on the taker order after it is matched on the book,
+   * either successfully or unsuccessfully.
+   */
+
+  taker_order_status?: StreamTakerOrderStatusSDKType;
+}
+/**
+ * StreamTakerOrderStatus is a representation of a taker order
+ * after it is attempted to be matched on the orderbook.
+ * It is intended to be used only in full node streaming.
+ */
+
+export interface StreamTakerOrderStatus {
+  /**
+   * The state of the taker order after attempting to match it against the
+   * orderbook. Possible enum values can be found here:
+   * https://github.com/dydxprotocol/v4-chain/blob/main/protocol/x/clob/types/orderbook.go#L105
+   */
+  orderStatus: number;
+  /** The amount of remaining (non-matched) base quantums of this taker order. */
+
+  remainingQuantums: Long;
+  /**
+   * The amount of base quantums that were *optimistically* filled for this
+   * taker order when the order is matched against the orderbook. Note that if
+   * any quantums of this order were optimistically filled or filled in state
+   * before this invocation of the matching loop, this value will not include
+   * them.
+   */
+
+  optimisticallyFilledQuantums: Long;
+}
+/**
+ * StreamTakerOrderStatus is a representation of a taker order
+ * after it is attempted to be matched on the orderbook.
+ * It is intended to be used only in full node streaming.
+ */
+
+export interface StreamTakerOrderStatusSDKType {
+  /**
+   * The state of the taker order after attempting to match it against the
+   * orderbook. Possible enum values can be found here:
+   * https://github.com/dydxprotocol/v4-chain/blob/main/protocol/x/clob/types/orderbook.go#L105
+   */
+  order_status: number;
+  /** The amount of remaining (non-matched) base quantums of this taker order. */
+
+  remaining_quantums: Long;
+  /**
+   * The amount of base quantums that were *optimistically* filled for this
+   * taker order when the order is matched against the orderbook. Note that if
+   * any quantums of this order were optimistically filled or filled in state
+   * before this invocation of the matching loop, this value will not include
+   * them.
+   */
+
+  optimistically_filled_quantums: Long;
 }
 
 function createBaseQueryGetClobPairRequest(): QueryGetClobPairRequest {
@@ -765,6 +1026,116 @@ export const QueryBlockRateLimitConfigurationResponse = {
 
 };
 
+function createBaseQueryStatefulOrderRequest(): QueryStatefulOrderRequest {
+  return {
+    orderId: undefined
+  };
+}
+
+export const QueryStatefulOrderRequest = {
+  encode(message: QueryStatefulOrderRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.orderId !== undefined) {
+      OrderId.encode(message.orderId, writer.uint32(10).fork()).ldelim();
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): QueryStatefulOrderRequest {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryStatefulOrderRequest();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.orderId = OrderId.decode(reader, reader.uint32());
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<QueryStatefulOrderRequest>): QueryStatefulOrderRequest {
+    const message = createBaseQueryStatefulOrderRequest();
+    message.orderId = object.orderId !== undefined && object.orderId !== null ? OrderId.fromPartial(object.orderId) : undefined;
+    return message;
+  }
+
+};
+
+function createBaseQueryStatefulOrderResponse(): QueryStatefulOrderResponse {
+  return {
+    orderPlacement: undefined,
+    fillAmount: Long.UZERO,
+    triggered: false
+  };
+}
+
+export const QueryStatefulOrderResponse = {
+  encode(message: QueryStatefulOrderResponse, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.orderPlacement !== undefined) {
+      LongTermOrderPlacement.encode(message.orderPlacement, writer.uint32(10).fork()).ldelim();
+    }
+
+    if (!message.fillAmount.isZero()) {
+      writer.uint32(16).uint64(message.fillAmount);
+    }
+
+    if (message.triggered === true) {
+      writer.uint32(24).bool(message.triggered);
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): QueryStatefulOrderResponse {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryStatefulOrderResponse();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.orderPlacement = LongTermOrderPlacement.decode(reader, reader.uint32());
+          break;
+
+        case 2:
+          message.fillAmount = (reader.uint64() as Long);
+          break;
+
+        case 3:
+          message.triggered = reader.bool();
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<QueryStatefulOrderResponse>): QueryStatefulOrderResponse {
+    const message = createBaseQueryStatefulOrderResponse();
+    message.orderPlacement = object.orderPlacement !== undefined && object.orderPlacement !== null ? LongTermOrderPlacement.fromPartial(object.orderPlacement) : undefined;
+    message.fillAmount = object.fillAmount !== undefined && object.fillAmount !== null ? Long.fromValue(object.fillAmount) : Long.UZERO;
+    message.triggered = object.triggered ?? false;
+    return message;
+  }
+
+};
+
 function createBaseQueryLiquidationsConfigurationRequest(): QueryLiquidationsConfigurationRequest {
   return {};
 }
@@ -844,9 +1215,90 @@ export const QueryLiquidationsConfigurationResponse = {
 
 };
 
+function createBaseQueryNextClobPairIdRequest(): QueryNextClobPairIdRequest {
+  return {};
+}
+
+export const QueryNextClobPairIdRequest = {
+  encode(_: QueryNextClobPairIdRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): QueryNextClobPairIdRequest {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryNextClobPairIdRequest();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(_: DeepPartial<QueryNextClobPairIdRequest>): QueryNextClobPairIdRequest {
+    const message = createBaseQueryNextClobPairIdRequest();
+    return message;
+  }
+
+};
+
+function createBaseQueryNextClobPairIdResponse(): QueryNextClobPairIdResponse {
+  return {
+    nextClobPairId: 0
+  };
+}
+
+export const QueryNextClobPairIdResponse = {
+  encode(message: QueryNextClobPairIdResponse, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.nextClobPairId !== 0) {
+      writer.uint32(8).uint32(message.nextClobPairId);
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): QueryNextClobPairIdResponse {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryNextClobPairIdResponse();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.nextClobPairId = reader.uint32();
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<QueryNextClobPairIdResponse>): QueryNextClobPairIdResponse {
+    const message = createBaseQueryNextClobPairIdResponse();
+    message.nextClobPairId = object.nextClobPairId ?? 0;
+    return message;
+  }
+
+};
+
 function createBaseStreamOrderbookUpdatesRequest(): StreamOrderbookUpdatesRequest {
   return {
-    clobPairId: []
+    clobPairId: [],
+    subaccountIds: [],
+    marketIds: []
   };
 }
 
@@ -855,6 +1307,18 @@ export const StreamOrderbookUpdatesRequest = {
     writer.uint32(10).fork();
 
     for (const v of message.clobPairId) {
+      writer.uint32(v);
+    }
+
+    writer.ldelim();
+
+    for (const v of message.subaccountIds) {
+      SubaccountId.encode(v!, writer.uint32(18).fork()).ldelim();
+    }
+
+    writer.uint32(26).fork();
+
+    for (const v of message.marketIds) {
       writer.uint32(v);
     }
 
@@ -884,6 +1348,23 @@ export const StreamOrderbookUpdatesRequest = {
 
           break;
 
+        case 2:
+          message.subaccountIds.push(SubaccountId.decode(reader, reader.uint32()));
+          break;
+
+        case 3:
+          if ((tag & 7) === 2) {
+            const end2 = reader.uint32() + reader.pos;
+
+            while (reader.pos < end2) {
+              message.marketIds.push(reader.uint32());
+            }
+          } else {
+            message.marketIds.push(reader.uint32());
+          }
+
+          break;
+
         default:
           reader.skipType(tag & 7);
           break;
@@ -896,6 +1377,8 @@ export const StreamOrderbookUpdatesRequest = {
   fromPartial(object: DeepPartial<StreamOrderbookUpdatesRequest>): StreamOrderbookUpdatesRequest {
     const message = createBaseStreamOrderbookUpdatesRequest();
     message.clobPairId = object.clobPairId?.map(e => e) || [];
+    message.subaccountIds = object.subaccountIds?.map(e => SubaccountId.fromPartial(e)) || [];
+    message.marketIds = object.marketIds?.map(e => e) || [];
     return message;
   }
 
@@ -903,19 +1386,14 @@ export const StreamOrderbookUpdatesRequest = {
 
 function createBaseStreamOrderbookUpdatesResponse(): StreamOrderbookUpdatesResponse {
   return {
-    updates: [],
-    snapshot: false
+    updates: []
   };
 }
 
 export const StreamOrderbookUpdatesResponse = {
   encode(message: StreamOrderbookUpdatesResponse, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     for (const v of message.updates) {
-      OffChainUpdateV1.encode(v!, writer.uint32(10).fork()).ldelim();
-    }
-
-    if (message.snapshot === true) {
-      writer.uint32(16).bool(message.snapshot);
+      StreamUpdate.encode(v!, writer.uint32(10).fork()).ldelim();
     }
 
     return writer;
@@ -931,11 +1409,7 @@ export const StreamOrderbookUpdatesResponse = {
 
       switch (tag >>> 3) {
         case 1:
-          message.updates.push(OffChainUpdateV1.decode(reader, reader.uint32()));
-          break;
-
-        case 2:
-          message.snapshot = reader.bool();
+          message.updates.push(StreamUpdate.decode(reader, reader.uint32()));
           break;
 
         default:
@@ -949,8 +1423,374 @@ export const StreamOrderbookUpdatesResponse = {
 
   fromPartial(object: DeepPartial<StreamOrderbookUpdatesResponse>): StreamOrderbookUpdatesResponse {
     const message = createBaseStreamOrderbookUpdatesResponse();
-    message.updates = object.updates?.map(e => OffChainUpdateV1.fromPartial(e)) || [];
+    message.updates = object.updates?.map(e => StreamUpdate.fromPartial(e)) || [];
+    return message;
+  }
+
+};
+
+function createBaseStreamUpdate(): StreamUpdate {
+  return {
+    blockHeight: 0,
+    execMode: 0,
+    orderbookUpdate: undefined,
+    orderFill: undefined,
+    takerOrder: undefined,
+    subaccountUpdate: undefined,
+    priceUpdate: undefined
+  };
+}
+
+export const StreamUpdate = {
+  encode(message: StreamUpdate, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.blockHeight !== 0) {
+      writer.uint32(8).uint32(message.blockHeight);
+    }
+
+    if (message.execMode !== 0) {
+      writer.uint32(16).uint32(message.execMode);
+    }
+
+    if (message.orderbookUpdate !== undefined) {
+      StreamOrderbookUpdate.encode(message.orderbookUpdate, writer.uint32(26).fork()).ldelim();
+    }
+
+    if (message.orderFill !== undefined) {
+      StreamOrderbookFill.encode(message.orderFill, writer.uint32(34).fork()).ldelim();
+    }
+
+    if (message.takerOrder !== undefined) {
+      StreamTakerOrder.encode(message.takerOrder, writer.uint32(42).fork()).ldelim();
+    }
+
+    if (message.subaccountUpdate !== undefined) {
+      StreamSubaccountUpdate.encode(message.subaccountUpdate, writer.uint32(50).fork()).ldelim();
+    }
+
+    if (message.priceUpdate !== undefined) {
+      StreamPriceUpdate.encode(message.priceUpdate, writer.uint32(58).fork()).ldelim();
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamUpdate {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStreamUpdate();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.blockHeight = reader.uint32();
+          break;
+
+        case 2:
+          message.execMode = reader.uint32();
+          break;
+
+        case 3:
+          message.orderbookUpdate = StreamOrderbookUpdate.decode(reader, reader.uint32());
+          break;
+
+        case 4:
+          message.orderFill = StreamOrderbookFill.decode(reader, reader.uint32());
+          break;
+
+        case 5:
+          message.takerOrder = StreamTakerOrder.decode(reader, reader.uint32());
+          break;
+
+        case 6:
+          message.subaccountUpdate = StreamSubaccountUpdate.decode(reader, reader.uint32());
+          break;
+
+        case 7:
+          message.priceUpdate = StreamPriceUpdate.decode(reader, reader.uint32());
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<StreamUpdate>): StreamUpdate {
+    const message = createBaseStreamUpdate();
+    message.blockHeight = object.blockHeight ?? 0;
+    message.execMode = object.execMode ?? 0;
+    message.orderbookUpdate = object.orderbookUpdate !== undefined && object.orderbookUpdate !== null ? StreamOrderbookUpdate.fromPartial(object.orderbookUpdate) : undefined;
+    message.orderFill = object.orderFill !== undefined && object.orderFill !== null ? StreamOrderbookFill.fromPartial(object.orderFill) : undefined;
+    message.takerOrder = object.takerOrder !== undefined && object.takerOrder !== null ? StreamTakerOrder.fromPartial(object.takerOrder) : undefined;
+    message.subaccountUpdate = object.subaccountUpdate !== undefined && object.subaccountUpdate !== null ? StreamSubaccountUpdate.fromPartial(object.subaccountUpdate) : undefined;
+    message.priceUpdate = object.priceUpdate !== undefined && object.priceUpdate !== null ? StreamPriceUpdate.fromPartial(object.priceUpdate) : undefined;
+    return message;
+  }
+
+};
+
+function createBaseStreamOrderbookUpdate(): StreamOrderbookUpdate {
+  return {
+    snapshot: false,
+    updates: []
+  };
+}
+
+export const StreamOrderbookUpdate = {
+  encode(message: StreamOrderbookUpdate, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.snapshot === true) {
+      writer.uint32(8).bool(message.snapshot);
+    }
+
+    for (const v of message.updates) {
+      OffChainUpdateV1.encode(v!, writer.uint32(18).fork()).ldelim();
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamOrderbookUpdate {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStreamOrderbookUpdate();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.snapshot = reader.bool();
+          break;
+
+        case 2:
+          message.updates.push(OffChainUpdateV1.decode(reader, reader.uint32()));
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<StreamOrderbookUpdate>): StreamOrderbookUpdate {
+    const message = createBaseStreamOrderbookUpdate();
     message.snapshot = object.snapshot ?? false;
+    message.updates = object.updates?.map(e => OffChainUpdateV1.fromPartial(e)) || [];
+    return message;
+  }
+
+};
+
+function createBaseStreamOrderbookFill(): StreamOrderbookFill {
+  return {
+    clobMatch: undefined,
+    orders: [],
+    fillAmounts: []
+  };
+}
+
+export const StreamOrderbookFill = {
+  encode(message: StreamOrderbookFill, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.clobMatch !== undefined) {
+      ClobMatch.encode(message.clobMatch, writer.uint32(10).fork()).ldelim();
+    }
+
+    for (const v of message.orders) {
+      Order.encode(v!, writer.uint32(18).fork()).ldelim();
+    }
+
+    writer.uint32(26).fork();
+
+    for (const v of message.fillAmounts) {
+      writer.uint64(v);
+    }
+
+    writer.ldelim();
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamOrderbookFill {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStreamOrderbookFill();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.clobMatch = ClobMatch.decode(reader, reader.uint32());
+          break;
+
+        case 2:
+          message.orders.push(Order.decode(reader, reader.uint32()));
+          break;
+
+        case 3:
+          if ((tag & 7) === 2) {
+            const end2 = reader.uint32() + reader.pos;
+
+            while (reader.pos < end2) {
+              message.fillAmounts.push((reader.uint64() as Long));
+            }
+          } else {
+            message.fillAmounts.push((reader.uint64() as Long));
+          }
+
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<StreamOrderbookFill>): StreamOrderbookFill {
+    const message = createBaseStreamOrderbookFill();
+    message.clobMatch = object.clobMatch !== undefined && object.clobMatch !== null ? ClobMatch.fromPartial(object.clobMatch) : undefined;
+    message.orders = object.orders?.map(e => Order.fromPartial(e)) || [];
+    message.fillAmounts = object.fillAmounts?.map(e => Long.fromValue(e)) || [];
+    return message;
+  }
+
+};
+
+function createBaseStreamTakerOrder(): StreamTakerOrder {
+  return {
+    order: undefined,
+    liquidationOrder: undefined,
+    takerOrderStatus: undefined
+  };
+}
+
+export const StreamTakerOrder = {
+  encode(message: StreamTakerOrder, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.order !== undefined) {
+      Order.encode(message.order, writer.uint32(10).fork()).ldelim();
+    }
+
+    if (message.liquidationOrder !== undefined) {
+      StreamLiquidationOrder.encode(message.liquidationOrder, writer.uint32(18).fork()).ldelim();
+    }
+
+    if (message.takerOrderStatus !== undefined) {
+      StreamTakerOrderStatus.encode(message.takerOrderStatus, writer.uint32(26).fork()).ldelim();
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamTakerOrder {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStreamTakerOrder();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.order = Order.decode(reader, reader.uint32());
+          break;
+
+        case 2:
+          message.liquidationOrder = StreamLiquidationOrder.decode(reader, reader.uint32());
+          break;
+
+        case 3:
+          message.takerOrderStatus = StreamTakerOrderStatus.decode(reader, reader.uint32());
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<StreamTakerOrder>): StreamTakerOrder {
+    const message = createBaseStreamTakerOrder();
+    message.order = object.order !== undefined && object.order !== null ? Order.fromPartial(object.order) : undefined;
+    message.liquidationOrder = object.liquidationOrder !== undefined && object.liquidationOrder !== null ? StreamLiquidationOrder.fromPartial(object.liquidationOrder) : undefined;
+    message.takerOrderStatus = object.takerOrderStatus !== undefined && object.takerOrderStatus !== null ? StreamTakerOrderStatus.fromPartial(object.takerOrderStatus) : undefined;
+    return message;
+  }
+
+};
+
+function createBaseStreamTakerOrderStatus(): StreamTakerOrderStatus {
+  return {
+    orderStatus: 0,
+    remainingQuantums: Long.UZERO,
+    optimisticallyFilledQuantums: Long.UZERO
+  };
+}
+
+export const StreamTakerOrderStatus = {
+  encode(message: StreamTakerOrderStatus, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.orderStatus !== 0) {
+      writer.uint32(8).uint32(message.orderStatus);
+    }
+
+    if (!message.remainingQuantums.isZero()) {
+      writer.uint32(16).uint64(message.remainingQuantums);
+    }
+
+    if (!message.optimisticallyFilledQuantums.isZero()) {
+      writer.uint32(24).uint64(message.optimisticallyFilledQuantums);
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamTakerOrderStatus {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStreamTakerOrderStatus();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.orderStatus = reader.uint32();
+          break;
+
+        case 2:
+          message.remainingQuantums = (reader.uint64() as Long);
+          break;
+
+        case 3:
+          message.optimisticallyFilledQuantums = (reader.uint64() as Long);
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<StreamTakerOrderStatus>): StreamTakerOrderStatus {
+    const message = createBaseStreamTakerOrderStatus();
+    message.orderStatus = object.orderStatus ?? 0;
+    message.remainingQuantums = object.remainingQuantums !== undefined && object.remainingQuantums !== null ? Long.fromValue(object.remainingQuantums) : Long.UZERO;
+    message.optimisticallyFilledQuantums = object.optimisticallyFilledQuantums !== undefined && object.optimisticallyFilledQuantums !== null ? Long.fromValue(object.optimisticallyFilledQuantums) : Long.UZERO;
     return message;
   }
 

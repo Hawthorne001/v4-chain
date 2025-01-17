@@ -15,18 +15,23 @@ import (
 	ibctransfer "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	ibcclient "github.com/cosmos/ibc-go/v8/modules/core/02-client/types" //nolint:staticcheck
 	ibcconn "github.com/cosmos/ibc-go/v8/modules/core/03-connection/types"
+	accountplus "github.com/dydxprotocol/v4-chain/protocol/x/accountplus/types"
+	affiliates "github.com/dydxprotocol/v4-chain/protocol/x/affiliates/types"
 	blocktime "github.com/dydxprotocol/v4-chain/protocol/x/blocktime/types"
 	bridge "github.com/dydxprotocol/v4-chain/protocol/x/bridge/types"
 	clob "github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 	delaymsg "github.com/dydxprotocol/v4-chain/protocol/x/delaymsg/types"
 	feetiers "github.com/dydxprotocol/v4-chain/protocol/x/feetiers/types"
 	govplus "github.com/dydxprotocol/v4-chain/protocol/x/govplus/types"
+	listing "github.com/dydxprotocol/v4-chain/protocol/x/listing/types"
 	perpetuals "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/types"
 	prices "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
 	ratelimit "github.com/dydxprotocol/v4-chain/protocol/x/ratelimit/types"
+	revshare "github.com/dydxprotocol/v4-chain/protocol/x/revshare/types"
 	rewards "github.com/dydxprotocol/v4-chain/protocol/x/rewards/types"
 	sending "github.com/dydxprotocol/v4-chain/protocol/x/sending/types"
 	stats "github.com/dydxprotocol/v4-chain/protocol/x/stats/types"
+	vault "github.com/dydxprotocol/v4-chain/protocol/x/vault/types"
 	vest "github.com/dydxprotocol/v4-chain/protocol/x/vest/types"
 )
 
@@ -67,9 +72,12 @@ func IsInternalMsg(msg sdk.Msg) bool {
 		*upgrade.MsgSoftwareUpgrade,
 
 		// ------- Custom modules
+		// accountplus
+		*accountplus.MsgSetActiveState,
+
 		// blocktime
 		*blocktime.MsgUpdateDowntimeParams,
-
+		*blocktime.MsgUpdateSynchronyParams,
 		// bridge
 		*bridge.MsgCompleteBridge,
 		*bridge.MsgUpdateEventParams,
@@ -92,6 +100,11 @@ func IsInternalMsg(msg sdk.Msg) bool {
 		// govplus
 		*govplus.MsgSlashValidator,
 
+		// listing
+		*listing.MsgSetMarketsHardCap,
+		*listing.MsgSetListingVaultDepositParams,
+		*listing.MsgUpgradeIsolatedPerpetualToCross,
+
 		// perpetuals
 		*perpetuals.MsgCreatePerpetual,
 		*perpetuals.MsgSetLiquidityTier,
@@ -106,6 +119,11 @@ func IsInternalMsg(msg sdk.Msg) bool {
 		*ratelimit.MsgSetLimitParams,
 		*ratelimit.MsgSetLimitParamsResponse,
 
+		// revshare
+		*revshare.MsgSetMarketMapperRevenueShare,
+		*revshare.MsgSetMarketMapperRevShareDetailsForMarket,
+		*revshare.MsgUpdateUnconditionalRevShareConfig,
+
 		// rewards
 		*rewards.MsgUpdateParams,
 
@@ -115,6 +133,11 @@ func IsInternalMsg(msg sdk.Msg) bool {
 		// stats
 		*stats.MsgUpdateParams,
 
+		// vault
+		*vault.MsgUnlockShares,
+		*vault.MsgUpdateDefaultQuotingParams,
+		*vault.MsgUpdateOperatorParams,
+
 		// vest
 		*vest.MsgDeleteVestEntry,
 		*vest.MsgSetVestEntry,
@@ -123,7 +146,11 @@ func IsInternalMsg(msg sdk.Msg) bool {
 		*icahosttypes.MsgUpdateParams,
 		*ibctransfer.MsgUpdateParams,
 		*ibcclient.MsgUpdateParams,
-		*ibcconn.MsgUpdateParams:
+		*ibcconn.MsgUpdateParams,
+
+		// affiliates
+		*affiliates.MsgUpdateAffiliateTiers,
+		*affiliates.MsgUpdateAffiliateWhitelist:
 
 		return true
 

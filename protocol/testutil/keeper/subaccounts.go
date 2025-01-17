@@ -1,9 +1,14 @@
 package keeper
 
 import (
-	"github.com/cosmos/gogoproto/proto"
-	"math/big"
 	"testing"
+
+	"github.com/dydxprotocol/v4-chain/protocol/streaming"
+
+	affiliateskeeper "github.com/dydxprotocol/v4-chain/protocol/x/affiliates/keeper"
+	revsharekeeper "github.com/dydxprotocol/v4-chain/protocol/x/revshare/keeper"
+
+	"github.com/cosmos/gogoproto/proto"
 
 	dbm "github.com/cosmos/cosmos-db"
 
@@ -19,9 +24,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
-	"github.com/dydxprotocol/v4-chain/protocol/dtypes"
 	asskeeper "github.com/dydxprotocol/v4-chain/protocol/x/assets/keeper"
-	assettypes "github.com/dydxprotocol/v4-chain/protocol/x/assets/types"
 	blocktimekeeper "github.com/dydxprotocol/v4-chain/protocol/x/blocktime/keeper"
 	perpskeeper "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/keeper"
 	priceskeeper "github.com/dydxprotocol/v4-chain/protocol/x/prices/keeper"
@@ -29,10 +32,7 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
 )
 
-func SubaccountsKeepers(
-	t testing.TB,
-	msgSenderEnabled bool,
-) (
+func SubaccountsKeepers(t testing.TB, msgSenderEnabled bool) (
 	ctx sdk.Context,
 	keeper *keeper.Keeper,
 	pricesKeeper *priceskeeper.Keeper,
@@ -41,6 +41,8 @@ func SubaccountsKeepers(
 	bankKeeper *bankkeeper.BaseKeeper,
 	assetsKeeper *asskeeper.Keeper,
 	blocktimeKeeper *blocktimekeeper.Keeper,
+	revShareKeeper *revsharekeeper.Keeper,
+	affiliatesKeeper *affiliateskeeper.Keeper,
 	storeKey storetypes.StoreKey,
 ) {
 	var mockTimeProvider *mocks.TimeProvider
@@ -52,15 +54,45 @@ func SubaccountsKeepers(
 		transientStoreKey storetypes.StoreKey,
 	) []GenesisInitializer {
 		// Define necessary keepers here for unit tests
-		pricesKeeper, _, _, _, mockTimeProvider = createPricesKeeper(stateStore, db, cdc, transientStoreKey)
 		epochsKeeper, _ := createEpochsKeeper(stateStore, db, cdc)
+
+		accountKeeper, _ = createAccountKeeper(
+			stateStore,
+			db,
+			cdc,
+			registry)
+		bankKeeper, _ = createBankKeeper(stateStore, db, cdc, accountKeeper)
+		stakingKeeper, _ := createStakingKeeper(
+			stateStore,
+			db,
+			cdc,
+			accountKeeper,
+			bankKeeper,
+		)
+		statsKeeper, _ := createStatsKeeper(
+			stateStore,
+			epochsKeeper,
+			db,
+			cdc,
+			stakingKeeper,
+		)
+		affiliatesKeeper, _ = createAffiliatesKeeper(stateStore, db, cdc, statsKeeper, transientStoreKey, true)
+		vaultKeeper, _ := createVaultKeeper(stateStore, db, cdc, transientStoreKey)
+		feetiersKeeper, _ := createFeeTiersKeeper(stateStore, statsKeeper, vaultKeeper, affiliatesKeeper, db, cdc)
+		revShareKeeper, _, _ = createRevShareKeeper(stateStore, db, cdc, affiliatesKeeper, feetiersKeeper)
+		marketMapKeeper, _ := createMarketMapKeeper(stateStore, db, cdc)
+		pricesKeeper, _, _, mockTimeProvider = createPricesKeeper(
+			stateStore,
+			db,
+			cdc,
+			transientStoreKey,
+			revShareKeeper,
+			marketMapKeeper,
+		)
 		perpetualsKeeper, _ = createPerpetualsKeeper(stateStore, db, cdc, pricesKeeper, epochsKeeper, transientStoreKey)
 		assetsKeeper, _ = createAssetsKeeper(stateStore, db, cdc, pricesKeeper, transientStoreKey, msgSenderEnabled)
-
-		accountKeeper, _ = createAccountKeeper(stateStore, db, cdc, registry)
 		blocktimeKeeper, _ = createBlockTimeKeeper(stateStore, db, cdc)
 
-		bankKeeper, _ = createBankKeeper(stateStore, db, cdc, accountKeeper)
 		keeper, storeKey = createSubaccountsKeeper(
 			stateStore,
 			db,
@@ -73,13 +105,23 @@ func SubaccountsKeepers(
 			msgSenderEnabled,
 		)
 
-		return []GenesisInitializer{pricesKeeper, perpetualsKeeper, assetsKeeper, keeper}
+		return []GenesisInitializer{pricesKeeper, perpetualsKeeper, assetsKeeper, revShareKeeper, affiliatesKeeper, keeper}
 	})
 
 	// Mock time provider response for market creation.
 	mockTimeProvider.On("Now").Return(constants.TimeT)
 
-	return ctx, keeper, pricesKeeper, perpetualsKeeper, accountKeeper, bankKeeper, assetsKeeper, blocktimeKeeper, storeKey
+	return ctx,
+		keeper,
+		pricesKeeper,
+		perpetualsKeeper,
+		accountKeeper,
+		bankKeeper,
+		assetsKeeper,
+		blocktimeKeeper,
+		revShareKeeper,
+		affiliatesKeeper,
+		storeKey
 }
 
 func createSubaccountsKeeper(
@@ -109,31 +151,10 @@ func createSubaccountsKeeper(
 		pk,
 		btk,
 		mockIndexerEventsManager,
+		streaming.NewNoopGrpcStreamingManager(),
 	)
 
 	return k, storeKey
-}
-
-func CreateUsdcAssetPosition(
-	quoteBalance *big.Int,
-) []*types.AssetPosition {
-	return []*types.AssetPosition{
-		{
-			AssetId:  assettypes.AssetUsdc.Id,
-			Quantums: dtypes.NewIntFromBigInt(quoteBalance),
-		},
-	}
-}
-
-func CreateUsdcAssetUpdate(
-	deltaQuoteBalance *big.Int,
-) []types.AssetUpdate {
-	return []types.AssetUpdate{
-		{
-			AssetId:          assettypes.AssetUsdc.Id,
-			BigQuantumsDelta: deltaQuoteBalance,
-		},
-	}
 }
 
 // GetSubaccountUpdateEventsFromIndexerBlock returns the subaccount update events in the

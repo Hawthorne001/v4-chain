@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"fmt"
-	"time"
 
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
@@ -12,19 +11,22 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/indexer/indexer_manager"
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
 	libtime "github.com/dydxprotocol/v4-chain/protocol/lib/time"
+	streamingtypes "github.com/dydxprotocol/v4-chain/protocol/streaming/types"
 	"github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
 )
 
 type (
 	Keeper struct {
-		cdc                    codec.BinaryCodec
-		storeKey               storetypes.StoreKey
-		indexPriceCache        *pricefeedtypes.MarketToExchangePrices
-		marketToSmoothedPrices types.MarketToSmoothedPrices
-		timeProvider           libtime.TimeProvider
-		indexerEventManager    indexer_manager.IndexerEventManager
-		marketToCreatedAt      map[uint32]time.Time
-		authorities            map[string]struct{}
+		cdc                 codec.BinaryCodec
+		storeKey            storetypes.StoreKey
+		indexPriceCache     *pricefeedtypes.MarketToExchangePrices
+		timeProvider        libtime.TimeProvider
+		indexerEventManager indexer_manager.IndexerEventManager
+		authorities         map[string]struct{}
+		RevShareKeeper      types.RevShareKeeper
+		MarketMapKeeper     types.MarketMapKeeper
+
+		streamingManager streamingtypes.FullNodeStreamingManager
 	}
 )
 
@@ -34,20 +36,23 @@ func NewKeeper(
 	cdc codec.BinaryCodec,
 	storeKey storetypes.StoreKey,
 	indexPriceCache *pricefeedtypes.MarketToExchangePrices,
-	marketToSmoothedPrices types.MarketToSmoothedPrices,
 	timeProvider libtime.TimeProvider,
 	indexerEventManager indexer_manager.IndexerEventManager,
 	authorities []string,
+	revShareKeeper types.RevShareKeeper,
+	marketMapKeeper types.MarketMapKeeper,
+	streamingManager streamingtypes.FullNodeStreamingManager,
 ) *Keeper {
 	return &Keeper{
-		cdc:                    cdc,
-		storeKey:               storeKey,
-		indexPriceCache:        indexPriceCache,
-		marketToSmoothedPrices: marketToSmoothedPrices,
-		timeProvider:           timeProvider,
-		indexerEventManager:    indexerEventManager,
-		marketToCreatedAt:      map[uint32]time.Time{},
-		authorities:            lib.UniqueSliceToSet(authorities),
+		cdc:                 cdc,
+		storeKey:            storeKey,
+		indexPriceCache:     indexPriceCache,
+		timeProvider:        timeProvider,
+		indexerEventManager: indexerEventManager,
+		authorities:         lib.UniqueSliceToSet(authorities),
+		RevShareKeeper:      revShareKeeper,
+		MarketMapKeeper:     marketMapKeeper,
+		streamingManager:    streamingManager,
 	}
 }
 
@@ -65,4 +70,8 @@ func (k Keeper) Logger(ctx sdk.Context) log.Logger {
 func (k Keeper) HasAuthority(authority string) bool {
 	_, ok := k.authorities[authority]
 	return ok
+}
+
+func (k Keeper) GetFullNodeStreamingManager() streamingtypes.FullNodeStreamingManager {
+	return k.streamingManager
 }

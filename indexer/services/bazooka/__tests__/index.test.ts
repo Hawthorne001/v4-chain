@@ -21,12 +21,23 @@ describe('index', () => {
       adminDeleteSpy
         .mockRejectedValueOnce(new Error('test'))
         .mockResolvedValueOnce(Promise<void>);
+      fetchTopicMetadataSpy
+        .mockResolvedValue({
+          topics: [
+            {
+              topic: KafkaTopics.TO_ENDER,
+              partitions: [
+                {},
+                {},
+              ],
+            },
+          ],
+        });
 
       await clearKafkaTopic(1,
         5,
         3,
         [KafkaTopics.TO_ENDER],
-        2,
         KafkaTopics.TO_ENDER);
       expect(adminDeleteSpy).toHaveBeenCalledTimes(2);
     });
@@ -37,13 +48,24 @@ describe('index', () => {
         .mockRejectedValueOnce(new Error('test'))
         .mockRejectedValueOnce(new Error('test'))
         .mockRejectedValueOnce(new Error('test'));
+      fetchTopicMetadataSpy
+        .mockResolvedValue({
+          topics: [
+            {
+              topic: KafkaTopics.TO_ENDER,
+              partitions: [
+                {},
+                {},
+              ],
+            },
+          ],
+        });
 
       await expect(async () => {
         await clearKafkaTopic(1,
           5,
           3,
           [KafkaTopics.TO_ENDER],
-          2,
           KafkaTopics.TO_ENDER);
       }).rejects.toThrowError('test');
       expect(adminDeleteSpy).toHaveBeenCalledTimes(3);
@@ -82,15 +104,6 @@ describe('index', () => {
         clear_db: false,
         reset_db: true,
         create_kafka_topics: false,
-        clear_kafka_topics: false,
-        clear_redis: false,
-        force: false,
-      } as APIGatewayEvent & BazookaEventJson],
-      [{
-        migrate: false,
-        clear_db: false,
-        reset_db: false,
-        create_kafka_topics: true,
         clear_kafka_topics: false,
         clear_redis: false,
         force: false,

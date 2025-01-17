@@ -13,6 +13,7 @@ import {
 } from '../helpers/stores-helpers';
 import Transaction from '../helpers/transaction';
 import ComplianceDataModel from '../models/compliance-data-model';
+import WalletModel from '../models/wallet-model';
 import {
   ComplianceDataFromDatabase,
   ComplianceDataQueryConfig,
@@ -34,6 +35,7 @@ export async function findAll(
     provider,
     blocked,
     limit,
+    addressInWalletsTable,
   }: ComplianceDataQueryConfig,
   requiredFields: QueryableField[],
   options: Options = DEFAULT_POSTGRES_OPTIONS,
@@ -45,6 +47,7 @@ export async function findAll(
       provider,
       blocked,
       limit,
+      addressInWalletsTable,
     } as QueryConfig,
     requiredFields,
   );
@@ -68,6 +71,14 @@ export async function findAll(
 
   if (blocked !== undefined) {
     baseQuery = baseQuery.where(ComplianceDataColumns.blocked, blocked);
+  }
+
+  if (addressInWalletsTable === true) {
+    baseQuery = baseQuery.innerJoin(
+      WalletModel.tableName,
+      `${ComplianceDataModel.tableName}.${ComplianceDataColumns.address}`,
+      '=',
+      `${WalletModel.tableName}.${WalletModel.idColumn}`);
   }
 
   if (options.orderBy !== undefined) {
@@ -123,25 +134,11 @@ export async function upsert(
   complianceDataToUpsert: ComplianceDataCreateObject,
   options: Options = { txId: undefined },
 ): Promise<ComplianceDataFromDatabase> {
-  const complianceData: ComplianceDataFromDatabase | undefined = await findByAddressAndProvider(
-    complianceDataToUpsert.address,
-    complianceDataToUpsert.provider,
-  );
-  if (complianceData === undefined) {
-    return create({
-      ...complianceDataToUpsert,
-    }, options);
-  }
+  const updatedComplianceData: ComplianceDataModel[] = await ComplianceDataModel.query(
+    Transaction.get(options.txId),
+  ).upsert(complianceDataToUpsert).returning('*');
 
-  const updatedComplianceData: ComplianceDataFromDatabase | undefined = await update({
-    ...complianceDataToUpsert,
-  }, options);
-
-  if (updatedComplianceData === undefined) {
-    throw Error('order must exist after update');
-  }
-
-  return updatedComplianceData;
+  return updatedComplianceData[0];
 }
 
 export async function findByAddressAndProvider(

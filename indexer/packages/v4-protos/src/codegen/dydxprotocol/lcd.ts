@@ -9,6 +9,12 @@ export const createLCDClient = async ({
   });
   return {
     dydxprotocol: {
+      accountplus: new (await import("./accountplus/query.lcd")).LCDQueryClient({
+        requestClient
+      }),
+      affiliates: new (await import("./affiliates/query.lcd")).LCDQueryClient({
+        requestClient
+      }),
       assets: new (await import("./assets/query.lcd")).LCDQueryClient({
         requestClient
       }),
@@ -30,6 +36,9 @@ export const createLCDClient = async ({
       feetiers: new (await import("./feetiers/query.lcd")).LCDQueryClient({
         requestClient
       }),
+      listing: new (await import("./listing/query.lcd")).LCDQueryClient({
+        requestClient
+      }),
       perpetuals: new (await import("./perpetuals/query.lcd")).LCDQueryClient({
         requestClient
       }),
@@ -39,6 +48,9 @@ export const createLCDClient = async ({
       ratelimit: new (await import("./ratelimit/query.lcd")).LCDQueryClient({
         requestClient
       }),
+      revshare: new (await import("./revshare/query.lcd")).LCDQueryClient({
+        requestClient
+      }),
       rewards: new (await import("./rewards/query.lcd")).LCDQueryClient({
         requestClient
       }),
@@ -46,6 +58,9 @@ export const createLCDClient = async ({
         requestClient
       }),
       subaccounts: new (await import("./subaccounts/query.lcd")).LCDQueryClient({
+        requestClient
+      }),
+      vault: new (await import("./vault/query.lcd")).LCDQueryClient({
         requestClient
       }),
       vest: new (await import("./vest/query.lcd")).LCDQueryClient({

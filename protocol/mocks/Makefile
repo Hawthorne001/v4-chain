@@ -39,6 +39,7 @@ mock-gen:
 	@go run github.com/vektra/mockery/v2 --name=PerpetualsKeeper --dir=./x/perpetuals/types --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=SendingKeeper --dir=./x/sending/types --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=SubaccountsKeeper --dir=./x/subaccounts/types --recursive --output=./mocks
+	@go run github.com/vektra/mockery/v2 --name=VaultKeeper --dir=./x/vault/types --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=FileHandler --dir=./daemons/types --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=GrpcServer --dir=./daemons/types --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=GrpcClient --dir=./daemons/types --recursive --output=./mocks
@@ -59,6 +60,8 @@ mock-gen:
 	@go run github.com/vektra/mockery/v2 --name=PriceUpdateGenerator --dir=./app/prepare/prices --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=PriceFetcher --dir=./daemons/slinky/client --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=MarketPairFetcher --dir=./daemons/slinky/client --recursive --output=./mocks
+	@go run github.com/vektra/mockery/v2 --name=SidecarVersionChecker --dir=./daemons/slinky/client --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=OracleClient --dir=$(GOPATH)/pkg/mod/github.com/skip-mev/slinky@$(SLINKY_VERSION)/service/clients/oracle --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=ExtendVoteHandler --dir=$(GOPATH)/pkg/mod/github.com/dydxprotocol/cosmos-sdk@$(COSMOS_VERSION)/types --recursive --output=./mocks
 	@go run github.com/vektra/mockery/v2 --name=UpdateMarketPriceTxDecoder --dir=./app/process --recursive --output=./mocks
+	@go run github.com/vektra/mockery/v2 --name=AssetsKeeper --dir=./x/assets/types --recursive --output=./mocks

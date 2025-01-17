@@ -2,7 +2,6 @@ package types
 
 import (
 	"math/big"
-	"time"
 
 	"cosmossdk.io/log"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -22,20 +21,13 @@ type MemClobKeeper interface {
 	ProcessSingleMatch(
 		ctx sdk.Context,
 		matchWithOrders *MatchWithOrders,
+		affiliatesWhitelistMap map[string]uint32,
 	) (
 		success bool,
 		takerUpdateResult satypes.UpdateResult,
 		makerUpdateResult satypes.UpdateResult,
-		offchainUpdates *OffchainUpdates,
+		affiliateRevSharesQuoteQuantums *big.Int,
 		err error,
-	)
-	AddOrderToOrderbookCollatCheck(
-		ctx sdk.Context,
-		clobPairId ClobPairId,
-		subaccountOpenOrders map[satypes.SubaccountId][]PendingOpenOrder,
-	) (
-		success bool,
-		successPerUpdate map[satypes.SubaccountId]satypes.UpdateResult,
 	)
 	CanDeleverageSubaccount(
 		ctx sdk.Context,
@@ -81,11 +73,6 @@ type MemClobKeeper interface {
 		order Order,
 		blockHeight uint32,
 	)
-	MustAddOrderToStatefulOrdersTimeSlice(
-		ctx sdk.Context,
-		goodTilBlockTime time.Time,
-		orderId OrderId,
-	)
 	OffsetSubaccountPerpetualPosition(
 		ctx sdk.Context,
 		liquidatedSubaccountId satypes.SubaccountId,
@@ -104,10 +91,6 @@ type MemClobKeeper interface {
 		bool,
 		error,
 	)
-	ValidateSubaccountEquityTierLimitForShortTermOrder(
-		ctx sdk.Context,
-		order Order,
-	) error
 	ValidateSubaccountEquityTierLimitForStatefulOrder(
 		ctx sdk.Context,
 		order Order,
@@ -115,4 +98,22 @@ type MemClobKeeper interface {
 	Logger(
 		ctx sdk.Context,
 	) log.Logger
+	SendOrderbookUpdates(
+		ctx sdk.Context,
+		offchainUpdates *OffchainUpdates,
+	)
+	SendOrderbookFillUpdate(
+		ctx sdk.Context,
+		orderbookFill StreamOrderbookFill,
+	)
+	SendTakerOrderStatus(
+		ctx sdk.Context,
+		takerOrder StreamTakerOrder,
+	)
+	AddOrderToOrderbookSubaccountUpdatesCheck(
+		ctx sdk.Context,
+		subaccountId satypes.SubaccountId,
+		order PendingOpenOrder,
+	) satypes.UpdateResult
+	MaybeValidateAuthenticators(ctx sdk.Context, txBytes []byte) error
 }

@@ -9,6 +9,8 @@ import (
 	"google.golang.org/grpc"
 
 	appflags "github.com/dydxprotocol/v4-chain/protocol/app/flags"
+	pricefeedmetrics "github.com/dydxprotocol/v4-chain/protocol/daemons/pricefeed/metrics"
+	daemonlib "github.com/dydxprotocol/v4-chain/protocol/daemons/shared"
 	daemontypes "github.com/dydxprotocol/v4-chain/protocol/daemons/types"
 	"github.com/dydxprotocol/v4-chain/protocol/lib/slinky"
 	pricetypes "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
@@ -87,18 +89,20 @@ func (m *MarketPairFetcherImpl) GetIDForPair(cp slinkytypes.CurrencyPair) (uint3
 // CurrencyPair and MarketParam ID.
 func (m *MarketPairFetcherImpl) FetchIdMappings(ctx context.Context) error {
 	// fetch all market params
-	resp, err := m.PricesQueryClient.AllMarketParams(ctx, &pricetypes.QueryAllMarketParamsRequest{})
+	marketParams, err := daemonlib.AllPaginatedMarketParams(ctx, m.PricesQueryClient)
 	if err != nil {
 		return err
 	}
-	var compatMappings = make(map[slinkytypes.CurrencyPair]uint32, len(resp.MarketParams))
-	for _, mp := range resp.MarketParams {
+
+	var compatMappings = make(map[slinkytypes.CurrencyPair]uint32, len(marketParams))
+	for _, mp := range marketParams {
 		cp, err := slinky.MarketPairToCurrencyPair(mp.Pair)
 		if err != nil {
 			return err
 		}
 		m.Logger.Debug("Mapped market to pair", "market id", mp.Id, "currency pair", cp.String())
 		compatMappings[cp] = mp.Id
+		pricefeedmetrics.SetMarketPairForTelemetry(mp.Id, mp.Pair)
 	}
 	m.compatMu.Lock()
 	defer m.compatMu.Unlock()

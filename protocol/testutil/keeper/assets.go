@@ -1,9 +1,10 @@
 package keeper
 
 import (
+	"testing"
+
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/gogoproto/proto"
-	"testing"
 
 	indexerevents "github.com/dydxprotocol/v4-chain/protocol/indexer/events"
 	"github.com/dydxprotocol/v4-chain/protocol/indexer/indexer_manager"
@@ -56,9 +57,41 @@ func AssetsKeepers(
 		transientStoreKey storetypes.StoreKey,
 	) []GenesisInitializer {
 		// Define necessary keepers here for unit tests
-		pricesKeeper, _, _, _, mockTimeProvider = createPricesKeeper(stateStore, db, cdc, transientStoreKey)
-		accountKeeper, _ = createAccountKeeper(stateStore, db, cdc, registry)
+		epochsKeeper, _ := createEpochsKeeper(stateStore, db, cdc)
+
+		accountKeeper, _ = createAccountKeeper(
+			stateStore,
+			db,
+			cdc,
+			registry)
 		bankKeeper, _ = createBankKeeper(stateStore, db, cdc, accountKeeper)
+		stakingKeeper, _ := createStakingKeeper(
+			stateStore,
+			db,
+			cdc,
+			accountKeeper,
+			bankKeeper,
+		)
+		statsKeeper, _ := createStatsKeeper(
+			stateStore,
+			epochsKeeper,
+			db,
+			cdc,
+			stakingKeeper,
+		)
+		affiliatesKeeper, _ := createAffiliatesKeeper(stateStore, db, cdc, statsKeeper, transientStoreKey, msgSenderEnabled)
+		vaultKeeper, _ := createVaultKeeper(stateStore, db, cdc, transientStoreKey)
+		feetiersKeeper, _ := createFeeTiersKeeper(stateStore, statsKeeper, vaultKeeper, affiliatesKeeper, db, cdc)
+		revShareKeeper, _, _ := createRevShareKeeper(stateStore, db, cdc, affiliatesKeeper, feetiersKeeper)
+		marketMapKeeper, _ := createMarketMapKeeper(stateStore, db, cdc)
+		pricesKeeper, _, _, mockTimeProvider = createPricesKeeper(
+			stateStore,
+			db,
+			cdc,
+			transientStoreKey,
+			revShareKeeper,
+			marketMapKeeper,
+		)
 		keeper, storeKey = createAssetsKeeper(stateStore, db, cdc, pricesKeeper, transientStoreKey, msgSenderEnabled)
 
 		return []GenesisInitializer{pricesKeeper, keeper}

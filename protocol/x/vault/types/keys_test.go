@@ -13,5 +13,16 @@ func TestModuleKeys(t *testing.T) {
 }
 
 func TestStateKeys(t *testing.T) {
-	require.Equal(t, "TotalShares:", types.TotalSharesKeyPrefix)
+	require.Equal(t, "TotalShares", types.TotalSharesKey)
+	require.Equal(t, "OwnerShares:", types.OwnerSharesKeyPrefix)
+	require.Equal(t, "DefaultQuotingParams", types.DefaultQuotingParamsKey)
+	require.Equal(t, "VaultParams:", types.VaultParamsKeyPrefix)
+	require.Equal(t, "VaultAddress:", types.VaultAddressKeyPrefix)
+	require.Equal(t, "MostRecentClientIds:", types.MostRecentClientIdsKeyPrefix)
+	require.Equal(t, "OwnerShareUnlocks:", types.OwnerShareUnlocksKeyPrefix)
+	require.Equal(t, "OperatorParams", types.OperatorParamsKey)
+}
+
+func TestModuleAccountKeys(t *testing.T) {
+	require.Equal(t, "megavault", types.MegavaultAccountName)
 }

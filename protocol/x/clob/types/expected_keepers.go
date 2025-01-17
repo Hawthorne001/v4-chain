@@ -6,10 +6,13 @@ import (
 	"math/rand"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/dydxprotocol/v4-chain/protocol/lib/margin"
 	assettypes "github.com/dydxprotocol/v4-chain/protocol/x/assets/types"
 	blocktimetypes "github.com/dydxprotocol/v4-chain/protocol/x/blocktime/types"
 	perpetualsmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/types"
 	pricestypes "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
+	revsharetypes "github.com/dydxprotocol/v4-chain/protocol/x/revshare/types"
+	stattypes "github.com/dydxprotocol/v4-chain/protocol/x/stats/types"
 	satypes "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
 )
 
@@ -27,9 +30,7 @@ type SubaccountsKeeper interface {
 		ctx sdk.Context,
 		update satypes.Update,
 	) (
-		bigNetCollateral *big.Int,
-		bigInitialMargin *big.Int,
-		bigMaintenanceMargin *big.Int,
+		risk margin.Risk,
 		err error,
 	)
 	GetSubaccount(
@@ -37,6 +38,13 @@ type SubaccountsKeeper interface {
 		id satypes.SubaccountId,
 	) (
 		val satypes.Subaccount,
+	)
+	GetStreamSubaccountUpdate(
+		ctx sdk.Context,
+		id satypes.SubaccountId,
+		snapshot bool,
+	) (
+		val satypes.StreamSubaccountUpdate,
 	)
 	GetAllSubaccount(
 		ctx sdk.Context,
@@ -61,13 +69,34 @@ type SubaccountsKeeper interface {
 	)
 	SetNegativeTncSubaccountSeenAtBlock(
 		ctx sdk.Context,
+		perpetualId uint32,
 		blockHeight uint32,
-	)
-	TransferFeesToFeeCollectorModule(ctx sdk.Context, assetId uint32, amount *big.Int, perpetualId uint32) error
+	) error
 	TransferInsuranceFundPayments(
 		ctx sdk.Context,
 		amount *big.Int,
 		perpetualId uint32,
+	) error
+	GetInsuranceFundBalance(
+		ctx sdk.Context,
+		perpetualId uint32,
+	) (
+		balance *big.Int,
+	)
+	GetCrossInsuranceFundBalance(
+		ctx sdk.Context,
+	) (
+		balance *big.Int,
+	)
+	GetCollateralPoolFromPerpetualId(
+		ctx sdk.Context,
+		perpetualId uint32,
+	) (sdk.AccAddress, error)
+	DistributeFees(
+		ctx sdk.Context,
+		assetId uint32,
+		revSharesForFill revsharetypes.RevSharesForFill,
+		fillForProcess FillForProcess,
 	) error
 }
 
@@ -100,21 +129,13 @@ type PerpetualsKeeper interface {
 		bigBaseQuantums *big.Int,
 		err error,
 	)
-	GetNetCollateral(
+	GetPerpetualAndMarketPriceAndLiquidityTier(
 		ctx sdk.Context,
-		id uint32,
-		bigQuantums *big.Int,
+		perpetualId uint32,
 	) (
-		bigNetCollateralQuoteQuantums *big.Int,
-		err error,
-	)
-	GetMarginRequirements(
-		ctx sdk.Context,
-		id uint32,
-		bigQuantums *big.Int,
-	) (
-		bigInitialMarginQuoteQuantums *big.Int,
-		bigMaintenanceMarginQuoteQuantums *big.Int,
+		perpetual perpetualsmoduletypes.Perpetual,
+		price pricestypes.MarketPrice,
+		liquidityTier perpetualsmoduletypes.LiquidityTier,
 		err error,
 	)
 	GetPerpetual(
@@ -125,26 +146,18 @@ type PerpetualsKeeper interface {
 		ctx sdk.Context,
 		perpetualId uint32,
 	) (perpetualsmoduletypes.Perpetual, pricestypes.MarketPrice, error)
-	GetSettlementPpm(
-		ctx sdk.Context,
-		perpetualId uint32,
-		quantums *big.Int,
-		index *big.Int,
-	) (
-		bigNetSettlement *big.Int,
-		newFundingIndex *big.Int,
-		err error,
-	)
 	MaybeProcessNewFundingTickEpoch(ctx sdk.Context)
 	GetInsuranceFundModuleAddress(ctx sdk.Context, perpetualId uint32) (sdk.AccAddress, error)
 }
 
 type PricesKeeper interface {
 	GetMarketParam(ctx sdk.Context, id uint32) (param pricestypes.MarketParam, exists bool)
+	GetStreamPriceUpdate(ctx sdk.Context, id uint32, snapshot bool) (val pricestypes.StreamPriceUpdate)
 }
 
 type StatsKeeper interface {
 	RecordFill(ctx sdk.Context, takerAddress string, makerAddress string, notional *big.Int)
+	GetUserStats(ctx sdk.Context, address string) *stattypes.UserStats
 }
 
 // AccountKeeper defines the expected account keeper used for simulations.
@@ -161,10 +174,25 @@ type BankKeeper interface {
 type RewardsKeeper interface {
 	AddRewardSharesForFill(
 		ctx sdk.Context,
-		takerAddress string,
-		makerAddress string,
-		bigFillQuoteQuantums *big.Int,
-		bigTakerFeeQuoteQuantums *big.Int,
-		bigMakerFeeQuoteQuantums *big.Int,
+		fill FillForProcess,
+		revSharesForFill revsharetypes.RevSharesForFill,
 	)
+}
+
+type RevShareKeeper interface {
+	GetAllRevShares(
+		ctx sdk.Context,
+		fill FillForProcess,
+		affiliateWhitelistMap map[string]uint32,
+	) (
+		revsharetypes.RevSharesForFill, error,
+	)
+}
+
+type AffiliatesKeeper interface {
+	GetAffiliateWhitelistMap(ctx sdk.Context) (map[string]uint32, error)
+}
+
+type AccountPlusKeeper interface {
+	MaybeValidateAuthenticators(ctx sdk.Context, tx sdk.Tx) error
 }

@@ -11,6 +11,7 @@ const (
 	Deterministic    = "deterministic"
 	Distribution     = "distribution"
 	Error            = "error"
+	ExecMode         = "exec_mode"
 	GitCommit        = "git_commit"
 	HttpGet5xx       = "http_get_5xx"
 	HttpGetHangup    = "http_get_hangup"
@@ -56,6 +57,7 @@ const (
 	OriginalNumTxs       = "original_num_txs"
 	OtherTxs             = "other_txs"
 	RemoveDisallowMsgs   = "remove_disallow_msgs"
+	PreBlocker           = "pre_blocker"
 	PrepareProposalTxs   = "prepare_proposal_txs"
 	PrepareCheckState    = "prepare_check_state"
 	PricesTx             = "prices_tx"
@@ -92,6 +94,7 @@ const (
 	// CLOB.
 	AddPerpetualFillAmount                                  = "add_perpetual_fill_amount"
 	BaseQuantums                                            = "base_quantums"
+	BatchCancel                                             = "batch_cancel"
 	BestAsk                                                 = "best_ask"
 	BestAskClobPair                                         = "best_ask_clob_pair"
 	BestBid                                                 = "best_bid"
@@ -117,7 +120,6 @@ const (
 	CreateClobPair                                          = "create_clob_pair"
 	Expired                                                 = "expired"
 	FullyFilled                                             = "fully_filled"
-	GetFillQuoteQuantums                                    = "get_fill_quote_quantums"
 	Hydrate                                                 = "hydrate"
 	IsLong                                                  = "is_long"
 	IterateOverPendingMatches                               = "iterate_over_pending_matches"
@@ -200,6 +202,7 @@ const (
 	UpdateType                                              = "update_type"
 	ValidateMatches                                         = "validate_matches"
 	ValidateOrder                                           = "validate_order"
+	StreamBatchUpdatesAfterFinalizeBlock                    = "stream_batch_updates_after_finalize_block"
 
 	// MemCLOB.
 	AddedToOrderBook                     = "added_to_orderbook"
@@ -242,6 +245,15 @@ const (
 	DistributedRewardTokens          = "distributed_reward_tokens"
 	TreasuryBalanceAfterDistribution = "treasury_balance_after_distribution"
 
+	// Vault.
+	NumActiveVaults  = "num_active_vaults"
+	VaultCancelOrder = "vault_cancel_order"
+	VaultPlaceOrder  = "vault_place_order"
+	VaultType        = "vault_type"
+	VaultId          = "vault_id"
+	VaultEquity      = "vault_equity"
+	TotalShares      = "total_shares"
+
 	// Vest.
 	GetVestEntry          = "get_vest_entry"
 	VestAmount            = "vest_amount"
@@ -254,26 +266,22 @@ const (
 	BlockTimeMs = "block_time_ms"
 
 	// Prices.
-	CreateOracleMarket                           = "create_oracle_market"
-	CurrentMarketPrices                          = "current_market_prices"
-	GetValidMarketPriceUpdates                   = "get_valid_market_price_updates"
-	IndexPriceDoesNotExist                       = "index_price_does_not_exist"
-	IndexPriceIsZero                             = "index_price_is_zero"
-	IndexPriceNotAccurate                        = "index_price_not_accurate"
-	IndexPriceNotAvailForAccuracyCheck           = "index_price_not_available_for_accuracy_check"
-	LastPriceUpdateForMarketBlock                = "last_price_update_for_market_block"
-	MissingPriceUpdates                          = "missing_price_updates"
-	NumMarketPricesToUpdate                      = "num_market_prices_to_update"
-	PriceChangeRate                              = "price_change_rate"
-	ProposedPriceChangesPriceUpdateDecision      = "proposed_price_changes_price_update_decision"
-	ProposedPriceCrossesOraclePrice              = "proposed_price_crosses_oracle_price"
-	ProposedPriceDoesNotMeetMinPriceChange       = "proposed_price_does_not_meet_min_price_change"
-	RecentSmoothedPriceDoesNotMeetMinPriceChange = "recent_smoothed_price_doesnt_meet_min_price_change"
-	RecentSmoothedPriceCrossesOraclePrice        = "recent_smoothed_price_crosses_old_price"
-	StatefulPriceUpdateValidation                = "stateful_price_update_validation"
-	UpdateMarketParam                            = "update_market_param"
-	UpdateMarketPrices                           = "update_market_prices"
-	UpdateSmoothedPrices                         = "update_smoothed_prices"
+	CreateOracleMarket                      = "create_oracle_market"
+	CurrentMarketPrices                     = "current_market_prices"
+	GetValidMarketPriceUpdates              = "get_valid_market_price_updates"
+	IndexPriceDoesNotExist                  = "index_price_does_not_exist"
+	IndexPriceIsZero                        = "index_price_is_zero"
+	IndexPriceNotAccurate                   = "index_price_not_accurate"
+	IndexPriceNotAvailForAccuracyCheck      = "index_price_not_available_for_accuracy_check"
+	LastPriceUpdateForMarketBlock           = "last_price_update_for_market_block"
+	MissingPriceUpdates                     = "missing_price_updates"
+	NumMarketPricesToUpdate                 = "num_market_prices_to_update"
+	PriceChangeRate                         = "price_change_rate"
+	ProposedPriceChangesPriceUpdateDecision = "proposed_price_changes_price_update_decision"
+	ProposedPriceDoesNotMeetMinPriceChange  = "proposed_price_does_not_meet_min_price_change"
+	StatefulPriceUpdateValidation           = "stateful_price_update_validation"
+	UpdateMarketParam                       = "update_market_param"
+	UpdateMarketPrices                      = "update_market_prices"
 
 	// Sending.
 	Account                       = "account"
@@ -296,6 +304,9 @@ const (
 	GetSubaccount                         = "get_subaccount"
 	UpdateSubaccounts                     = "update_subaccounts"
 	SubaccountOwner                       = "subaccount_owner"
+	MarketMapperRevenueDistribution       = "market_mapper_revenue_distribution"
+	RevenueShareDistribution              = "revenue_share_distribution"
+	NetFeesPostRevenueShareDistribution   = "net_fees_post_revenue_share_distribution"
 
 	// Liquidation Daemon.
 	CheckCollateralizationForSubaccounts     = "check_collateralization_for_subaccounts"
@@ -306,6 +317,7 @@ const (
 	GetSubaccountsFromKey                    = "get_subaccounts_from_key"
 	LiquidatableSubaccountIds                = "liquidatable_subaccount_ids"
 	LiquidationDaemon                        = "liquidation_daemon"
+	NumRequests                              = "num_requests"
 	NegativeTncSubaccountIds                 = "negative_tnc_subaccount_ids"
 	PageLimit                                = "page_limit"
 	SendLiquidatableSubaccountIds            = "send_liquidatable_subaccount_ids"
@@ -364,8 +376,6 @@ const (
 	PriceUpdaterZeroPrices                  = "price_updater_zero_prices"
 
 	// Pricefeed Server.
-	GetValidPrices                = "get_valid_prices"
-	ValidPrices                   = "valid_prices"
 	NoMarketPrice                 = "no_market_price"
 	NoValidMedianPrice            = "no_valid_median_price"
 	PricefeedServer               = "pricefeed_server"
@@ -401,6 +411,12 @@ const (
 	ValidatorNumFills              = "validator_num_fills"
 	ValidatorNumMatchedTakerOrders = "validator_num_matched_taker_orders"
 	ValidatorVolumeQuoteQuantums   = "validator_volume_quote_quantums"
+
+	// x/revshare
+	RevShareType = "rev_share_type"
+
+	// x/acocuntplus
+	TimestampNonce = "timestamp_nonce"
 
 	// x/ratelimit
 	Capacity           = "capacity"

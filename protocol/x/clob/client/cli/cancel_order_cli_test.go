@@ -19,8 +19,8 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/testutil/appoptions"
 	testutil_bank "github.com/dydxprotocol/v4-chain/protocol/testutil/bank"
 	"github.com/dydxprotocol/v4-chain/protocol/testutil/constants"
-	testutil "github.com/dydxprotocol/v4-chain/protocol/testutil/keeper"
 	"github.com/dydxprotocol/v4-chain/protocol/testutil/network"
+	testutil "github.com/dydxprotocol/v4-chain/protocol/testutil/util"
 	cli_testutil "github.com/dydxprotocol/v4-chain/protocol/x/clob/client/testutil"
 	"github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 	epochstypes "github.com/dydxprotocol/v4-chain/protocol/x/epochs/types"
@@ -73,6 +73,7 @@ func (s *CancelOrderIntegrationTestSuite) SetupTest() {
 			// Disable the Bridge and Price daemons in the integration tests.
 			appOptions.Set(daemonflags.FlagPriceDaemonEnabled, false)
 			appOptions.Set(daemonflags.FlagBridgeDaemonEnabled, false)
+			appOptions.Set(daemonflags.FlagOracleEnabled, false)
 
 			// Effectively disable the health monitor panic timeout for these tests. This is necessary
 			// because all clob cli tests are running in the same process and the total time to run is >> 5 minutes
@@ -124,7 +125,7 @@ func (s *CancelOrderIntegrationTestSuite) SetupTest() {
 				Owner:  s.validatorAddress.String(),
 				Number: cancelsSubaccountNumberZero,
 			},
-			AssetPositions:     testutil.CreateUsdcAssetPosition(big.NewInt(cancelsInitialQuoteBalance)),
+			AssetPositions:     testutil.CreateUsdcAssetPositions(big.NewInt(cancelsInitialQuoteBalance)),
 			PerpetualPositions: []*satypes.PerpetualPosition{},
 		},
 		satypes.Subaccount{
@@ -132,7 +133,7 @@ func (s *CancelOrderIntegrationTestSuite) SetupTest() {
 				Owner:  s.validatorAddress.String(),
 				Number: cancelsSubaccountNumberOne,
 			},
-			AssetPositions:     testutil.CreateUsdcAssetPosition(big.NewInt(cancelsInitialQuoteBalance)),
+			AssetPositions:     testutil.CreateUsdcAssetPositions(big.NewInt(cancelsInitialQuoteBalance)),
 			PerpetualPositions: []*satypes.PerpetualPosition{},
 		},
 	)
@@ -207,6 +208,7 @@ func (s *CancelOrderIntegrationTestSuite) TestCLICancelPendingOrder() {
 		s.validatorAddress,
 		cancelsSubaccountNumberZero,
 		clientId,
+		constants.ClobPair_Btc.Id,
 		goodTilBlock,
 	)
 	s.Require().NoError(err)
@@ -232,6 +234,7 @@ func (s *CancelOrderIntegrationTestSuite) TestCLICancelPendingOrder() {
 		s.validatorAddress,
 		cancelsSubaccountNumberZero,
 		unknownClientId,
+		constants.ClobPair_Btc.Id,
 		goodTilBlock,
 	)
 	s.Require().NoError(err)
@@ -345,6 +348,7 @@ func (s *CancelOrderIntegrationTestSuite) TestCLICancelMatchingOrders() {
 		s.validatorAddress,
 		cancelsSubaccountNumberZero,
 		clientId,
+		constants.ClobPair_Btc.Id,
 		goodTilBlock,
 	)
 	s.Require().NoError(err)

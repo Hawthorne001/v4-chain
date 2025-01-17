@@ -11,6 +11,7 @@ import (
 
 	cmt "github.com/cometbft/cometbft/types"
 	testapp "github.com/dydxprotocol/v4-chain/protocol/testutil/app"
+	perptest "github.com/dydxprotocol/v4-chain/protocol/testutil/perpetuals"
 
 	"github.com/dydxprotocol/v4-chain/protocol/indexer/indexer_manager"
 
@@ -56,7 +57,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 		expectedMultiStoreWrites []string
 		expectedOrderStatus      types.OrderStatus
 		expectedFilledSize       satypes.BaseQuantums
-		expectedErr              error
+		// Expected remaining OI after test.
+		// The test initializes each perp with default open interest of 1 full coin.
+		expectedOpenInterests map[uint32]*big.Int
+		expectedErr           error
 	}{
 		"Can place an order on the orderbook closing a position": {
 			perpetuals: []perptypes.Perpetual{
@@ -72,6 +76,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 
 			expectedOrderStatus: types.Success,
 			expectedFilledSize:  0,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
+			},
 		},
 		"Can place an order on the orderbook in a different market than their current perpetual position": {
 			perpetuals: []perptypes.Perpetual{
@@ -91,6 +99,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 
 			expectedOrderStatus: types.Success,
 			expectedFilledSize:  0,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
+			},
 		},
 		"Can place an order and the order is fully matched": {
 			perpetuals: []perptypes.Perpetual{
@@ -129,37 +141,18 @@ func TestPlaceShortTermOrder(t *testing.T) {
 				// Update block stats
 				statstypes.BlockStatsKey,
 				// Update prunable block height for taker fill amount
-				types.BlockHeightToPotentiallyPrunableOrdersPrefix,
+				types.PrunableOrdersKeyPrefix,
 				// Update taker order fill amount
 				types.OrderAmountFilledKeyPrefix,
-				// Update taker order fill amount in memStore
-				types.OrderAmountFilledKeyPrefix,
 				// Update prunable block height for maker fill amount
-				types.BlockHeightToPotentiallyPrunableOrdersPrefix,
+				types.PrunableOrdersKeyPrefix,
 				// Update maker order fill amount
 				types.OrderAmountFilledKeyPrefix,
-				// Update maker order fill amount in memStore
-				types.OrderAmountFilledKeyPrefix,
 			},
-		},
-		"Cannot place an order on the orderbook if the account would be undercollateralized": {
-			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_SmallMarginRequirement,
-				constants.EthUsd_20PercentInitial_10PercentMaintenance,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// positions fully closed
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(0),
 			},
-			subaccounts: []satypes.Subaccount{
-				constants.Carl_Num0_599USD,
-			},
-			clobs: []types.ClobPair{
-				constants.ClobPair_Btc,
-				constants.ClobPair_Eth,
-			},
-			feeParams: constants.PerpetualFeeParams,
-
-			order: constants.Order_Carl_Num0_Id3_Clob1_Buy1ETH_Price3000,
-
-			expectedOrderStatus: types.Undercollateralized,
-			expectedFilledSize:  0,
 		},
 		"Can place an order on the orderbook if the subaccount is right at the initial margin ratio": {
 			perpetuals: []perptypes.Perpetual{
@@ -177,24 +170,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 
 			expectedOrderStatus: types.Success,
 			expectedFilledSize:  0,
-		},
-		"Cannot place an order on the orderbook if the account would be undercollateralized due to fees paid": {
-			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_100PercentMarginRequirement,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
 			},
-			subaccounts: []satypes.Subaccount{
-				constants.Carl_Num0_1BTC_Short,
-			},
-			clobs: []types.ClobPair{
-				// Exact same set-up as the previous test, except the clob pair has fees.
-				constants.ClobPair_Btc,
-			},
-			feeParams: constants.PerpetualFeeParams,
-
-			order: constants.Order_Carl_Num0_Id0_Clob0_Buy10QtBTC_Price100000QuoteQt,
-
-			expectedOrderStatus: types.Undercollateralized,
-			expectedFilledSize:  0,
 		},
 		"Can place an order on the orderbook if the account would be collateralized due to rebate": {
 			perpetuals: []perptypes.Perpetual{
@@ -214,6 +193,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 
 			expectedOrderStatus: types.Success,
 			expectedFilledSize:  0,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
+			},
 		},
 		"Cannot open an order if it doesn't reference a valid CLOB": {
 			perpetuals: []perptypes.Perpetual{
@@ -231,6 +214,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			order: constants.Order_Carl_Num0_Id3_Clob1_Buy1ETH_Price3000,
 
 			expectedErr: types.ErrInvalidClob,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
+			},
 		},
 		"Cannot open an order if the subticks are invalid": {
 			perpetuals: []perptypes.Perpetual{
@@ -253,6 +240,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			},
 
 			expectedErr: types.ErrInvalidPlaceOrder,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
+			},
 		},
 		"Cannot open an order that is smaller than the minimum base quantums": {
 			perpetuals: []perptypes.Perpetual{
@@ -275,6 +266,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			},
 
 			expectedErr: types.ErrInvalidPlaceOrder,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
+			},
 		},
 		"Cannot open an order that is not divisible by the step size base quantums": {
 			perpetuals: []perptypes.Perpetual{
@@ -295,6 +290,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			},
 
 			expectedErr: types.ErrInvalidPlaceOrder,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
+			},
 		},
 		"Cannot open an order with a GoodTilBlock in the past": {
 			perpetuals: []perptypes.Perpetual{
@@ -316,6 +315,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			},
 
 			expectedErr: types.ErrHeightExceedsGoodTilBlock,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
+			},
 		},
 		"Cannot open an order with a GoodTilBlock greater than ShortBlockWindow blocks in the future": {
 			perpetuals: []perptypes.Perpetual{
@@ -337,69 +340,10 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			},
 
 			expectedErr: types.ErrGoodTilBlockExceedsShortBlockWindow,
-		},
-		// This is a regression test for an issue whereby orders that had been previously matched were being checked for
-		// collateralization as if the subticks of the order were `0`. This resulted in always using `0`
-		// `bigFillQuoteQuantums` for the order when performing collateralization checks during `PlaceOrder`.
-		// This meant that previous buy orders in the match queue could only ever increase collateralization
-		// of the subaccount.
-		// Context: https://dydx-team.slack.com/archives/C03SLFHC3L7/p1668105457456389
-		`Regression: New order should be undercollateralized when adding to the orderbook when previous fills make it
-			undercollateralized`: {
-			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_100PercentMarginRequirement,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// unchanged, no match happened
+				constants.BtcUsd_SmallMarginRequirement.Params.Id: big.NewInt(100_000_000),
 			},
-			subaccounts: []satypes.Subaccount{
-				constants.Carl_Num1_500USD,
-				constants.Carl_Num0_10000USD,
-			},
-			clobs: []types.ClobPair{
-				constants.ClobPair_Btc,
-			},
-			existingOrders: []types.Order{
-				// The maker subaccount places an order which is a maker order to buy $500 worth of BTC.
-				// The subaccount has a balance of $500 worth of USDC, and the perpetual has a 100% margin requirement.
-				// This order does not match, and is placed on the book as a maker order.
-				constants.Order_Carl_Num1_Id0_Clob0_Buy1kQtBTC_Price50000,
-				// The taker subaccount places an order which fully fills the previous order.
-				constants.Order_Carl_Num0_Id0_Clob0_Sell1kQtBTC_Price50000,
-			},
-			feeParams: constants.PerpetualFeeParamsNoFee,
-			// The maker subaccount places a second order identical to the first.
-			// This should fail, because the maker subaccount currently has a balance of $0 USDC, and a perpetual of size
-			// 0.01 BTC ($500), and the perpetual has a 100% margin requirement.
-			order:               constants.Order_Carl_Num1_Id1_Clob0_Buy1kQtBTC_Price50000,
-			expectedOrderStatus: types.Undercollateralized,
-		},
-		`Regression: New order should be undercollateralized when matching when previous fills make it
-				undercollateralized`: {
-			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_100PercentMarginRequirement,
-			},
-			subaccounts: []satypes.Subaccount{
-				constants.Carl_Num1_500USD,
-				constants.Carl_Num0_10000USD,
-			},
-			clobs: []types.ClobPair{
-				constants.ClobPair_Btc,
-			},
-			existingOrders: []types.Order{
-				// The maker subaccount places an order which is a maker order to buy $500 worth of BTC.
-				// The subaccount has a balance of $500 worth of USDC, and the perpetual has a 100% margin requirement.
-				// This order does not match, and is placed on the book as a maker order.
-				constants.Order_Carl_Num1_Id0_Clob0_Buy1kQtBTC_Price50000,
-				// The taker subaccount places an order which fully fills the previous order.
-				constants.Order_Carl_Num0_Id0_Clob0_Sell1kQtBTC_Price50000,
-				// Match queue is now empty.
-				// The subaccount from the above order now places an order which is added to the book.
-				constants.Order_Carl_Num0_Id1_Clob0_Sell1kQtBTC_Price50000,
-			},
-			feeParams: constants.PerpetualFeeParamsNoFee,
-			// The maker subaccount places a second order identical to the first.
-			// This should fail, because the maker during matching, because subaccount currently has a balance of $0 USDC,
-			// and a perpetual of size 0.01 BTC ($500), and the perpetual has a 100% margin requirement.
-			order:               constants.Order_Carl_Num1_Id1_Clob0_Buy1kQtBTC_Price50000,
-			expectedOrderStatus: types.Undercollateralized,
 		},
 		`New order should be undercollateralized when matching when previous fills make it undercollateralized when using
 				maker orders subticks, but would be collateralized if using taker order subticks`: {
@@ -445,17 +389,17 @@ func TestPlaceShortTermOrder(t *testing.T) {
 				// Update block stats
 				statstypes.BlockStatsKey,
 				// Update prunable block height for taker fill amount
-				types.BlockHeightToPotentiallyPrunableOrdersPrefix,
+				types.PrunableOrdersKeyPrefix,
 				// Update taker order fill amount
 				types.OrderAmountFilledKeyPrefix,
-				// Update taker order fill amount in memStore
-				types.OrderAmountFilledKeyPrefix,
 				// Update prunable block height for maker fill amount
-				types.BlockHeightToPotentiallyPrunableOrdersPrefix,
+				types.PrunableOrdersKeyPrefix,
 				// Update maker order fill amount
 				types.OrderAmountFilledKeyPrefix,
-				// Update maker order fill amount in memStore
-				types.OrderAmountFilledKeyPrefix,
+			},
+			expectedOpenInterests: map[uint32]*big.Int{
+				// 1 BTC + 0.01 BTC + 0.01 BTC filled
+				constants.BtcUsd_50PercentInitial_40PercentMaintenance.Params.Id: big.NewInt(102_000_000),
 			},
 		},
 		// This is a regression test for an issue whereby orders that had been previously matched were being checked for
@@ -507,32 +451,12 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			// quantums required to open the previous buy order and fail.
 			order:               constants.Order_Carl_Num0_Id4_Clob1_Buy01ETH_Price3000,
 			expectedOrderStatus: types.Success,
-		},
-		`Subaccount cannot place maker buy order for 1 BTC at 5 subticks with 0 collateral`: {
-			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_50PercentInitial_40PercentMaintenance,
+			expectedOpenInterests: map[uint32]*big.Int{
+				// Unchanged, no BTC match happened
+				constants.BtcUsd_NoMarginRequirement.Params.Id: big.NewInt(100_000_000),
+				// 1 ETH + 1 ETH filled
+				constants.EthUsd_20PercentInitial_10PercentMaintenance.Params.Id: big.NewInt(2_000_000_000),
 			},
-			subaccounts: []satypes.Subaccount{constants.Carl_Num0_0USD},
-			clobs: []types.ClobPair{
-				constants.ClobPair_Btc,
-			},
-			existingOrders: []types.Order{},
-			feeParams:      constants.PerpetualFeeParamsNoFee,
-			order:          constants.Order_Carl_Num0_Id0_Clob0_Buy1BTC_Price5subticks_GTB10,
-			expectedErr:    types.ErrOrderWouldExceedMaxOpenOrdersEquityTierLimit,
-		},
-		`Subaccount cannot place maker sell order for 1 BTC at 500,000 with 0 collateral`: {
-			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_50PercentInitial_40PercentMaintenance,
-			},
-			subaccounts: []satypes.Subaccount{constants.Carl_Num0_0USD},
-			clobs: []types.ClobPair{
-				constants.ClobPair_Btc,
-			},
-			existingOrders: []types.Order{},
-			feeParams:      constants.PerpetualFeeParamsNoFee,
-			order:          constants.Order_Carl_Num0_Id0_Clob0_Sell1BTC_Price500000_GTB10,
-			expectedErr:    types.ErrOrderWouldExceedMaxOpenOrdersEquityTierLimit,
 		},
 		// <grouped tests: deprecating pessimistic value collateralization check -- BUY>
 		// The following 3 tests are a group to test the deprecation of pessimistic collateralization check.
@@ -552,22 +476,6 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			feeParams:                constants.PerpetualFeeParamsNoFee,
 			order:                    constants.Order_Carl_Num0_Id0_Clob0_Buy1BTC_Price5subticks_GTB10,
 			expectedOrderStatus:      types.Success,
-			expectedFilledSize:       0,
-			expectedMultiStoreWrites: []string{},
-		},
-		`Subaccount cannot place buy order due to a failed collateralization check with its maker price but would
-				pass if using the oracle price`: {
-			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_50PercentInitial_40PercentMaintenance,
-			},
-			subaccounts: []satypes.Subaccount{constants.Carl_Num0_100000USD},
-			clobs: []types.ClobPair{
-				constants.ClobPair_Btc,
-			},
-			existingOrders:           []types.Order{},
-			feeParams:                constants.PerpetualFeeParamsNoFee,
-			order:                    constants.Order_Carl_Num0_Id0_Clob0_Buy1BTC_Price500000_GTB10,
-			expectedOrderStatus:      types.Undercollateralized,
 			expectedFilledSize:       0,
 			expectedMultiStoreWrites: []string{},
 		},
@@ -605,22 +513,6 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			feeParams:                constants.PerpetualFeeParamsNoFee,
 			order:                    constants.Order_Carl_Num0_Id0_Clob0_Sell1BTC_Price500000_GTB10,
 			expectedOrderStatus:      types.Success,
-			expectedFilledSize:       0,
-			expectedMultiStoreWrites: []string{},
-		},
-		`Subaccount cannot place sell order due to a failed collateralization check with its maker price but would
-				pass if using the oracle price`: {
-			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_50PercentInitial_40PercentMaintenance,
-			},
-			subaccounts: []satypes.Subaccount{constants.Carl_Num0_50000USD},
-			clobs: []types.ClobPair{
-				constants.ClobPair_Btc,
-			},
-			existingOrders:           []types.Order{},
-			feeParams:                constants.PerpetualFeeParamsNoFee,
-			order:                    constants.Order_Carl_Num0_Id0_Clob0_Sell1BTC_Price5000_GTB10,
-			expectedOrderStatus:      types.Undercollateralized,
 			expectedFilledSize:       0,
 			expectedMultiStoreWrites: []string{},
 		},
@@ -684,6 +576,13 @@ func TestPlaceShortTermOrder(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			perptest.SetUpDefaultPerpOIsForTest(
+				t,
+				ks.Ctx,
+				ks.PerpetualsKeeper,
+				tc.perpetuals,
+			)
+
 			// Create all subaccounts.
 			for _, subaccount := range tc.subaccounts {
 				ks.SubaccountsKeeper.SetSubaccount(ctx, subaccount)
@@ -691,7 +590,7 @@ func TestPlaceShortTermOrder(t *testing.T) {
 
 			// Create all CLOBs.
 			for _, clobPair := range tc.clobs {
-				_, err = ks.ClobKeeper.CreatePerpetualClobPair(
+				_, err = ks.ClobKeeper.CreatePerpetualClobPairAndMemStructs(
 					ctx,
 					clobPair.Id,
 					clobtest.MustPerpetualId(clobPair),
@@ -724,7 +623,16 @@ func TestPlaceShortTermOrder(t *testing.T) {
 
 			// Create all existing orders.
 			for _, order := range tc.existingOrders {
-				_, _, err := ks.ClobKeeper.PlaceShortTermOrder(ctx, &types.MsgPlaceOrder{Order: order})
+				msg := &types.MsgPlaceOrder{Order: order}
+
+				txBuilder := constants.TestEncodingCfg.TxConfig.NewTxBuilder()
+				err := txBuilder.SetMsgs(msg)
+				require.NoError(t, err)
+				bytes, err := constants.TestEncodingCfg.TxConfig.TxEncoder()(txBuilder.GetTx())
+				require.NoError(t, err)
+				ctx = ctx.WithTxBytes(bytes)
+
+				_, _, err = ks.ClobKeeper.PlaceShortTermOrder(ctx, msg)
 				require.NoError(t, err)
 			}
 
@@ -733,6 +641,14 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			ctx.MultiStore().SetTracer(traceDecoder)
 
 			msg := &types.MsgPlaceOrder{Order: tc.order}
+
+			txBuilder := constants.TestEncodingCfg.TxConfig.NewTxBuilder()
+			err = txBuilder.SetMsgs(msg)
+			require.NoError(t, err)
+			bytes, err := constants.TestEncodingCfg.TxConfig.TxEncoder()(txBuilder.GetTx())
+			require.NoError(t, err)
+			ctx = ctx.WithTxBytes(bytes)
+
 			orderSizeOptimisticallyFilledFromMatching,
 				orderStatus,
 				err := ks.ClobKeeper.PlaceShortTermOrder(ctx, msg)
@@ -745,6 +661,19 @@ func TestPlaceShortTermOrder(t *testing.T) {
 			}
 
 			traceDecoder.RequireKeyPrefixesWritten(t, tc.expectedMultiStoreWrites)
+
+			for _, perp := range tc.perpetuals {
+				if expectedOI, exists := tc.expectedOpenInterests[perp.Params.Id]; exists {
+					gotPerp, err := ks.PerpetualsKeeper.GetPerpetual(ks.Ctx, perp.Params.Id)
+					require.NoError(t, err)
+					require.Zero(t,
+						expectedOI.Cmp(gotPerp.OpenInterest.BigInt()),
+						"expected open interest %s, got %s",
+						expectedOI.String(),
+						gotPerp.OpenInterest.String(),
+					)
+				}
+			}
 		})
 	}
 }
@@ -834,14 +763,10 @@ func TestAddPreexistingStatefulOrder(t *testing.T) {
 				indexer_manager.IndexerEventsCountKey,
 				// Update block stats
 				statstypes.BlockStatsKey,
-				// Update taker order fill amount to state and memStore.
+				// Update taker order fill amount to state.
 				types.OrderAmountFilledKeyPrefix +
 					string(constants.LongTermOrder_Carl_Num0_Id0_Clob0_Buy1BTC_Price50000_GTBT10.OrderId.ToStateKey()),
-				types.OrderAmountFilledKeyPrefix +
-					string(constants.LongTermOrder_Carl_Num0_Id0_Clob0_Buy1BTC_Price50000_GTBT10.OrderId.ToStateKey()),
-				// Update maker order fill amount to state and memStore.
-				types.OrderAmountFilledKeyPrefix +
-					string(constants.LongTermOrder_Dave_Num0_Id0_Clob0_Sell1BTC_Price50000_GTBT10.OrderId.ToStateKey()),
+				// Update maker order fill amount to state.
 				types.OrderAmountFilledKeyPrefix +
 					string(constants.LongTermOrder_Dave_Num0_Id0_Clob0_Sell1BTC_Price50000_GTBT10.OrderId.ToStateKey()),
 			},
@@ -912,6 +837,13 @@ func TestAddPreexistingStatefulOrder(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			perptest.SetUpDefaultPerpOIsForTest(
+				t,
+				ks.Ctx,
+				ks.PerpetualsKeeper,
+				tc.perpetuals,
+			)
+
 			// Create all subaccounts.
 			for _, subaccount := range tc.subaccounts {
 				ks.SubaccountsKeeper.SetSubaccount(ctx, subaccount)
@@ -919,7 +851,7 @@ func TestAddPreexistingStatefulOrder(t *testing.T) {
 
 			// Create all CLOBs.
 			for _, clobPair := range tc.clobs {
-				_, err := ks.ClobKeeper.CreatePerpetualClobPair(
+				_, err := ks.ClobKeeper.CreatePerpetualClobPairAndMemStructs(
 					ctx,
 					clobPair.Id,
 					clobPair.GetPerpetualClobMetadata().PerpetualId,
@@ -945,7 +877,7 @@ func TestAddPreexistingStatefulOrder(t *testing.T) {
 			for _, order := range tc.existingOrders {
 				if order.IsStatefulOrder() {
 					ks.ClobKeeper.SetLongTermOrderPlacement(ctx, order, blockHeight)
-					ks.ClobKeeper.MustAddOrderToStatefulOrdersTimeSlice(
+					ks.ClobKeeper.AddStatefulOrderIdExpiration(
 						ctx,
 						order.MustGetUnixGoodTilBlockTime(),
 						order.GetOrderId(),
@@ -966,7 +898,7 @@ func TestAddPreexistingStatefulOrder(t *testing.T) {
 			// by the time PlaceOrder was called, as PlaceOrder is called in PrepareCheckState for stateful orders.
 			if tc.order.IsStatefulOrder() {
 				ks.ClobKeeper.SetLongTermOrderPlacement(ctx, tc.order, blockHeight)
-				ks.ClobKeeper.MustAddOrderToStatefulOrdersTimeSlice(
+				ks.ClobKeeper.AddStatefulOrderIdExpiration(
 					ctx,
 					tc.order.MustGetUnixGoodTilBlockTime(),
 					tc.order.GetOrderId(),
@@ -988,7 +920,7 @@ func TestAddPreexistingStatefulOrder(t *testing.T) {
 			// Verify test expectations.
 			require.ErrorIs(t, err, tc.expectedErr)
 			statefulOrderPlacement, _ := ks.ClobKeeper.GetLongTermOrderPlacement(ctx, tc.order.OrderId)
-			statefulOrderIds := ks.ClobKeeper.GetStatefulOrdersTimeSlice(ctx, tc.order.MustGetUnixGoodTilBlockTime())
+			statefulOrderIds := ks.ClobKeeper.GetStatefulOrderIdExpirations(ctx, tc.order.MustGetUnixGoodTilBlockTime())
 			if err == nil {
 				require.Equal(t, tc.expectedOrderStatus, orderStatus)
 				require.Equal(t, tc.expectedFilledSize, orderSizeOptimisticallyFilledFromMatching)
@@ -1020,12 +952,14 @@ func TestPlaceOrder_SendOffchainMessages(t *testing.T) {
 	memClob.On("SetClobKeeper", mock.Anything).Return()
 
 	ks := keepertest.NewClobKeepersTestContext(t, memClob, &mocks.BankKeeper{}, indexerEventManager)
+
+	ks.MarketMapKeeper.InitGenesis(ks.Ctx, constants.MarketMap_DefaultGenesisState)
 	prices.InitGenesis(ks.Ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
 	perpetuals.InitGenesis(ks.Ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
 	ctx := ks.Ctx.WithTxBytes(constants.TestTxBytes)
 	ctx = ctx.WithIsCheckTx(true)
 
-	memClob.On("CreateOrderbook", ctx, constants.ClobPair_Btc).Return()
+	memClob.On("CreateOrderbook", constants.ClobPair_Btc).Return()
 	// PerpetualMarketCreateEvents are emitted when initializing the genesis state, so we need to mock
 	// the indexer event manager to expect these events.
 	indexerEventManager.On("AddTxnEvent",
@@ -1044,10 +978,11 @@ func TestPlaceOrder_SendOffchainMessages(t *testing.T) {
 				constants.ClobPair_Btc.SubticksPerTick,
 				constants.ClobPair_Btc.StepBaseQuantums,
 				constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.LiquidityTier,
+				constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.MarketType,
 			),
 		),
 	).Once().Return()
-	_, err := ks.ClobKeeper.CreatePerpetualClobPair(
+	_, err := ks.ClobKeeper.CreatePerpetualClobPairAndMemStructs(
 		ctx,
 		constants.ClobPair_Btc.Id,
 		clobtest.MustPerpetualId(constants.ClobPair_Btc),
@@ -1076,10 +1011,12 @@ func TestPerformStatefulOrderValidation_PreExistingStatefulOrder(t *testing.T) {
 	memClob.On("SetClobKeeper", mock.Anything).Return()
 	indexerEventManager := &mocks.IndexerEventManager{}
 	ks := keepertest.NewClobKeepersTestContext(t, memClob, &mocks.BankKeeper{}, indexerEventManager)
+
+	ks.MarketMapKeeper.InitGenesis(ks.Ctx, constants.MarketMap_DefaultGenesisState)
 	prices.InitGenesis(ks.Ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
 	perpetuals.InitGenesis(ks.Ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
 
-	memClob.On("CreateOrderbook", ks.Ctx, constants.ClobPair_Btc).Return()
+	memClob.On("CreateOrderbook", constants.ClobPair_Btc).Return()
 	// PerpetualMarketCreateEvents are emitted when initializing the genesis state, so we need to mock
 	// the indexer event manager to expect these events.
 	indexerEventManager.On("AddTxnEvent",
@@ -1098,10 +1035,11 @@ func TestPerformStatefulOrderValidation_PreExistingStatefulOrder(t *testing.T) {
 				constants.ClobPair_Btc.SubticksPerTick,
 				constants.ClobPair_Btc.StepBaseQuantums,
 				constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.LiquidityTier,
+				constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.MarketType,
 			),
 		),
 	).Once().Return()
-	_, err := ks.ClobKeeper.CreatePerpetualClobPair(
+	_, err := ks.ClobKeeper.CreatePerpetualClobPairAndMemStructs(
 		ks.Ctx,
 		constants.ClobPair_Btc.Id,
 		clobtest.MustPerpetualId(constants.ClobPair_Btc),
@@ -1829,6 +1767,8 @@ func TestGetStatePosition_Success(t *testing.T) {
 			if tc.subaccount != nil {
 				ks.SubaccountsKeeper.SetSubaccount(ks.Ctx, *tc.subaccount)
 			}
+
+			ks.MarketMapKeeper.InitGenesis(ks.Ctx, constants.MarketMap_DefaultGenesisState)
 			prices.InitGenesis(ks.Ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
 			perpetuals.InitGenesis(ks.Ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
 
@@ -1852,10 +1792,11 @@ func TestGetStatePosition_Success(t *testing.T) {
 							cp.SubticksPerTick,
 							cp.StepBaseQuantums,
 							constants.Perpetuals_DefaultGenesisState.Perpetuals[i].Params.LiquidityTier,
+							constants.Perpetuals_DefaultGenesisState.Perpetuals[i].Params.MarketType,
 						),
 					),
 				).Once().Return()
-				_, err := ks.ClobKeeper.CreatePerpetualClobPair(
+				_, err := ks.ClobKeeper.CreatePerpetualClobPairAndMemStructs(
 					ks.Ctx,
 					cp.Id,
 					perpetualId,
@@ -1879,6 +1820,8 @@ func TestGetStatePosition_PanicsOnInvalidClob(t *testing.T) {
 	// Setup keeper state.
 	memClob := memclob.NewMemClobPriceTimePriority(false)
 	ks := keepertest.NewClobKeepersTestContext(t, memClob, &mocks.BankKeeper{}, &mocks.IndexerEventManager{})
+
+	ks.MarketMapKeeper.InitGenesis(ks.Ctx, constants.MarketMap_DefaultGenesisState)
 	prices.InitGenesis(ks.Ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
 	perpetuals.InitGenesis(ks.Ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
 
@@ -1910,7 +1853,7 @@ func TestGetStatePosition_PanicsOnInvalidClob(t *testing.T) {
 
 // 	// Create CLOB pair.
 // 	clobPair := constants.ClobPair_Asset
-// 	clobKeeper.CreatePerpetualClobPair(
+// 	clobKeeper.CreatePerpetualClobPairAndMemStructs(
 // 		ctx,
 // 		clobPair.Metadata.(*types.ClobPair_PerpetualClobMetadata),
 // 		satypes.BaseQuantums(clobPair.StepBaseQuantums),
@@ -2044,11 +1987,13 @@ func TestInitStatefulOrders(t *testing.T) {
 			indexerEventManager := &mocks.IndexerEventManager{}
 
 			ks := keepertest.NewClobKeepersTestContext(t, memClob, &mocks.BankKeeper{}, indexerEventManager)
+
+			ks.MarketMapKeeper.InitGenesis(ks.Ctx, constants.MarketMap_DefaultGenesisState)
 			prices.InitGenesis(ks.Ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
 			perpetuals.InitGenesis(ks.Ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
 
 			// Create CLOB pair.
-			memClob.On("CreateOrderbook", mock.Anything, constants.ClobPair_Btc).Return()
+			memClob.On("CreateOrderbook", constants.ClobPair_Btc).Return()
 			indexerEventManager.On("AddTxnEvent",
 				ks.Ctx,
 				indexerevents.SubtypePerpetualMarket,
@@ -2065,10 +2010,11 @@ func TestInitStatefulOrders(t *testing.T) {
 						constants.ClobPair_Btc.SubticksPerTick,
 						constants.ClobPair_Btc.StepBaseQuantums,
 						constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.LiquidityTier,
+						constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.MarketType,
 					),
 				),
 			).Once().Return()
-			_, err := ks.ClobKeeper.CreatePerpetualClobPair(
+			_, err := ks.ClobKeeper.CreatePerpetualClobPairAndMemStructs(
 				ks.Ctx,
 				constants.ClobPair_Btc.Id,
 				clobtest.MustPerpetualId(constants.ClobPair_Btc),
@@ -2125,124 +2071,6 @@ func TestInitStatefulOrders(t *testing.T) {
 				len(constants.TestOffchainMessages)*len(expectedPlacedOrders),
 			)
 			memClob.AssertExpectations(t)
-		})
-	}
-}
-
-func TestHydrateUntriggeredConditionalOrdersInMemClob(t *testing.T) {
-	tests := map[string]struct {
-		// CLOB module state.
-		statefulOrdersInState       []types.Order
-		isConditionalOrderTriggered map[types.OrderId]bool
-	}{
-		`Can initialize untriggered conditional orders with 0 stateful orders in state`: {
-			statefulOrdersInState:       []types.Order{},
-			isConditionalOrderTriggered: map[types.OrderId]bool{},
-		},
-		`Can initialize untriggered conditional orders with both Long-Term and triggered
-			conditional orders in state`: {
-			statefulOrdersInState: []types.Order{
-				constants.ConditionalOrder_Bob_Num0_Id0_Clob0_Sell1BTC_Price50000_GTBT10_TP_50005,
-				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy100_Price10_GTBT15_PO,
-			},
-			isConditionalOrderTriggered: map[types.OrderId]bool{
-				constants.ConditionalOrder_Bob_Num0_Id0_Clob0_Sell1BTC_Price50000_GTBT10_TP_50005.
-					OrderId: true,
-			},
-		},
-		`Can initialize untriggered conditional orders with both Long-Term, untriggered conditional
-			orders, and triggered conditional orders in state`: {
-			statefulOrdersInState: []types.Order{
-				constants.ConditionalOrder_Carl_Num0_Id0_Clob0_Buy1BTC_Price50000_GTBT10,
-				constants.ConditionalOrder_Bob_Num0_Id0_Clob0_Sell1BTC_Price50000_GTBT10_TP_50005,
-				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy100_Price10_GTBT15_PO,
-				constants.ConditionalOrder_Alice_Num0_Id1_Clob0_Buy15_Price10_GTBT15_TakeProfit20,
-				constants.LongTermOrder_Bob_Num0_Id0_Clob0_Buy25_Price30_GTBT10,
-			},
-			isConditionalOrderTriggered: map[types.OrderId]bool{
-				constants.ConditionalOrder_Bob_Num0_Id0_Clob0_Sell1BTC_Price50000_GTBT10_TP_50005.
-					OrderId: true,
-			},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			// Setup state.
-			memClob := &mocks.MemClob{}
-			memClob.On("SetClobKeeper", mock.Anything).Return()
-
-			indexerEventManager := &mocks.IndexerEventManager{}
-
-			ks := keepertest.NewClobKeepersTestContext(t, memClob, &mocks.BankKeeper{}, indexerEventManager)
-			prices.InitGenesis(ks.Ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
-			perpetuals.InitGenesis(ks.Ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
-
-			// Create CLOB pair.
-			memClob.On("CreateOrderbook", mock.Anything, constants.ClobPair_Btc).Return()
-			indexerEventManager.On("AddTxnEvent",
-				ks.Ctx,
-				indexerevents.SubtypePerpetualMarket,
-				indexerevents.PerpetualMarketEventVersion,
-				indexer_manager.GetBytes(
-					indexerevents.NewPerpetualMarketCreateEvent(
-						0,
-						0,
-						constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.Ticker,
-						constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.MarketId,
-						constants.ClobPair_Btc.Status,
-						constants.ClobPair_Btc.QuantumConversionExponent,
-						constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.AtomicResolution,
-						constants.ClobPair_Btc.SubticksPerTick,
-						constants.ClobPair_Btc.StepBaseQuantums,
-						constants.Perpetuals_DefaultGenesisState.Perpetuals[0].Params.LiquidityTier,
-					),
-				),
-			).Once().Return()
-			_, err := ks.ClobKeeper.CreatePerpetualClobPair(
-				ks.Ctx,
-				constants.ClobPair_Btc.Id,
-				clobtest.MustPerpetualId(constants.ClobPair_Btc),
-				satypes.BaseQuantums(constants.ClobPair_Btc.StepBaseQuantums),
-				constants.ClobPair_Btc.QuantumConversionExponent,
-				constants.ClobPair_Btc.SubticksPerTick,
-				constants.ClobPair_Btc.Status,
-			)
-			require.NoError(t, err)
-
-			// Create each stateful order placement in state.
-			expectedUntriggeredConditionalOrders := make(map[types.ClobPairId]*keeper.UntriggeredConditionalOrders)
-			for i, order := range tc.statefulOrdersInState {
-				require.True(t, order.IsStatefulOrder())
-
-				// Write the stateful order placement to state.
-				ks.ClobKeeper.SetLongTermOrderPlacement(ks.Ctx, order, uint32(i))
-
-				// No further state updates are required if this isn't a conditional order.
-				if !order.IsConditionalOrder() {
-					continue
-				}
-
-				// If it's a triggered conditional order, ensure it's triggered in state and skip
-				// updating the expected untriggered conditional orders.
-				if tc.isConditionalOrderTriggered[order.OrderId] {
-					ks.ClobKeeper.MustTriggerConditionalOrder(ks.Ctx, order.OrderId)
-					continue
-				}
-
-				// This is an untriggered conditional order and we expect it to be returned.
-				untriggeredConditionalOrders, exists := expectedUntriggeredConditionalOrders[order.GetClobPairId()]
-				if !exists {
-					untriggeredConditionalOrders = ks.ClobKeeper.NewUntriggeredConditionalOrders()
-					expectedUntriggeredConditionalOrders[order.GetClobPairId()] = untriggeredConditionalOrders
-				}
-				untriggeredConditionalOrders.AddUntriggeredConditionalOrder(order)
-			}
-
-			// Run the test and verify expectations.
-			ks.ClobKeeper.HydrateUntriggeredConditionalOrders(ks.Ctx)
-
-			require.Equal(t, expectedUntriggeredConditionalOrders, ks.ClobKeeper.UntriggeredConditionalOrders)
 		})
 	}
 }
@@ -2342,6 +2170,8 @@ func TestPlaceStatefulOrdersFromLastBlock(t *testing.T) {
 				&mocks.BankKeeper{},
 				indexer_manager.NewIndexerEventManagerNoop(),
 			)
+
+			ks.MarketMapKeeper.InitGenesis(ks.Ctx, constants.MarketMap_DefaultGenesisState)
 			prices.InitGenesis(ks.Ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
 			perpetuals.InitGenesis(ks.Ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
 
@@ -2353,8 +2183,8 @@ func TestPlaceStatefulOrdersFromLastBlock(t *testing.T) {
 			})
 
 			// Create CLOB pair.
-			memClob.On("CreateOrderbook", mock.Anything, constants.ClobPair_Btc).Return()
-			_, err := ks.ClobKeeper.CreatePerpetualClobPair(
+			memClob.On("CreateOrderbook", constants.ClobPair_Btc).Return()
+			_, err := ks.ClobKeeper.CreatePerpetualClobPairAndMemStructs(
 				ctx,
 				constants.ClobPair_Btc.Id,
 				clobtest.MustPerpetualId(constants.ClobPair_Btc),
@@ -2388,7 +2218,139 @@ func TestPlaceStatefulOrdersFromLastBlock(t *testing.T) {
 			for _, order := range tc.orders {
 				orderIds = append(orderIds, order.OrderId)
 			}
-			ks.ClobKeeper.PlaceStatefulOrdersFromLastBlock(ctx, orderIds, offchainUpdates)
+			ks.ClobKeeper.PlaceStatefulOrdersFromLastBlock(ctx, orderIds, offchainUpdates, true)
+			ks.ClobKeeper.PlaceStatefulOrdersFromLastBlock(ctx, orderIds, offchainUpdates, false)
+
+			// PlaceStatefulOrdersFromLastBlock utilizes the memclob's PlaceOrder flow, but we
+			// do not want to emit PlaceMessages in offchain events for stateful orders. This assertion
+			// verifies that we call `ClearPlaceMessages()` on the offchain updates before returning.
+			require.Equal(t, 0, memclobtest.MessageCountOfType(offchainUpdates, types.PlaceMessageType))
+
+			// Verify that all removed orders have an associated off-chain update.
+			orderMap := make(map[types.OrderId]bool)
+			for _, order := range tc.orders {
+				orderMap[order.OrderId] = true
+			}
+
+			removedOrders := lib.FilterSlice(tc.expectedOrderPlacementCalls, func(order types.Order) bool {
+				return !orderMap[order.OrderId]
+			})
+
+			for _, order := range removedOrders {
+				require.True(
+					t,
+					memclobtest.HasMessage(offchainUpdates, order.OrderId, types.RemoveMessageType),
+				)
+			}
+
+			memClob.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPlaceStatefulOrdersFromLastBlock_PostOnly(t *testing.T) {
+	tests := map[string]struct {
+		orders         []types.Order
+		postOnlyFilter bool
+
+		expectedOrderPlacementCalls []types.Order
+	}{
+		"places PO stateful orders from last block when postOnlyFilter = true": {
+			postOnlyFilter: true,
+			orders: []types.Order{
+				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT5_PO,
+			},
+			expectedOrderPlacementCalls: []types.Order{
+				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT5_PO,
+			},
+		},
+		"does not places non-PO stateful orders when postOnlyFilter = true": {
+			postOnlyFilter: true,
+			orders: []types.Order{
+				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT5,
+			},
+			expectedOrderPlacementCalls: []types.Order{},
+		},
+		"does not places PO stateful orders from last block, when postOnlyFilter = false": {
+			postOnlyFilter: false,
+			orders: []types.Order{
+				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT5_PO,
+			},
+			expectedOrderPlacementCalls: []types.Order{},
+		},
+		"places non-PO stateful orders from last block when postOnlyFilter = false": {
+			postOnlyFilter: false,
+			orders: []types.Order{
+				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT5,
+			},
+			expectedOrderPlacementCalls: []types.Order{
+				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT5,
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Setup state.
+			memClob := &mocks.MemClob{}
+
+			memClob.On("SetClobKeeper", mock.Anything).Return()
+
+			ks := keepertest.NewClobKeepersTestContext(
+				t,
+				memClob,
+				&mocks.BankKeeper{},
+				indexer_manager.NewIndexerEventManagerNoop(),
+			)
+
+			ks.MarketMapKeeper.InitGenesis(ks.Ctx, constants.MarketMap_DefaultGenesisState)
+			prices.InitGenesis(ks.Ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
+			perpetuals.InitGenesis(ks.Ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
+
+			ctx := ks.Ctx.WithBlockHeight(int64(100)).WithBlockTime(time.Unix(5, 0))
+			ctx = ctx.WithIsCheckTx(true)
+			ks.BlockTimeKeeper.SetPreviousBlockInfo(ctx, &blocktimetypes.BlockInfo{
+				Height:    100,
+				Timestamp: time.Unix(int64(2), 0),
+			})
+
+			// Create CLOB pair.
+			memClob.On("CreateOrderbook", constants.ClobPair_Btc).Return()
+			_, err := ks.ClobKeeper.CreatePerpetualClobPairAndMemStructs(
+				ctx,
+				constants.ClobPair_Btc.Id,
+				clobtest.MustPerpetualId(constants.ClobPair_Btc),
+				satypes.BaseQuantums(constants.ClobPair_Btc.StepBaseQuantums),
+				constants.ClobPair_Btc.QuantumConversionExponent,
+				constants.ClobPair_Btc.SubticksPerTick,
+				constants.ClobPair_Btc.Status,
+			)
+			require.NoError(t, err)
+
+			// Create each stateful order placement in state
+			for i, order := range tc.orders {
+				require.True(t, order.IsStatefulOrder())
+
+				ks.ClobKeeper.SetLongTermOrderPlacement(ctx.WithIsCheckTx(false), order, uint32(i))
+			}
+
+			// Assert expected order placement memclob calls.
+			for _, order := range tc.expectedOrderPlacementCalls {
+				memClob.On("PlaceOrder", mock.Anything, order).Return(
+					satypes.BaseQuantums(0),
+					types.Success,
+					constants.TestOffchainUpdates,
+					nil,
+				).Once()
+			}
+
+			// Run the test and verify expectations.
+			offchainUpdates := types.NewOffchainUpdates()
+			orderIds := make([]types.OrderId, 0)
+			for _, order := range tc.orders {
+				orderIds = append(orderIds, order.OrderId)
+			}
+			ks.ClobKeeper.PlaceStatefulOrdersFromLastBlock(ctx, orderIds, offchainUpdates, tc.postOnlyFilter)
 
 			// PlaceStatefulOrdersFromLastBlock utilizes the memclob's PlaceOrder flow, but we
 			// do not want to emit PlaceMessages in offchain events for stateful orders. This assertion
@@ -2471,6 +2433,7 @@ func TestPlaceConditionalOrdersTriggeredInLastBlock(t *testing.T) {
 				&mocks.BankKeeper{},
 				indexer_manager.NewIndexerEventManagerNoop(),
 			)
+			ks.MarketMapKeeper.InitGenesis(ks.Ctx, constants.MarketMap_DefaultGenesisState)
 			prices.InitGenesis(ks.Ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
 			perpetuals.InitGenesis(ks.Ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
 
@@ -2482,8 +2445,8 @@ func TestPlaceConditionalOrdersTriggeredInLastBlock(t *testing.T) {
 			})
 
 			// Create CLOB pair.
-			memClob.On("CreateOrderbook", mock.Anything, constants.ClobPair_Btc).Return()
-			_, err := ks.ClobKeeper.CreatePerpetualClobPair(
+			memClob.On("CreateOrderbook", constants.ClobPair_Btc).Return()
+			_, err := ks.ClobKeeper.CreatePerpetualClobPairAndMemStructs(
 				ctx,
 				constants.ClobPair_Btc.Id,
 				clobtest.MustPerpetualId(constants.ClobPair_Btc),
@@ -2502,11 +2465,9 @@ func TestPlaceConditionalOrdersTriggeredInLastBlock(t *testing.T) {
 				longTermOrderPlacementBytes := ks.Cdc.MustMarshal(&longTermOrderPlacement)
 
 				store := ks.ClobKeeper.GetTriggeredConditionalOrderPlacementStore(ctx)
-				memstore := ks.ClobKeeper.GetTriggeredConditionalOrderPlacementMemStore(ctx)
 
 				orderKey := order.OrderId.ToStateKey()
 				store.Set(orderKey, longTermOrderPlacementBytes)
-				memstore.Set(orderKey, longTermOrderPlacementBytes)
 			}
 
 			// Write to untriggered orders state
@@ -2517,11 +2478,9 @@ func TestPlaceConditionalOrdersTriggeredInLastBlock(t *testing.T) {
 				longTermOrderPlacementBytes := ks.Cdc.MustMarshal(&longTermOrderPlacement)
 
 				store := ks.ClobKeeper.GetUntriggeredConditionalOrderPlacementStore(ctx)
-				memstore := ks.ClobKeeper.GetUntriggeredConditionalOrderPlacementMemStore(ctx)
 
 				orderKey := order.OrderId.ToStateKey()
 				store.Set(orderKey, longTermOrderPlacementBytes)
-				memstore.Set(orderKey, longTermOrderPlacementBytes)
 			}
 
 			// Assert expected order placement memclob calls.
@@ -2549,13 +2508,15 @@ func TestPlaceConditionalOrdersTriggeredInLastBlock(t *testing.T) {
 					t,
 					tc.expectedPanic,
 					func() {
-						ks.ClobKeeper.PlaceConditionalOrdersTriggeredInLastBlock(ctx, orderIds, offchainUpdates)
+						ks.ClobKeeper.PlaceConditionalOrdersTriggeredInLastBlock(ctx, orderIds, offchainUpdates, true)
+						ks.ClobKeeper.PlaceConditionalOrdersTriggeredInLastBlock(ctx, orderIds, offchainUpdates, false)
 					},
 				)
 				return
 			}
 
-			ks.ClobKeeper.PlaceConditionalOrdersTriggeredInLastBlock(ctx, orderIds, offchainUpdates)
+			ks.ClobKeeper.PlaceConditionalOrdersTriggeredInLastBlock(ctx, orderIds, offchainUpdates, true)
+			ks.ClobKeeper.PlaceConditionalOrdersTriggeredInLastBlock(ctx, orderIds, offchainUpdates, false)
 
 			// PlaceStatefulOrdersFromLastBlock utilizes the memclob's PlaceOrder flow, but we
 			// do not want to emit PlaceMessages in offchain events for stateful orders. This assertion

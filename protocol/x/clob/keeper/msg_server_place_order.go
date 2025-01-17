@@ -25,7 +25,7 @@ func (k msgServer) PlaceOrder(goCtx context.Context, msg *types.MsgPlaceOrder) (
 ) {
 	ctx := lib.UnwrapSDKContext(goCtx, types.ModuleName)
 
-	if err := k.Keeper.HandleMsgPlaceOrder(ctx, msg); err != nil {
+	if err := k.Keeper.HandleMsgPlaceOrder(ctx, msg, false); err != nil {
 		return nil, err
 	}
 
@@ -36,9 +36,11 @@ func (k msgServer) PlaceOrder(goCtx context.Context, msg *types.MsgPlaceOrder) (
 // 1. persisting the placement on chain.
 // 2. updating ProcessProposerMatchesEvents with the new stateful order placement.
 // 3. adding order placement on-chain indexer event.
+// Various logs, metrics, and validations are skipped for orders internal to the protocol.
 func (k Keeper) HandleMsgPlaceOrder(
 	ctx sdk.Context,
 	msg *types.MsgPlaceOrder,
+	isInternalOrder bool,
 ) (err error) {
 	lib.AssertDeliverTxMode(ctx)
 
@@ -49,34 +51,35 @@ func (k Keeper) HandleMsgPlaceOrder(
 		log.Callback, lib.TxMode(ctx),
 		log.BlockHeight, ctx.BlockHeight(),
 		log.Handler, log.PlaceOrder,
-		log.Msg, msg,
 	)
 
-	defer func() {
-		metrics.IncrSuccessOrErrorCounter(
-			err,
-			types.ModuleName,
-			metrics.PlaceOrder,
-			metrics.DeliverTx,
-			msg.Order.GetOrderLabels()...,
-		)
-		if err != nil {
-			if errors.Is(err, types.ErrStatefulOrderCollateralizationCheckFailed) {
-				telemetry.IncrCounterWithLabels(
-					[]string{
-						types.ModuleName,
-						metrics.PlaceOrder,
-						metrics.CollateralizationCheckFailed,
-					},
-					1,
-					msg.Order.GetOrderLabels(),
-				)
-				log.InfoLog(ctx, "Place Order Expected Error", log.Error, err)
-				return
+	if !isInternalOrder {
+		defer func() {
+			metrics.IncrSuccessOrErrorCounter(
+				err,
+				types.ModuleName,
+				metrics.PlaceOrder,
+				metrics.DeliverTx,
+				msg.Order.GetOrderLabels()...,
+			)
+			if err != nil {
+				if errors.Is(err, types.ErrStatefulOrderCollateralizationCheckFailed) {
+					telemetry.IncrCounterWithLabels(
+						[]string{
+							types.ModuleName,
+							metrics.PlaceOrder,
+							metrics.CollateralizationCheckFailed,
+						},
+						1,
+						msg.Order.GetOrderLabels(),
+					)
+					log.InfoLog(ctx, "Place Order Expected Error", log.Error, err)
+					return
+				}
+				log.ErrorLogWithError(ctx, "Error placing order", err)
 			}
-			log.ErrorLogWithError(ctx, "Error placing order", err)
-		}
-	}()
+		}()
+	}
 
 	// 1. Ensure the order is not a Short-Term order.
 	order := msg.GetOrder()
@@ -84,7 +87,7 @@ func (k Keeper) HandleMsgPlaceOrder(
 
 	// 2. Return an error if an associated cancellation or removal already exists in the current block.
 	processProposerMatchesEvents := k.GetProcessProposerMatchesEvents(ctx)
-	cancelledOrderIds := lib.UniqueSliceToSet(processProposerMatchesEvents.PlacedStatefulCancellationOrderIds)
+	cancelledOrderIds := lib.UniqueSliceToSet(k.GetDeliveredCancelledOrderIds(ctx))
 	if _, found := cancelledOrderIds[order.GetOrderId()]; found {
 		return errorsmod.Wrapf(
 			types.ErrStatefulOrderPreviouslyCancelled,
@@ -105,7 +108,7 @@ func (k Keeper) HandleMsgPlaceOrder(
 	//   - stateful order validation.
 	//   - collateralization check.
 	//   - writing the order to state and the memstore.
-	if err := k.PlaceStatefulOrder(ctx, msg); err != nil {
+	if err := k.PlaceStatefulOrder(ctx, msg, isInternalOrder); err != nil {
 		return err
 	}
 
@@ -121,8 +124,8 @@ func (k Keeper) HandleMsgPlaceOrder(
 				),
 			),
 		)
-		processProposerMatchesEvents.PlacedConditionalOrderIds = append(
-			processProposerMatchesEvents.PlacedConditionalOrderIds,
+		k.AddDeliveredConditionalOrderId(
+			ctx,
 			order.OrderId,
 		)
 	} else {
@@ -136,16 +139,11 @@ func (k Keeper) HandleMsgPlaceOrder(
 				),
 			),
 		)
-		processProposerMatchesEvents.PlacedLongTermOrderIds = append(
-			processProposerMatchesEvents.PlacedLongTermOrderIds,
+		k.AddDeliveredLongTermOrderId(
+			ctx,
 			order.OrderId,
 		)
 	}
-	// 5. Add the newly-placed stateful order to `ProcessProposerMatchesEvents` for use in `PrepareCheckState`.
-	k.MustSetProcessProposerMatchesEvents(
-		ctx,
-		processProposerMatchesEvents,
-	)
 
 	return nil
 }

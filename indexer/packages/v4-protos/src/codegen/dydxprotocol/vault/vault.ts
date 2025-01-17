@@ -49,6 +49,100 @@ export function vaultTypeToJSON(object: VaultType): string {
       return "UNRECOGNIZED";
   }
 }
+/** VaultStatus represents the status of a vault. */
+
+export enum VaultStatus {
+  /** VAULT_STATUS_UNSPECIFIED - Default value, invalid and unused. */
+  VAULT_STATUS_UNSPECIFIED = 0,
+
+  /**
+   * VAULT_STATUS_DEACTIVATED - Don’t place orders. Does not count toward global vault balances.
+   * A vault can only be set to this status if its equity is non-positive.
+   */
+  VAULT_STATUS_DEACTIVATED = 1,
+
+  /** VAULT_STATUS_STAND_BY - Don’t place orders. Does count towards global vault balances. */
+  VAULT_STATUS_STAND_BY = 2,
+
+  /** VAULT_STATUS_QUOTING - Places orders on both sides of the book. */
+  VAULT_STATUS_QUOTING = 3,
+
+  /** VAULT_STATUS_CLOSE_ONLY - Only place orders that close the position. */
+  VAULT_STATUS_CLOSE_ONLY = 4,
+  UNRECOGNIZED = -1,
+}
+/** VaultStatus represents the status of a vault. */
+
+export enum VaultStatusSDKType {
+  /** VAULT_STATUS_UNSPECIFIED - Default value, invalid and unused. */
+  VAULT_STATUS_UNSPECIFIED = 0,
+
+  /**
+   * VAULT_STATUS_DEACTIVATED - Don’t place orders. Does not count toward global vault balances.
+   * A vault can only be set to this status if its equity is non-positive.
+   */
+  VAULT_STATUS_DEACTIVATED = 1,
+
+  /** VAULT_STATUS_STAND_BY - Don’t place orders. Does count towards global vault balances. */
+  VAULT_STATUS_STAND_BY = 2,
+
+  /** VAULT_STATUS_QUOTING - Places orders on both sides of the book. */
+  VAULT_STATUS_QUOTING = 3,
+
+  /** VAULT_STATUS_CLOSE_ONLY - Only place orders that close the position. */
+  VAULT_STATUS_CLOSE_ONLY = 4,
+  UNRECOGNIZED = -1,
+}
+export function vaultStatusFromJSON(object: any): VaultStatus {
+  switch (object) {
+    case 0:
+    case "VAULT_STATUS_UNSPECIFIED":
+      return VaultStatus.VAULT_STATUS_UNSPECIFIED;
+
+    case 1:
+    case "VAULT_STATUS_DEACTIVATED":
+      return VaultStatus.VAULT_STATUS_DEACTIVATED;
+
+    case 2:
+    case "VAULT_STATUS_STAND_BY":
+      return VaultStatus.VAULT_STATUS_STAND_BY;
+
+    case 3:
+    case "VAULT_STATUS_QUOTING":
+      return VaultStatus.VAULT_STATUS_QUOTING;
+
+    case 4:
+    case "VAULT_STATUS_CLOSE_ONLY":
+      return VaultStatus.VAULT_STATUS_CLOSE_ONLY;
+
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return VaultStatus.UNRECOGNIZED;
+  }
+}
+export function vaultStatusToJSON(object: VaultStatus): string {
+  switch (object) {
+    case VaultStatus.VAULT_STATUS_UNSPECIFIED:
+      return "VAULT_STATUS_UNSPECIFIED";
+
+    case VaultStatus.VAULT_STATUS_DEACTIVATED:
+      return "VAULT_STATUS_DEACTIVATED";
+
+    case VaultStatus.VAULT_STATUS_STAND_BY:
+      return "VAULT_STATUS_STAND_BY";
+
+    case VaultStatus.VAULT_STATUS_QUOTING:
+      return "VAULT_STATUS_QUOTING";
+
+    case VaultStatus.VAULT_STATUS_CLOSE_ONLY:
+      return "VAULT_STATUS_CLOSE_ONLY";
+
+    case VaultStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
 /** VaultId uniquely identifies a vault by its type and number. */
 
 export interface VaultId {
@@ -66,18 +160,6 @@ export interface VaultIdSDKType {
   /** Unique ID of the vault within above type. */
 
   number: number;
-}
-/** NumShares represents the number of shares in a vault. */
-
-export interface NumShares {
-  /** Number of shares. */
-  numShares: Uint8Array;
-}
-/** NumShares represents the number of shares in a vault. */
-
-export interface NumSharesSDKType {
-  /** Number of shares. */
-  num_shares: Uint8Array;
 }
 
 function createBaseVaultId(): VaultId {
@@ -130,51 +212,6 @@ export const VaultId = {
     const message = createBaseVaultId();
     message.type = object.type ?? 0;
     message.number = object.number ?? 0;
-    return message;
-  }
-
-};
-
-function createBaseNumShares(): NumShares {
-  return {
-    numShares: new Uint8Array()
-  };
-}
-
-export const NumShares = {
-  encode(message: NumShares, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.numShares.length !== 0) {
-      writer.uint32(10).bytes(message.numShares);
-    }
-
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): NumShares {
-    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseNumShares();
-
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-
-      switch (tag >>> 3) {
-        case 1:
-          message.numShares = reader.bytes();
-          break;
-
-        default:
-          reader.skipType(tag & 7);
-          break;
-      }
-    }
-
-    return message;
-  },
-
-  fromPartial(object: DeepPartial<NumShares>): NumShares {
-    const message = createBaseNumShares();
-    message.numShares = object.numShares ?? new Uint8Array();
     return message;
   }
 

@@ -1,6 +1,6 @@
 # NB: This is a digest for a multi-arch manifest list, you will want to get this by running
-# `docker buildx imagetools inspect golang:1.21-alpine`
-ARG GOLANG_1_22_ALPINE_DIGEST="8e96e6cff6a388c2f70f5f662b64120941fcd7d4b89d62fec87520323a316bd9"
+# `docker buildx imagetools inspect golang:1.23.1-alpine`
+ARG GOLANG_1_23_ALPINE_DIGEST="ac67716dd016429be8d4c2c53a248d7bcdf06d34127d3dc451bda6aa5a87bc06"
 
 # This Dockerfile is a stateless build of the `dydxprotocold` binary as a Docker container.
 # It does not include any configuration, state, or genesis information.
@@ -9,7 +9,7 @@ ARG GOLANG_1_22_ALPINE_DIGEST="8e96e6cff6a388c2f70f5f662b64120941fcd7d4b89d62fec
 # Builder
 # --------------------------------------------------------
 
-FROM golang@sha256:${GOLANG_1_22_ALPINE_DIGEST} as builder
+FROM golang@sha256:${GOLANG_1_23_ALPINE_DIGEST} as builder
 ARG VERSION
 ARG COMMIT
 
@@ -41,24 +41,16 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -o /dydxprotocol/build/ \
       ./...
 
-# Build the oracle binary
-WORKDIR /
-RUN git clone https://github.com/skip-mev/slinky.git
-WORKDIR /slinky
-RUN make build
 
 # --------------------------------------------------------
 # Runner
 # --------------------------------------------------------
 
-FROM golang@sha256:${GOLANG_1_22_ALPINE_DIGEST}
+FROM golang@sha256:${GOLANG_1_23_ALPINE_DIGEST}
 
 RUN apk add --no-cache bash
 
 COPY --from=builder /dydxprotocol/build/dydxprotocold /bin/dydxprotocold
-COPY --from=builder /dydxprotocol/daemons/slinky/config/oracle.json /etc/oracle.json
-COPY --from=builder /dydxprotocol/daemons/slinky/config/market.json /etc/market.json
-COPY --from=builder /slinky/build/oracle /bin/slinky
 
 ENV HOME /dydxprotocol
 WORKDIR $HOME

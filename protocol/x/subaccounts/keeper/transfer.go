@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"fmt"
 	"math/big"
 
 	errorsmod "cosmossdk.io/errors"
@@ -8,7 +9,11 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
+	"github.com/dydxprotocol/v4-chain/protocol/lib/metrics"
 	assettypes "github.com/dydxprotocol/v4-chain/protocol/x/assets/types"
+	clobtypes "github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
+	perptypes "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/types"
+	revsharetypes "github.com/dydxprotocol/v4-chain/protocol/x/revshare/types"
 	"github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
 )
 
@@ -209,14 +214,119 @@ func (k Keeper) WithdrawFundsFromSubaccountToAccount(
 	)
 }
 
-// TransferFeesToFeeCollectorModule translates the assetId and quantums into a sdk.Coin,
-// and moves the funds from subaccounts module to the `fee_collector` module account by calling
-// bankKeeper.SendCoins(). Does not change any individual subaccount state.
-func (k Keeper) TransferFeesToFeeCollectorModule(
+// DistributeFees calculates the market mapper revenue share and fee collector share
+// based on the quantums and perpetual parameters, and transfers the fees to the
+// market mapper and fee collector.
+func (k Keeper) DistributeFees(
 	ctx sdk.Context,
 	assetId uint32,
+	revSharesForFill revsharetypes.RevSharesForFill,
+	fill clobtypes.FillForProcess,
+) error {
+	// get perpetual
+	totalFeeQuoteQuantums := new(big.Int).Add(fill.TakerFeeQuoteQuantums, fill.MakerFeeQuoteQuantums)
+	perpetual, err := k.perpetualsKeeper.GetPerpetual(ctx, fill.ProductId)
+	if err != nil {
+		return err
+	}
+
+	collateralPoolAddr, err := k.GetCollateralPoolFromPerpetualId(ctx, fill.ProductId)
+	if err != nil {
+		return err
+	}
+
+	// Transfer fees to rev share recipients
+	for _, revShare := range revSharesForFill.AllRevShares {
+		// transfer fees to the recipient
+		recipientAddress, err := sdk.AccAddressFromBech32(revShare.Recipient)
+		if err != nil {
+			return err
+		}
+		if err := k.TransferFees(
+			ctx,
+			assetId,
+			collateralPoolAddr,
+			recipientAddress,
+			revShare.QuoteQuantums,
+		); err != nil {
+			return err
+		}
+
+		// Emit revenue share
+		metrics.AddSampleWithLabels(
+			metrics.RevenueShareDistribution,
+			metrics.GetMetricValueFromBigInt(revShare.QuoteQuantums),
+			metrics.GetLabelForStringValue(metrics.RevShareType, revShare.RevShareType.String()),
+			metrics.GetLabelForStringValue(metrics.RecipientAddress, revShare.Recipient),
+		)
+
+		// Old metric which is being kept for now to ensure data continuity
+		if revShare.RevShareType == revsharetypes.REV_SHARE_TYPE_MARKET_MAPPER {
+			labels := []metrics.Label{
+				metrics.GetLabelForIntValue(metrics.MarketId, int(perpetual.Params.MarketId)),
+			}
+			metrics.AddSampleWithLabels(
+				metrics.MarketMapperRevenueDistribution,
+				metrics.GetMetricValueFromBigInt(revShare.QuoteQuantums),
+				labels...,
+			)
+		}
+	}
+
+	totalTakerFeeRevShareQuantums := big.NewInt(0)
+	if value, ok := revSharesForFill.FeeSourceToQuoteQuantums[revsharetypes.REV_SHARE_FEE_SOURCE_TAKER_FEE]; ok {
+		totalTakerFeeRevShareQuantums = value
+	}
+	totalNetFeeRevShareQuantums := big.NewInt(0)
+	if value, ok :=
+		revSharesForFill.FeeSourceToQuoteQuantums[revsharetypes.REV_SHARE_FEE_SOURCE_NET_PROTOCOL_REVENUE]; ok {
+		totalNetFeeRevShareQuantums = value
+	}
+
+	totalRevShareQuoteQuantums := big.NewInt(0).Add(
+		totalTakerFeeRevShareQuantums,
+		totalNetFeeRevShareQuantums,
+	)
+
+	// Remaining amount goes to the fee collector
+	feeCollectorShare := new(big.Int).Sub(
+		totalFeeQuoteQuantums,
+		totalRevShareQuoteQuantums,
+	)
+
+	// If Collector fee share is < 0, panic
+	if feeCollectorShare.Sign() < 0 {
+		panic("fee collector share is < 0")
+	}
+
+	// Emit fee colletor metric
+	metrics.AddSample(
+		metrics.NetFeesPostRevenueShareDistribution,
+		metrics.GetMetricValueFromBigInt(feeCollectorShare),
+	)
+
+	// Transfer fees to the fee collector
+	if err := k.TransferFees(
+		ctx,
+		assetId,
+		collateralPoolAddr,
+		authtypes.NewModuleAddress(authtypes.FeeCollectorName),
+		feeCollectorShare,
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// TransferFees translates the assetId and quantums into a sdk.Coin, and moves the funds from
+// `fromAddr` to `toAddr` by calling `bankKeeper.SendCoins()`
+func (k Keeper) TransferFees(
+	ctx sdk.Context,
+	assetId uint32,
+	fromAddr sdk.AccAddress,
+	toAddr sdk.AccAddress,
 	quantums *big.Int,
-	perpetualId uint32,
 ) error {
 	// TODO(DEC-715): Support non-USDC assets.
 	if assetId != assettypes.AssetUsdc.Id {
@@ -236,24 +346,16 @@ func (k Keeper) TransferFeesToFeeCollectorModule(
 		return err
 	}
 
-	collateralPoolAddr, err := k.GetCollateralPoolFromPerpetualId(ctx, perpetualId)
-	if err != nil {
-		return err
-	}
-
-	// Send coins from `subaccounts` to the `auth` module fee collector account.
-	fromModuleAddr := collateralPoolAddr
-	toModuleAddr := authtypes.NewModuleAddress(authtypes.FeeCollectorName)
-
 	if quantums.Sign() < 0 {
 		// In the case of a liquidation, net fees can be negative if the maker gets a rebate.
-		fromModuleAddr, toModuleAddr = toModuleAddr, fromModuleAddr
+		fromAddr, toAddr = toAddr, fromAddr
 	}
 
+	// Send coins from `fromAddr` to `toAddr`
 	if err := k.bankKeeper.SendCoins(
 		ctx,
-		fromModuleAddr,
-		toModuleAddr,
+		fromAddr,
+		toAddr,
 		[]sdk.Coin{coinToTransfer},
 	); err != nil {
 		return err
@@ -401,5 +503,91 @@ func (k Keeper) TransferFundsFromSubaccountToSubaccount(
 		ctx,
 		updates,
 		types.Transfer,
+	)
+}
+
+// TransferIsolatedInsuranceFundToCross transfers funds from an isolated perpetual's
+// insurance fund to the cross-perpetual insurance fund.
+// Note: This uses the `x/bank` keeper and modifies `x/bank` state.
+func (k Keeper) TransferIsolatedInsuranceFundToCross(ctx sdk.Context, perpetualId uint32) error {
+	// Validate perpetual exists
+	if _, err := k.perpetualsKeeper.GetPerpetual(ctx, perpetualId); err != nil {
+		return err
+	}
+
+	isolatedInsuranceFundBalance := k.GetInsuranceFundBalance(ctx, perpetualId)
+
+	// Skip if balance is zero
+	if isolatedInsuranceFundBalance.Sign() == 0 {
+		return nil
+	}
+
+	_, exists := k.assetsKeeper.GetAsset(ctx, assettypes.AssetUsdc.Id)
+	if !exists {
+		return fmt.Errorf("USDC asset not found in state")
+	}
+
+	_, coinToTransfer, err := k.assetsKeeper.ConvertAssetToCoin(
+		ctx,
+		assettypes.AssetUsdc.Id,
+		isolatedInsuranceFundBalance,
+	)
+	if err != nil {
+		return err
+	}
+
+	isolatedInsuranceFundAddr, err := k.perpetualsKeeper.GetInsuranceFundModuleAddress(ctx, perpetualId)
+	if err != nil {
+		return err
+	}
+
+	crossInsuranceFundAddr := perptypes.InsuranceFundModuleAddress
+
+	return k.bankKeeper.SendCoins(
+		ctx,
+		isolatedInsuranceFundAddr,
+		crossInsuranceFundAddr,
+		[]sdk.Coin{coinToTransfer},
+	)
+}
+
+// TransferIsolatedCollateralToCross transfers the collateral balance from an isolated perpetual's
+// collateral pool to the cross-margin collateral pool. This is used during the upgrade process
+// from isolated perpetuals to cross-margin.
+// Note: This uses the `x/bank` keeper and modifies `x/bank` state.
+func (k Keeper) TransferIsolatedCollateralToCross(ctx sdk.Context, perpetualId uint32) error {
+	// Validate perpetual exists
+	if _, err := k.perpetualsKeeper.GetPerpetual(ctx, perpetualId); err != nil {
+		return err
+	}
+
+	isolatedCollateralPoolAddr, err := k.GetCollateralPoolFromPerpetualId(ctx, perpetualId)
+	if err != nil {
+		return err
+	}
+
+	crossCollateralPoolAddr := types.ModuleAddress
+
+	usdcAsset, exists := k.assetsKeeper.GetAsset(ctx, assettypes.AssetUsdc.Id)
+	if !exists {
+		panic("TransferIsolatedCollateralToCross: Usdc asset not found in state")
+	}
+
+	isolatedCollateralPoolBalance := k.bankKeeper.GetBalance(
+		ctx,
+		isolatedCollateralPoolAddr,
+		usdcAsset.Denom,
+	)
+
+	// Skip if balance is zero
+	if isolatedCollateralPoolBalance.IsZero() {
+		return nil
+	}
+
+	return k.bankKeeper.SendCoins(
+		ctx,
+		isolatedCollateralPoolAddr,
+		crossCollateralPoolAddr,
+		[]sdk.Coin{isolatedCollateralPoolBalance},
 	)
 }

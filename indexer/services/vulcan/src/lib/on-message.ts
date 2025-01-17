@@ -1,4 +1,5 @@
 import {
+  getInstanceId,
   logger,
   stats,
   ParseMessageError,
@@ -42,9 +43,17 @@ function getMessageType(update: OffChainUpdateV1): string {
 }
 
 export async function onMessage(message: KafkaMessage): Promise<void> {
-  stats.increment(`${config.SERVICE_NAME}.received_kafka_message`, 1);
+  stats.increment(
+    `${config.SERVICE_NAME}.received_kafka_message`,
+    1,
+    { instance: getInstanceId() },
+  );
   if (!message || !message.value || !message.timestamp) {
-    stats.increment(`${config.SERVICE_NAME}.empty_kafka_message`, 1);
+    stats.increment(
+      `${config.SERVICE_NAME}.empty_kafka_message`,
+      1,
+      { instance: getInstanceId() },
+    );
     logger.error({
       at: 'onMessage#onMessage',
       message: 'Empty message',
@@ -59,8 +68,23 @@ export async function onMessage(message: KafkaMessage): Promise<void> {
     STATS_NO_SAMPLING,
     {
       topic: KafkaTopics.TO_VULCAN,
+      instance: getInstanceId(),
     },
   );
+
+  const originalMessageTimestamp = message.headers?.message_received_timestamp;
+  if (originalMessageTimestamp !== undefined) {
+    stats.timing(
+      `${config.SERVICE_NAME}.message_time_since_received`,
+      start - Number(originalMessageTimestamp),
+      STATS_NO_SAMPLING,
+      {
+        topic: KafkaTopics.TO_VULCAN,
+        event_type: String(message.headers?.event_type),
+        instance: getInstanceId(),
+      },
+    );
+  }
 
   const messageValue: Buffer = message.value;
   const offset: string = message.offset;
@@ -86,7 +110,41 @@ export async function onMessage(message: KafkaMessage): Promise<void> {
     const handler: Handler = new (getHandler(update))!(
       getTransactionHashFromHeaders(message.headers),
     );
-    await handler.handleUpdate(update);
+
+    // If headers don't exist, create them.
+    const headers = message.headers ?? {};
+    // If the message received timestamp doesn't exist
+    // (i.e when a short term order is directly sent to vulcan via full node)
+    // set the message_received_timestamp to the message timestamp and the event type
+    // to be a short term order event type.
+    if (!headers.message_received_timestamp) {
+      headers.message_received_timestamp = message.timestamp;
+    }
+    if (!headers.event_type) {
+      if (update.orderPlace) {
+        headers.event_type = 'ShortTermOrderPlacement';
+      } else if (update.orderRemove) {
+        headers.event_type = 'ShortTermOrderRemoval';
+      } else if (update.orderUpdate) {
+        headers.event_type = 'ShortTermOrderUpdate';
+      }
+    }
+
+    await handler.handleUpdate(update, headers);
+
+    const postProcessingTime: number = Date.now();
+    if (headers.message_received_timestamp !== undefined) {
+      stats.timing(
+        `${config.SERVICE_NAME}.message_time_since_received_post_processing`,
+        postProcessingTime - Number(headers.message_received_timestamp),
+        STATS_NO_SAMPLING,
+        {
+          topic: KafkaTopics.TO_VULCAN,
+          event_type: String(headers?.event_type),
+          instance: getInstanceId(),
+        },
+      );
+    }
 
     success = true;
   } catch (error) {
@@ -118,6 +176,7 @@ export async function onMessage(message: KafkaMessage): Promise<void> {
       {
         success: success.toString(),
         messageType: getMessageType(update),
+        instance: getInstanceId(),
       },
     );
   }

@@ -13,10 +13,10 @@ import {
   TimeInForce,
 } from '@dydxprotocol-indexer/postgres';
 import {
+  IndexerOrder,
   IndexerTendermintBlock,
   IndexerTendermintEvent,
   OffChainUpdateV1,
-  IndexerOrder,
   OrderPlaceV1_OrderPlacementStatus,
   StatefulOrderEventV1,
 } from '@dydxprotocol-indexer/v4-protos';
@@ -44,8 +44,11 @@ import { STATEFUL_ORDER_ORDER_FILL_EVENT_TYPE } from '../../../src/constants';
 import { producer } from '@dydxprotocol-indexer/kafka';
 import { ORDER_FLAG_LONG_TERM } from '@dydxprotocol-indexer/v4-proto-parser';
 import { createPostgresFunctions } from '../../../src/helpers/postgres/postgres-functions';
+import config from '../../../src/config';
 
 describe('statefulOrderPlacementHandler', () => {
+  const prevSkippedOrderUUIDs: string = config.SKIP_STATEFUL_ORDER_UUIDS;
+
   beforeAll(async () => {
     await dbHelpers.migrate();
     await createPostgresFunctions();
@@ -59,6 +62,7 @@ describe('statefulOrderPlacementHandler', () => {
   });
 
   afterEach(async () => {
+    config.SKIP_STATEFUL_ORDER_UUIDS = prevSkippedOrderUUIDs;
     await dbHelpers.clearData();
     jest.clearAllMocks();
   });
@@ -135,14 +139,18 @@ describe('statefulOrderPlacementHandler', () => {
 
   it.each([
     // TODO(IND-334): Remove after deprecating StatefulOrderPlacementEvent
-    ['stateful order placement', defaultStatefulOrderEvent],
-    ['stateful long term order placement', defaultStatefulOrderLongTermEvent],
+    ['stateful order placement as txn event', defaultStatefulOrderEvent, 0],
+    ['stateful long term order placement as txn event', defaultStatefulOrderLongTermEvent, 0],
+    ['stateful order placement as block event', defaultStatefulOrderEvent, -1],
+    ['stateful long term order placement as block event', defaultStatefulOrderLongTermEvent, -1],
   ])('successfully places order with %s', async (
     _name: string,
     statefulOrderEvent: StatefulOrderEventV1,
+    transactionIndex: number,
   ) => {
     const kafkaMessage: KafkaMessage = createKafkaMessageFromStatefulOrderEvent(
       statefulOrderEvent,
+      transactionIndex,
     );
 
     await onMessage(kafkaMessage);
@@ -180,6 +188,7 @@ describe('statefulOrderPlacementHandler', () => {
       producerSendMock,
       orderId: defaultOrder.orderId!,
       offchainUpdate: expectedOffchainUpdate,
+      headers: { message_received_timestamp: kafkaMessage.timestamp, event_type: 'StatefulOrderPlacement' },
     });
   });
 
@@ -244,5 +253,27 @@ describe('statefulOrderPlacementHandler', () => {
       updatedAtHeight: defaultHeight.toString(),
     });
     // TODO[IND-20]: Add tests for vulcan messages
+  });
+
+  it.each([
+    // TODO(IND-334): Remove after deprecating StatefulOrderPlacementEvent
+    ['stateful order placement as txn event', defaultStatefulOrderEvent, 0],
+    ['stateful long term order placement as txn event', defaultStatefulOrderLongTermEvent, 0],
+    ['stateful order placement as block event', defaultStatefulOrderEvent, -1],
+    ['stateful long term order placement as block event', defaultStatefulOrderLongTermEvent, -1],
+  ])('successfully skips order with %s', async (
+    _name: string,
+    statefulOrderEvent: StatefulOrderEventV1,
+    transactionIndex: number,
+  ) => {
+    config.SKIP_STATEFUL_ORDER_UUIDS = OrderTable.orderIdToUuid(defaultOrder.orderId!);
+    const kafkaMessage: KafkaMessage = createKafkaMessageFromStatefulOrderEvent(
+      statefulOrderEvent,
+      transactionIndex,
+    );
+
+    await onMessage(kafkaMessage);
+    const order: OrderFromDatabase | undefined = await OrderTable.findById(orderId);
+    expect(order).toBeUndefined();
   });
 });

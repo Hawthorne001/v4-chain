@@ -1,7 +1,8 @@
-import { logger } from '@dydxprotocol-indexer/base';
-import { Producer, RecordMetadata } from 'kafkajs';
+import { logger, stats } from '@dydxprotocol-indexer/base';
+import { IHeaders, Producer, RecordMetadata } from 'kafkajs';
 import _ from 'lodash';
 
+import config from './config';
 import { KafkaTopics } from './types';
 
 /**
@@ -10,6 +11,7 @@ import { KafkaTopics } from './types';
 export type ProducerMessage = {
   key?: Buffer,
   value: Buffer,
+  headers?: IHeaders,
 };
 
 /**
@@ -52,7 +54,7 @@ export class BatchKafkaProducer {
     if (this.currentSize + msgBuffer.byteLength + keyByteLength > this.maxBatchSizeBytes) {
       this.sendBatch();
     }
-    this.producerMessages.push({ key: message.key, value: msgBuffer });
+    this.producerMessages.push({ key: message.key, value: msgBuffer, headers: message.headers });
     this.currentSize += msgBuffer.byteLength;
     this.currentSize += keyByteLength;
   }
@@ -64,6 +66,7 @@ export class BatchKafkaProducer {
   }
 
   private sendBatch(): void {
+    const startTime: number = Date.now();
     if (!_.isEmpty(this.producerMessages)) {
       this.producerPromises.push(
         this.producer.send({ topic: this.topic, messages: this.producerMessages }),
@@ -79,7 +82,10 @@ export class BatchKafkaProducer {
         0,
       ),
       topic: this.topic,
+      sendTime: Date.now() - startTime,
     });
+    stats.gauge(`${config.SERVICE_NAME}.kafka_batch_size`, this.currentSize);
+    stats.timing(`${config.SERVICE_NAME}.kafka_batch_send_time`, Date.now() - startTime);
     this.producerMessages = [];
     this.currentSize = 0;
   }

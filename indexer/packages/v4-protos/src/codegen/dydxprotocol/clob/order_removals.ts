@@ -59,6 +59,18 @@ export enum OrderRemoval_RemovalReason {
    * was fully filled and should therefore be removed from state.
    */
   REMOVAL_REASON_FULLY_FILLED = 7,
+
+  /**
+   * REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS - REMOVAL_REASON_FULLY_FILLED represents a removal of an order that
+   *  would lead to the subaccount violating isolated subaccount constraints.
+   */
+  REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS = 8,
+
+  /**
+   * REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED - REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED represents a removal of an order
+   * that was placed using an expired permissioned key.
+   */
+  REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED = 9,
   UNRECOGNIZED = -1,
 }
 export enum OrderRemoval_RemovalReasonSDKType {
@@ -119,6 +131,18 @@ export enum OrderRemoval_RemovalReasonSDKType {
    * was fully filled and should therefore be removed from state.
    */
   REMOVAL_REASON_FULLY_FILLED = 7,
+
+  /**
+   * REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS - REMOVAL_REASON_FULLY_FILLED represents a removal of an order that
+   *  would lead to the subaccount violating isolated subaccount constraints.
+   */
+  REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS = 8,
+
+  /**
+   * REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED - REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED represents a removal of an order
+   * that was placed using an expired permissioned key.
+   */
+  REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED = 9,
   UNRECOGNIZED = -1,
 }
 export function orderRemoval_RemovalReasonFromJSON(object: any): OrderRemoval_RemovalReason {
@@ -155,6 +179,14 @@ export function orderRemoval_RemovalReasonFromJSON(object: any): OrderRemoval_Re
     case "REMOVAL_REASON_FULLY_FILLED":
       return OrderRemoval_RemovalReason.REMOVAL_REASON_FULLY_FILLED;
 
+    case 8:
+    case "REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS":
+      return OrderRemoval_RemovalReason.REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS;
+
+    case 9:
+    case "REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED":
+      return OrderRemoval_RemovalReason.REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED;
+
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -186,6 +218,12 @@ export function orderRemoval_RemovalReasonToJSON(object: OrderRemoval_RemovalRea
 
     case OrderRemoval_RemovalReason.REMOVAL_REASON_FULLY_FILLED:
       return "REMOVAL_REASON_FULLY_FILLED";
+
+    case OrderRemoval_RemovalReason.REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS:
+      return "REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS";
+
+    case OrderRemoval_RemovalReason.REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED:
+      return "REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED";
 
     case OrderRemoval_RemovalReason.UNRECOGNIZED:
     default:

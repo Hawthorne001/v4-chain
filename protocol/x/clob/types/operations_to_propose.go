@@ -183,7 +183,7 @@ func (o *OperationsToPropose) MustAddStatefulOrderPlacementToOperationsQueue(
 func (o *OperationsToPropose) MustAddMatchToOperationsQueue(
 	takerMatchableOrder MatchableOrder,
 	makerFillsWithOrders []MakerFillWithOrder,
-) {
+) InternalOperation {
 	makerFills := lib.MapSlice(
 		makerFillsWithOrders,
 		func(mfwo MakerFillWithOrder) MakerFill {
@@ -234,6 +234,7 @@ func (o *OperationsToPropose) MustAddMatchToOperationsQueue(
 		o.OperationsQueue,
 		matchOperation,
 	)
+	return matchOperation
 }
 
 // AddZeroFillDeleveragingToOperationsQueue adds a zero-fill deleveraging match operation to the
@@ -473,4 +474,28 @@ func (o *OperationsToPropose) GetOperationsToPropose() []OperationRaw {
 	}
 
 	return operationRaws
+}
+
+// MustGetShortTermOrderTxBytes returns the `ShortTermOrderHashToTxBytes` for a short term order.
+// This function will panic for any of the following:
+// - the order is not a short term order.
+// - the order hash is not present in `ShortTermOrderHashToTxBytes`
+func (o *OperationsToPropose) MustGetShortTermOrderTxBytes(
+	order Order,
+) (txBytes []byte) {
+	order.OrderId.MustBeShortTermOrder()
+
+	orderHash := order.GetOrderHash()
+	bytes, exists := o.ShortTermOrderHashToTxBytes[orderHash]
+	if !exists {
+		panic(
+			fmt.Sprintf(
+				"MustGetShortTermOrderTxBytes: Order (%s) does not exist in "+
+					"`ShortTermOrderHashToTxBytes`.",
+				order.GetOrderTextString(),
+			),
+		)
+	}
+
+	return bytes
 }

@@ -1,6 +1,9 @@
-import { logger, runFuncWithTimingStat, stats } from '@dydxprotocol-indexer/base';
-import { KafkaTopics, SUBACCOUNTS_WEBSOCKET_MESSAGE_VERSION } from '@dydxprotocol-indexer/kafka';
 import {
+  logger, getInstanceId, runFuncWithTimingStat, stats,
+} from '@dydxprotocol-indexer/base';
+import { KafkaTopics, SUBACCOUNTS_WEBSOCKET_MESSAGE_VERSION, getTriggerPrice } from '@dydxprotocol-indexer/kafka';
+import {
+  blockHeightRefresher,
   BlockTable,
   BlockFromDatabase,
   OrderFromDatabase,
@@ -14,9 +17,11 @@ import {
   apiTranslations,
   TimeInForce,
   IsoString,
+  OrderSide,
+  APITimeInForce,
+  OrderType,
 } from '@dydxprotocol-indexer/postgres';
 import {
-  OpenOrdersCache,
   OrderbookLevelsCache,
   OrdersCache,
   RemoveOrderResult,
@@ -31,6 +36,7 @@ import {
 import {
   OffChainUpdateV1,
   IndexerOrder,
+  IndexerSubaccountId,
   OrderRemoveV1,
   OrderRemovalReason,
   OrderRemoveV1_OrderRemovalStatus,
@@ -38,13 +44,13 @@ import {
   SubaccountMessage,
 } from '@dydxprotocol-indexer/v4-protos';
 import { Big } from 'big.js';
-import { Message } from 'kafkajs';
+import { IHeaders, Message } from 'kafkajs';
 
 import config from '../config';
 import { redisClient } from '../helpers/redis/redis-controller';
 import { sendMessageWrapper } from '../lib/send-message-helper';
 import { Handler } from './handler';
-import { getStateRemainingQuantums, getTriggerPrice } from './helpers';
+import { getStateRemainingQuantums } from './helpers';
 
 /**
  * Handler for OrderRemove messages.
@@ -68,7 +74,7 @@ import { getStateRemainingQuantums, getTriggerPrice } from './helpers';
  */
 export class OrderRemoveHandler extends Handler {
   // eslint-disable-next-line @typescript-eslint/require-await
-  protected async handle(update: OffChainUpdateV1): Promise<void> {
+  protected async handle(update: OffChainUpdateV1, headers: IHeaders): Promise<void> {
     logger.info({
       at: 'OrderRemoveHandler#handle',
       message: 'Received OffChainUpdate with OrderRemove.',
@@ -86,7 +92,11 @@ export class OrderRemoveHandler extends Handler {
       reason === OrderRemovalReason.ORDER_REMOVAL_REASON_INDEXER_EXPIRED &&
       !(await this.isOrderExpired(orderRemove))
     ) {
-      stats.increment(`${config.SERVICE_NAME}.order_remove_reason_indexer_temp_expired`, 1);
+      stats.increment(
+        `${config.SERVICE_NAME}.order_remove_reason_indexer_temp_expired`,
+        1,
+        { instance: getInstanceId() },
+      );
       logger.info({
         at: 'OrderRemoveHandler#handle',
         message: 'Order was expired by Indexer but is no longer expired. Ignoring.',
@@ -109,19 +119,14 @@ export class OrderRemoveHandler extends Handler {
       removeOrderResult,
     });
 
-    if (removeOrderResult.removed) {
-      const clobPairId: string = orderRemove.removedOrderId!.clobPairId.toString();
-      await OpenOrdersCache.removeOpenOrder(
-        removeOrderResult.removedOrder!.id,
-        clobPairId,
-        redisClient,
-      );
-    }
-
     if (
       orderRemove.reason === OrderRemovalReason.ORDER_REMOVAL_REASON_INDEXER_EXPIRED
     ) {
-      stats.increment(`${config.SERVICE_NAME}.order_remove_reason_indexer_expired`, 1);
+      stats.increment(
+        `${config.SERVICE_NAME}.order_remove_reason_indexer_expired`,
+        1,
+        { instance: getInstanceId() },
+      );
       logger.info({
         at: 'OrderRemoveHandler#handle',
         message: 'Order was expired by Indexer',
@@ -131,11 +136,11 @@ export class OrderRemoveHandler extends Handler {
     }
 
     if (this.isStatefulOrderCancelation(orderRemove)) {
-      await this.handleStatefulOrderCancelation(orderRemove, removeOrderResult);
+      await this.handleStatefulOrderCancelation(orderRemove, removeOrderResult, headers);
       return;
     }
 
-    await this.handleOrderRemoval(orderRemove, removeOrderResult);
+    await this.handleOrderRemoval(orderRemove, removeOrderResult, headers);
   }
 
   protected validateOrderRemove(orderRemove: OrderRemoveV1): void {
@@ -193,6 +198,7 @@ export class OrderRemoveHandler extends Handler {
   protected async handleStatefulOrderCancelation(
     orderRemove: OrderRemoveV1,
     removeOrderResult: RemoveOrderResult,
+    headers: IHeaders,
   ): Promise<void> {
     const order: OrderFromDatabase | undefined = await runFuncWithTimingStat(
       OrderTable.findById(
@@ -225,11 +231,16 @@ export class OrderRemoveHandler extends Handler {
     }
 
     const subaccountMessage: Message = {
+      key: Buffer.from(Uint8Array.from(
+        IndexerSubaccountId.encode(orderRemove.removedOrderId!.subaccountId!).finish(),
+      )),
       value: this.createSubaccountWebsocketMessageFromPostgresOrder(
         order,
         orderRemove,
         perpetualMarket.ticker,
+        blockHeightRefresher.getLatestBlockHeight(),
       ),
+      headers,
     };
     sendMessageWrapper(subaccountMessage, KafkaTopics.TO_WEBSOCKETS_SUBACCOUNTS);
 
@@ -241,7 +252,7 @@ export class OrderRemoveHandler extends Handler {
       removeOrderResult.removed &&
       removeOrderResult.restingOnBook === true &&
       !requiresImmediateExecution(removeOrderResult.removedOrder!.order!.timeInForce)) {
-      await this.updateOrderbook(removeOrderResult, perpetualMarket);
+      await this.updateOrderbook(removeOrderResult, perpetualMarket, headers);
     }
 
   }
@@ -259,7 +270,19 @@ export class OrderRemoveHandler extends Handler {
   protected async handleOrderRemoval(
     orderRemove: OrderRemoveV1,
     removeOrderResult: RemoveOrderResult,
+    headers: IHeaders,
   ): Promise<void> {
+    const perpetualMarket: PerpetualMarketFromDatabase | undefined = perpetualMarketRefresher
+      .getPerpetualMarketFromClobPairId(orderRemove.removedOrderId!.clobPairId.toString());
+    if (perpetualMarket === undefined) {
+      const clobPairId: string = orderRemove.removedOrderId!.clobPairId.toString();
+      logger.error({
+        at: 'orderRemoveHandler#handle',
+        message: `Unable to find perpetual market with clobPairId: ${clobPairId}`,
+      });
+      return;
+    }
+    // This can happen for short term orders if the order place message was not received.
     if (!removeOrderResult.removed) {
       logger.info({
         at: 'orderRemoveHandler#handleOrderRemoval',
@@ -267,22 +290,37 @@ export class OrderRemoveHandler extends Handler {
         orderId: orderRemove.removedOrderId,
         orderRemove,
       });
+      if (config.SEND_SUBACCOUNT_WEBSOCKET_MESSAGE_FOR_CANCELS_MISSING_ORDERS) {
+        const canceledOrder: OrderFromDatabase | undefined = await runFuncWithTimingStat(
+          OrderTable.findById(OrderTable.orderIdToUuid(orderRemove.removedOrderId!)),
+          this.generateTimingStatsOptions('find_order'),
+        );
+        const subaccountMessage: Message = {
+          key: Buffer.from(Uint8Array.from(
+            IndexerSubaccountId.encode(orderRemove.removedOrderId!.subaccountId!).finish(),
+          )),
+          value: this.createSubaccountWebsocketMessageFromOrderRemoveMessage(
+            canceledOrder,
+            orderRemove,
+            perpetualMarket.ticker,
+            blockHeightRefresher.getLatestBlockHeight(),
+          ),
+          headers,
+        };
+        const reason: OrderRemovalReason = orderRemove.reason;
+        if (!(
+          reason === OrderRemovalReason.ORDER_REMOVAL_REASON_INDEXER_EXPIRED ||
+          reason === OrderRemovalReason.ORDER_REMOVAL_REASON_FULLY_FILLED
+        )) {
+          sendMessageWrapper(subaccountMessage, KafkaTopics.TO_WEBSOCKETS_SUBACCOUNTS);
+        }
+      }
       return;
     }
 
     const stateRemainingQuantums: Big = await getStateRemainingQuantums(
       removeOrderResult.removedOrder!,
     );
-    const perpetualMarket: PerpetualMarketFromDatabase | undefined = perpetualMarketRefresher
-      .getPerpetualMarketFromTicker(removeOrderResult.removedOrder!.ticker);
-    if (perpetualMarket === undefined) {
-      const ticker: string = removeOrderResult.removedOrder!.ticker;
-      logger.error({
-        at: 'orderRemoveHandler#handle',
-        message: `Unable to find perpetual market with ticker: ${ticker}`,
-      });
-      return;
-    }
 
     // If the remaining amount of the order in state is <= 0, the order is filled and
     // does not need to have it's status updated
@@ -300,12 +338,17 @@ export class OrderRemoveHandler extends Handler {
     }
 
     const subaccountMessage: Message = {
+      key: Buffer.from(Uint8Array.from(
+        IndexerSubaccountId.encode(orderRemove.removedOrderId!.subaccountId!).finish(),
+      )),
       value: this.createSubaccountWebsocketMessageFromRemoveOrderResult(
         removeOrderResult,
         canceledOrder,
         orderRemove,
         perpetualMarket,
+        blockHeightRefresher.getLatestBlockHeight(),
       ),
+      headers,
     };
 
     if (this.shouldSendSubaccountMessage(orderRemove, removeOrderResult, stateRemainingQuantums)) {
@@ -322,7 +365,7 @@ export class OrderRemoveHandler extends Handler {
       !remainingQuantums.eq('0') &&
       removeOrderResult.restingOnBook !== false &&
       !requiresImmediateExecution(removeOrderResult.removedOrder!.order!.timeInForce)) {
-      await this.updateOrderbook(removeOrderResult, perpetualMarket);
+      await this.updateOrderbook(removeOrderResult, perpetualMarket, headers);
     }
     // TODO: consolidate remove handler logic into a single lua script.
     await this.addOrderToCanceledOrdersCache(
@@ -339,6 +382,7 @@ export class OrderRemoveHandler extends Handler {
   protected async updateOrderbook(
     removeOrderResult: RemoveOrderResult,
     perpetualMarket: PerpetualMarketFromDatabase,
+    headers: IHeaders,
   ): Promise<void> {
     const updatedQuantums: number = await runFuncWithTimingStat(
       this.updatePriceLevelsCache(
@@ -352,6 +396,7 @@ export class OrderRemoveHandler extends Handler {
         perpetualMarket,
         updatedQuantums,
       ),
+      headers,
     };
     sendMessageWrapper(orderbookMessage, KafkaTopics.TO_WEBSOCKETS_ORDERBOOKS);
   }
@@ -414,7 +459,11 @@ export class OrderRemoveHandler extends Handler {
       this.generateTimingStatsOptions('find_order_for_indexer_expired_expiry_verification'),
     );
     if (redisOrder === null) {
-      stats.increment(`${config.SERVICE_NAME}.indexer_expired_order_not_found`, 1);
+      stats.increment(
+        `${config.SERVICE_NAME}.indexer_expired_order_not_found`,
+        1,
+        { instance: getInstanceId() },
+      );
       logger.info({
         at: 'orderRemoveHandler#isOrderExpired',
         message: 'Could not find order for Indexer-expired expiry verification',
@@ -438,7 +487,11 @@ export class OrderRemoveHandler extends Handler {
 
     // We know the order is short-term, so the goodTilBlock must exist.
     if (order.goodTilBlock! >= +block.blockHeight) {
-      stats.increment(`${config.SERVICE_NAME}.indexer_expired_order_is_not_expired`, 1);
+      stats.increment(
+        `${config.SERVICE_NAME}.indexer_expired_order_is_not_expired`,
+        1,
+        { instance: getInstanceId() },
+      );
       logger.info({
         at: 'orderRemoveHandler#isOrderExpired',
         message: 'Indexer marked order that is not yet expired as expired',
@@ -525,11 +578,86 @@ export class OrderRemoveHandler extends Handler {
     return sizeDelta.toFixed();
   }
 
+  /**
+   * Should be called when an OrderRemove message is received for a non-existent order.
+   * This can happen when the order was not found in redis because the initial order
+   * placement message wasn't received.
+   *
+   * @param canceledOrder
+   * @param orderRemove
+   * @param perpetualMarket
+   * @param blockHeight: latest block height processed by Indexer
+   * @protected
+   */
+  protected createSubaccountWebsocketMessageFromOrderRemoveMessage(
+    canceledOrder: OrderFromDatabase | undefined,
+    orderRemove: OrderRemoveV1,
+    ticker: string,
+    blockHeight: string,
+  ): Buffer {
+    const createdAtHeight: string | undefined = canceledOrder?.createdAtHeight;
+    const updatedAt: IsoString | undefined = canceledOrder?.updatedAt;
+    const updatedAtHeight: string | undefined = canceledOrder?.updatedAtHeight;
+    const price: string | undefined = canceledOrder?.price;
+    const size: string | undefined = canceledOrder?.size;
+    const clientMetadata: string | undefined = canceledOrder?.clientMetadata;
+    const reduceOnly: boolean | undefined = canceledOrder?.reduceOnly;
+    const side: OrderSide | undefined = canceledOrder?.side;
+    const timeInForce: APITimeInForce | undefined = canceledOrder
+      ? apiTranslations.orderTIFToAPITIF(canceledOrder.timeInForce) : undefined;
+    const totalFilled: string | undefined = canceledOrder?.totalFilled;
+    const goodTilBlock: string | undefined = canceledOrder?.goodTilBlock;
+    const goodTilBlockTime: string | undefined = canceledOrder?.goodTilBlockTime;
+    const triggerPrice: string | undefined = canceledOrder?.triggerPrice;
+    const type: OrderType | undefined = canceledOrder?.type;
+
+    const contents: SubaccountMessageContents = {
+      orders: [
+        {
+          id: OrderTable.orderIdToUuid(orderRemove.removedOrderId!),
+          subaccountId: SubaccountTable.subaccountIdToUuid(
+            orderRemove.removedOrderId!.subaccountId!,
+          ),
+          clientId: orderRemove.removedOrderId!.clientId.toString(),
+          clobPairId: orderRemove.removedOrderId!.clobPairId.toString(),
+          status: this.orderRemovalStatusToOrderStatus(orderRemove.removalStatus),
+          orderFlags: orderRemove.removedOrderId!.orderFlags.toString(),
+          ticker,
+          removalReason: OrderRemovalReason[orderRemove.reason],
+          ...(createdAtHeight && { createdAtHeight }),
+          ...(updatedAt && { updatedAt }),
+          ...(updatedAtHeight && { updatedAtHeight }),
+          ...(price && { price }),
+          ...(size && { size }),
+          ...(clientMetadata && { clientMetadata }),
+          ...(reduceOnly && { reduceOnly }),
+          ...(side && { side }),
+          ...(timeInForce && { timeInForce }),
+          ...(totalFilled && { totalFilled }),
+          ...(goodTilBlock && { goodTilBlock }),
+          ...(goodTilBlockTime && { goodTilBlockTime }),
+          ...(triggerPrice && { triggerPrice }),
+          ...(type && { type }),
+        },
+      ],
+      blockHeight,
+    };
+
+    const subaccountMessage: SubaccountMessage = SubaccountMessage.fromPartial({
+      contents: JSON.stringify(contents),
+      subaccountId: orderRemove.removedOrderId!.subaccountId!,
+      version: SUBACCOUNTS_WEBSOCKET_MESSAGE_VERSION,
+    });
+
+    return Buffer.from(Uint8Array.from(SubaccountMessage.encode(subaccountMessage).finish()));
+  }
+
   protected createSubaccountWebsocketMessageFromRemoveOrderResult(
     removeOrderResult: RemoveOrderResult,
     canceledOrder: OrderFromDatabase | undefined,
     orderRemove: OrderRemoveV1,
     perpetualMarket: PerpetualMarketFromDatabase,
+    blockHeight: string | undefined,
   ): Buffer {
     const redisOrder: RedisOrder = removeOrderResult.removedOrder!;
     const orderTIF: TimeInForce = protocolTranslations.protocolOrderTIFToTIF(
@@ -574,6 +702,7 @@ export class OrderRemoveHandler extends Handler {
           triggerPrice: getTriggerPrice(redisOrder.order!, perpetualMarket),
         },
       ],
+      ...(blockHeight && { blockHeight }),
     };
 
     const subaccountMessage: SubaccountMessage = SubaccountMessage.fromPartial({
@@ -589,6 +718,7 @@ export class OrderRemoveHandler extends Handler {
     order: OrderFromDatabase,
     orderRemove: OrderRemoveV1,
     orderTicker: string,
+    blockHeight: string | undefined,
   ): Buffer {
     const contents: SubaccountMessageContents = {
       orders: [
@@ -620,6 +750,7 @@ export class OrderRemoveHandler extends Handler {
           triggerPrice: order.triggerPrice ?? undefined,
         },
       ],
+      ...(blockHeight && { blockHeight }),
     };
 
     const subaccountMessage: SubaccountMessage = SubaccountMessage.fromPartial({

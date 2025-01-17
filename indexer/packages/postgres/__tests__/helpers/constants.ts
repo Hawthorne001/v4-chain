@@ -17,6 +17,8 @@ import * as TradingRewardAggregationTable from '../../src/stores/trading-reward-
 import * as TransactionTable from '../../src/stores/transaction-table';
 import * as TransferTable from '../../src/stores/transfer-table';
 import {
+  AffiliateInfoCreateObject,
+  AffiliateReferredUsersCreateObject,
   AssetCreateObject,
   AssetPositionCreateObject,
   BlockCreateObject,
@@ -31,6 +33,7 @@ import {
   FillCreateObject,
   FillType,
   FundingIndexUpdatesCreateObject,
+  LeaderboardPnlCreateObject,
   Liquidity,
   LiquidityTiersCreateObject,
   MarketCreateObject,
@@ -41,11 +44,13 @@ import {
   OrderType,
   PerpetualMarketCreateObject,
   PerpetualMarketStatus,
+  PerpetualMarketType,
   PerpetualPositionCreateObject,
   PerpetualPositionStatus,
   PnlTicksCreateObject,
   PositionSide,
   SubaccountCreateObject,
+  SubaccountUsernamesCreateObject,
   TendermintEventCreateObject,
   TimeInForce,
   TradingRewardAggregationCreateObject,
@@ -54,6 +59,9 @@ import {
   TransactionCreateObject,
   TransferCreateObject,
   WalletCreateObject,
+  PersistentCacheCreateObject,
+  VaultCreateObject,
+  VaultStatus,
 } from '../../src/types';
 import { denomToHumanReadableConversion } from './conversion-helpers';
 
@@ -62,9 +70,15 @@ export const createdHeight: string = '2';
 export const invalidTicker: string = 'INVALID-INVALID';
 export const dydxChain: string = 'dydx';
 export const defaultAddress: string = 'dydx1n88uc38xhjgxzw9nwre4ep2c8ga4fjxc565lnf';
+export const defaultAddress2: string = 'dydx1n88uc38xhjgxzw9nwre4ep2c8ga4fjxc575lnf';
+export const defaultAddress3: string = 'dydx199tqg4wdlnu4qjlxchpd7seg454937hjrknju4';
 export const blockedAddress: string = 'dydx1f9k5qldwmqrnwy8hcgp4fw6heuvszt35egvtx2';
+// Vault address for vault id 0 was generated using
+// script protocol/scripts/vault/get_vault.go
+export const vaultAddress: string = 'dydx1c0m5x87llaunl5sgv3q5vd7j5uha26d2q2r2q0';
 
 // ============== Subaccounts ==============
+export const defaultWalletAddress: string = 'dydx199tqg4wdlnu4qjlxchpd7seg454937hjrknju4';
 
 export const defaultSubaccount: SubaccountCreateObject = {
   address: defaultAddress,
@@ -87,7 +101,55 @@ export const defaultSubaccount3: SubaccountCreateObject = {
   updatedAtHeight: createdHeight,
 };
 
-export const defaultWalletAddress: string = 'defaultWalletAddress';
+export const defaultSubaccount2Num0: SubaccountCreateObject = {
+  address: defaultAddress2,
+  subaccountNumber: 0,
+  updatedAt: createdDateTime.toISO(),
+  updatedAtHeight: createdHeight,
+};
+
+export const defaultSubaccount3Num0: SubaccountCreateObject = {
+  address: defaultAddress3,
+  subaccountNumber: 0,
+  updatedAt: createdDateTime.toISO(),
+  updatedAtHeight: createdHeight,
+};
+
+// defaultWalletAddress belongs to defaultWallet2 and is different from defaultAddress
+export const defaultSubaccountDefaultWalletAddress: SubaccountCreateObject = {
+  address: defaultWalletAddress,
+  subaccountNumber: 0,
+  updatedAt: createdDateTime.toISO(),
+  updatedAtHeight: createdHeight,
+};
+
+export const defaultSubaccountWithAlternateAddress: SubaccountCreateObject = {
+  address: defaultAddress2,
+  subaccountNumber: 0,
+  updatedAt: createdDateTime.toISO(),
+  updatedAtHeight: createdHeight,
+};
+
+export const vaultSubaccount: SubaccountCreateObject = {
+  address: vaultAddress,
+  subaccountNumber: 0,
+  updatedAt: createdDateTime.toISO(),
+  updatedAtHeight: createdHeight,
+};
+
+export const isolatedSubaccount: SubaccountCreateObject = {
+  address: defaultAddress,
+  subaccountNumber: 128,
+  updatedAt: createdDateTime.toISO(),
+  updatedAtHeight: createdHeight,
+};
+
+export const isolatedSubaccount2: SubaccountCreateObject = {
+  address: defaultAddress,
+  subaccountNumber: 256,
+  updatedAt: createdDateTime.toISO(),
+  updatedAtHeight: createdHeight,
+};
 
 export const defaultSubaccountId: string = SubaccountTable.uuid(
   defaultAddress,
@@ -101,16 +163,51 @@ export const defaultSubaccountId3: string = SubaccountTable.uuid(
   defaultAddress,
   defaultSubaccount3.subaccountNumber,
 );
+export const defaultSubaccountIdDefaultWalletAddress: string = SubaccountTable.uuid(
+  defaultWalletAddress,
+  defaultSubaccountDefaultWalletAddress.subaccountNumber,
+);
+export const defaultSubaccountIdWithAlternateAddress: string = SubaccountTable.uuid(
+  defaultAddress2,
+  defaultSubaccountWithAlternateAddress.subaccountNumber,
+);
+export const isolatedSubaccountId: string = SubaccountTable.uuid(
+  defaultAddress,
+  isolatedSubaccount.subaccountNumber,
+);
+export const isolatedSubaccountId2: string = SubaccountTable.uuid(
+  defaultAddress,
+  isolatedSubaccount2.subaccountNumber,
+);
+
+export const vaultSubaccountId: string = SubaccountTable.uuid(
+  vaultAddress,
+  vaultSubaccount.subaccountNumber,
+);
 
 // ============== Wallets ==============
 export const defaultWallet: WalletCreateObject = {
   address: defaultAddress,
   totalTradingRewards: denomToHumanReadableConversion(0),
+  totalVolume: '0',
 };
 
 export const defaultWallet2: WalletCreateObject = {
   address: defaultWalletAddress,
   totalTradingRewards: denomToHumanReadableConversion(1),
+  totalVolume: '0',
+};
+
+export const vaultWallet: WalletCreateObject = {
+  address: vaultAddress,
+  totalTradingRewards: denomToHumanReadableConversion(0),
+  totalVolume: '0',
+};
+
+export const defaultWallet3: WalletCreateObject = {
+  address: defaultAddress2,
+  totalTradingRewards: denomToHumanReadableConversion(0),
+  totalVolume: '0',
 };
 
 // ============== Assets ==============
@@ -157,6 +254,16 @@ export const defaultAssetPositionId2: string = AssetPositionTable.uuid(
   defaultAssetPosition2.subaccountId,
   defaultAssetPosition2.assetId,
 );
+export const isolatedSubaccountAssetPosition: AssetPositionCreateObject = {
+  subaccountId: isolatedSubaccountId,
+  assetId: '0',
+  size: '5000',
+  isLong: true,
+};
+export const isolatedSubaccountAssetPositionId: string = AssetPositionTable.uuid(
+  isolatedSubaccountAssetPosition.subaccountId,
+  isolatedSubaccountAssetPosition.assetId,
+);
 
 // ============== PerpetualMarkets ==============
 
@@ -176,6 +283,8 @@ export const defaultPerpetualMarket: PerpetualMarketCreateObject = {
   subticksPerTick: 100,
   stepBaseQuantums: 10,
   liquidityTierId: 0,
+  marketType: PerpetualMarketType.CROSS,
+  baseOpenInterest: '100000',
 };
 export const defaultPerpetualMarket2: PerpetualMarketCreateObject = {
   id: '1',
@@ -193,6 +302,8 @@ export const defaultPerpetualMarket2: PerpetualMarketCreateObject = {
   subticksPerTick: 10,
   stepBaseQuantums: 1,
   liquidityTierId: 0,
+  marketType: PerpetualMarketType.CROSS,
+  baseOpenInterest: '100000',
 };
 export const defaultPerpetualMarket3: PerpetualMarketCreateObject = {
   id: '2',
@@ -210,6 +321,48 @@ export const defaultPerpetualMarket3: PerpetualMarketCreateObject = {
   subticksPerTick: 10,
   stepBaseQuantums: 1,
   liquidityTierId: 0,
+  marketType: PerpetualMarketType.CROSS,
+  baseOpenInterest: '100000',
+};
+
+export const isolatedPerpetualMarket: PerpetualMarketCreateObject = {
+  id: '3',
+  clobPairId: '4',
+  ticker: 'ISO-USD',
+  marketId: 3,
+  status: PerpetualMarketStatus.ACTIVE,
+  priceChange24H: '0.000000001',
+  volume24H: '10000000',
+  trades24H: 200,
+  nextFundingRate: '1.2',
+  openInterest: '40000',
+  quantumConversionExponent: -16,
+  atomicResolution: -2,
+  subticksPerTick: 10,
+  stepBaseQuantums: 1,
+  liquidityTierId: 0,
+  marketType: PerpetualMarketType.ISOLATED,
+  baseOpenInterest: '100000',
+};
+
+export const isolatedPerpetualMarket2: PerpetualMarketCreateObject = {
+  id: '4',
+  clobPairId: '5',
+  ticker: 'ISO2-USD',
+  marketId: 4,
+  status: PerpetualMarketStatus.ACTIVE,
+  priceChange24H: '0.000000001',
+  volume24H: '10000000',
+  trades24H: 200,
+  nextFundingRate: '1.2',
+  openInterest: '40000',
+  quantumConversionExponent: -16,
+  atomicResolution: -2,
+  subticksPerTick: 10,
+  stepBaseQuantums: 1,
+  liquidityTierId: 0,
+  marketType: PerpetualMarketType.ISOLATED,
+  baseOpenInterest: '100000',
 };
 
 // ============== Orders ==============
@@ -218,6 +371,25 @@ export const defaultOrder: OrderCreateObject = {
   subaccountId: defaultSubaccountId,
   clientId: '1',
   clobPairId: '1',
+  side: OrderSide.BUY,
+  size: '25',
+  totalFilled: '0',
+  price: '20000',
+  type: OrderType.LIMIT,
+  status: OrderStatus.OPEN,
+  timeInForce: TimeInForce.FOK,
+  reduceOnly: false,
+  goodTilBlock: '100',
+  orderFlags: ORDER_FLAG_SHORT_TERM.toString(),
+  clientMetadata: '0',
+  updatedAt: '2023-01-22T00:00:00.000Z',
+  updatedAtHeight: '1',
+};
+
+export const isolatedMarketOrder: OrderCreateObject = {
+  subaccountId: isolatedSubaccountId,
+  clientId: '1',
+  clobPairId: '4',
   side: OrderSide.BUY,
   size: '25',
   totalFilled: '0',
@@ -255,6 +427,13 @@ export const defaultOrderId: string = OrderTable.uuid(
   defaultOrder.clientId,
   defaultOrder.clobPairId,
   defaultOrder.orderFlags,
+);
+
+export const isolatedMarketOrderId: string = OrderTable.uuid(
+  isolatedMarketOrder.subaccountId,
+  isolatedMarketOrder.clientId,
+  isolatedMarketOrder.clobPairId,
+  isolatedMarketOrder.orderFlags,
 );
 
 export const defaultOrderGoodTilBlockTimeId: string = OrderTable.uuid(
@@ -361,6 +540,28 @@ export const defaultPerpetualPositionId: string = PerpetualPositionTable.uuid(
   defaultPerpetualPosition.openEventId,
 );
 
+export const isolatedPerpetualPosition: PerpetualPositionCreateObject = {
+  subaccountId: isolatedSubaccountId,
+  perpetualId: isolatedPerpetualMarket.id,
+  side: PositionSide.LONG,
+  status: PerpetualPositionStatus.OPEN,
+  size: '10',
+  maxSize: '25',
+  entryPrice: '1.5',
+  sumOpen: '10',
+  sumClose: '0',
+  createdAt: createdDateTime.toISO(),
+  createdAtHeight: createdHeight,
+  openEventId: defaultTendermintEventId,
+  lastEventId: defaultTendermintEventId2,
+  settledFunding: '200000',
+};
+
+export const isolatedPerpetualPositionId: string = PerpetualPositionTable.uuid(
+  isolatedPerpetualPosition.subaccountId,
+  isolatedPerpetualPosition.openEventId,
+);
+
 // ============== Fills ==============
 
 export const defaultFill: FillCreateObject = {
@@ -379,6 +580,45 @@ export const defaultFill: FillCreateObject = {
   createdAtHeight: createdHeight,
   clientMetadata: '0',
   fee: '1.1',
+  affiliateRevShare: '1.10',
+};
+
+export const isolatedMarketFill: FillCreateObject = {
+  subaccountId: isolatedSubaccountId,
+  side: OrderSide.BUY,
+  liquidity: Liquidity.TAKER,
+  type: FillType.LIMIT,
+  clobPairId: '4',
+  orderId: isolatedMarketOrderId,
+  size: '10',
+  price: '20000',
+  quoteAmount: '200000',
+  eventId: defaultTendermintEventId2,
+  transactionHash: '', // TODO: Add a real transaction Hash
+  createdAt: createdDateTime.toISO(),
+  createdAtHeight: createdHeight,
+  clientMetadata: '0',
+  fee: '1.1',
+  affiliateRevShare: '0',
+};
+
+export const isolatedMarketFill2: FillCreateObject = {
+  subaccountId: isolatedSubaccountId2,
+  side: OrderSide.BUY,
+  liquidity: Liquidity.TAKER,
+  type: FillType.LIMIT,
+  clobPairId: '4',
+  orderId: isolatedMarketOrderId,
+  size: '10',
+  price: '20000',
+  quoteAmount: '200000',
+  eventId: defaultTendermintEventId3,
+  transactionHash: '', // TODO: Add a real transaction Hash
+  createdAt: createdDateTime.toISO(),
+  createdAtHeight: createdHeight,
+  clientMetadata: '0',
+  fee: '1.1',
+  affiliateRevShare: '0',
 };
 
 // ============== Transfers ==============
@@ -405,6 +645,12 @@ export const defaultTransfer3: TransferCreateObject = {
   assetId: defaultAsset2.id,
 };
 
+export const defaultTransferWithAlternateAddress: TransferCreateObject = {
+  ...defaultTransfer,
+  senderSubaccountId: defaultSubaccountIdWithAlternateAddress,
+  recipientSubaccountId: defaultSubaccountId,
+};
+
 export const defaultTransferId: string = TransferTable.uuid(
   defaultTransfer.eventId,
   defaultTransfer.assetId,
@@ -412,6 +658,15 @@ export const defaultTransferId: string = TransferTable.uuid(
   defaultTransfer.recipientSubaccountId,
   defaultTransfer.senderWalletAddress,
   defaultTransfer.recipientWalletAddress,
+);
+
+export const defaultTransferWithAlternateAddressId: string = TransferTable.uuid(
+  defaultTransferWithAlternateAddress.eventId,
+  defaultTransferWithAlternateAddress.assetId,
+  defaultTransferWithAlternateAddress.senderSubaccountId,
+  defaultTransferWithAlternateAddress.recipientSubaccountId,
+  defaultTransferWithAlternateAddress.senderWalletAddress,
+  defaultTransferWithAlternateAddress.recipientWalletAddress,
 );
 
 export const defaultWithdrawal: TransferCreateObject = {
@@ -480,6 +735,22 @@ export const defaultMarket3: MarketCreateObject = {
   oraclePrice: '0.000000065',
 };
 
+export const isolatedMarket: MarketCreateObject = {
+  id: 3,
+  pair: 'ISO-USD',
+  exponent: -12,
+  minPriceChangePpm: 50,
+  oraclePrice: '1.00',
+};
+
+export const isolatedMarket2: MarketCreateObject = {
+  id: 4,
+  pair: 'ISO2-USD',
+  exponent: -20,
+  minPriceChangePpm: 50,
+  oraclePrice: '0.000000085',
+};
+
 // ============== LiquidityTiers ==============
 
 export const defaultLiquidityTier: LiquidityTiersCreateObject = {
@@ -494,6 +765,8 @@ export const defaultLiquidityTier2: LiquidityTiersCreateObject = {
   name: 'Mid-Cap',
   initialMarginPpm: '100000',  // 10%
   maintenanceFractionPpm: '500000',  // 50%
+  openInterestLowerCap: '0',
+  openInterestUpperCap: '5000000',
 };
 
 // ============== OraclePrices ==============
@@ -536,6 +809,8 @@ export const defaultCandle: CandleCreateObject = {
   usdVolume: '2200000',
   trades: 300,
   startingOpenInterest: '200000',
+  orderbookMidPriceOpen: '11500',
+  orderbookMidPriceClose: '12500',
 };
 
 export const defaultCandleId: string = CandleTable.uuid(
@@ -572,6 +847,22 @@ export const defaultFundingIndexUpdateId: string = FundingIndexUpdatesTable.uuid
   defaultFundingIndexUpdate.effectiveAtHeight,
   defaultFundingIndexUpdate.eventId,
   defaultFundingIndexUpdate.perpetualId,
+);
+
+export const isolatedMarketFundingIndexUpdate: FundingIndexUpdatesCreateObject = {
+  perpetualId: isolatedPerpetualMarket.id,
+  eventId: defaultTendermintEventId,
+  rate: '0.0004',
+  oraclePrice: '10000',
+  fundingIndex: '10200',
+  effectiveAt: createdDateTime.toISO(),
+  effectiveAtHeight: createdHeight,
+};
+
+export const isolatedMarketFundingIndexUpdateId: string = FundingIndexUpdatesTable.uuid(
+  isolatedMarketFundingIndexUpdate.effectiveAtHeight,
+  isolatedMarketFundingIndexUpdate.eventId,
+  isolatedMarketFundingIndexUpdate.perpetualId,
 );
 
 // ========= Compliance Data ==========
@@ -641,3 +932,145 @@ export const defaultTradingRewardAggregationId: string = TradingRewardAggregatio
   defaultTradingRewardAggregation.period,
   defaultTradingRewardAggregation.startedAtHeight,
 );
+
+// ============== Subaccount Usernames ==============
+export const defaultSubaccountUsername: SubaccountUsernamesCreateObject = {
+  username: 'LyingRaisin32',
+  subaccountId: defaultSubaccountId,
+};
+
+export const defaultSubaccountUsername2: SubaccountUsernamesCreateObject = {
+  username: 'LyingRaisin33',
+  subaccountId: defaultSubaccountId2,
+};
+
+export const duplicatedSubaccountUsername: SubaccountUsernamesCreateObject = {
+  username: 'LyingRaisin32',
+  subaccountId: defaultSubaccountId3,
+};
+
+// defaultWalletAddress belongs to defaultWallet2 and is different from defaultAddress
+export const subaccountUsernameWithDefaultWalletAddress: SubaccountUsernamesCreateObject = {
+  username: 'EvilRaisin11',
+  subaccountId: defaultSubaccountIdDefaultWalletAddress,
+};
+
+export const subaccountUsernameWithAlternativeAddress: SubaccountUsernamesCreateObject = {
+  username: 'HonestRaisin32',
+  subaccountId: defaultSubaccountIdWithAlternateAddress,
+};
+
+// ============== Leaderboard pnl Data ==============
+
+export const defaultLeaderboardPnlOneDay: LeaderboardPnlCreateObject = {
+  address: defaultAddress,
+  timeSpan: 'ONE_DAY',
+  pnl: '10000',
+  currentEquity: '1000',
+  rank: 1,
+};
+
+export const defaultLeaderboardPnl2OneDay: LeaderboardPnlCreateObject = {
+  address: defaultAddress2,
+  timeSpan: 'ONE_DAY',
+  pnl: '100',
+  currentEquity: '10000',
+  rank: 2,
+};
+
+export const defaultLeaderboardPnl1AllTime: LeaderboardPnlCreateObject = {
+  address: defaultAddress,
+  timeSpan: 'ALL_TIME',
+  pnl: '10000',
+  currentEquity: '1000',
+  rank: 1,
+};
+
+export const defaultLeaderboardPnlOneDayToUpsert: LeaderboardPnlCreateObject = {
+  address: defaultAddress,
+  timeSpan: 'ONE_DAY',
+  pnl: '100000',
+  currentEquity: '1000',
+  rank: 1,
+};
+
+// ============== Affiliate referred users data ==============
+export const defaultAffiliateReferredUser: AffiliateReferredUsersCreateObject = {
+  affiliateAddress: defaultAddress,
+  refereeAddress: defaultAddress2,
+  referredAtBlock: '1',
+};
+
+// ============== Persistent cache Data ==============
+
+export const defaultKV: PersistentCacheCreateObject = {
+  key: 'someKey',
+  value: 'someValue',
+};
+
+export const defaultKV2: PersistentCacheCreateObject = {
+  key: 'otherKey',
+  value: 'otherValue',
+};
+
+// ============== Affiliate Info Data ==============
+
+export const defaultAffiliateInfo: AffiliateInfoCreateObject = {
+  address: defaultAddress,
+  affiliateEarnings: '10',
+  referredMakerTrades: 10,
+  referredTakerTrades: 20,
+  totalReferredMakerFees: '10',
+  totalReferredTakerFees: '10',
+  totalReferredMakerRebates: '-10',
+  totalReferredUsers: 5,
+  firstReferralBlockHeight: '1',
+  referredTotalVolume: '1000',
+};
+
+export const defaultAffiliateInfo2: AffiliateInfoCreateObject = {
+  address: defaultWalletAddress,
+  affiliateEarnings: '11',
+  referredMakerTrades: 11,
+  referredTakerTrades: 21,
+  totalReferredMakerFees: '11',
+  totalReferredTakerFees: '11',
+  totalReferredMakerRebates: '-11',
+  totalReferredUsers: 5,
+  firstReferralBlockHeight: '11',
+  referredTotalVolume: '1000',
+};
+
+export const defaultAffiliateInfo3: AffiliateInfoCreateObject = {
+  address: defaultAddress2,
+  affiliateEarnings: '12',
+  referredMakerTrades: 12,
+  referredTakerTrades: 22,
+  totalReferredMakerFees: '12',
+  totalReferredTakerFees: '12',
+  totalReferredMakerRebates: '-12',
+  totalReferredUsers: 10,
+  firstReferralBlockHeight: '12',
+  referredTotalVolume: '1111111',
+};
+
+// ==============  Tokens  =============
+
+export const defaultFirebaseNotificationToken = {
+  token: 'DEFAULT_TOKEN',
+  address: defaultAddress,
+  language: 'en',
+  updatedAt: createdDateTime.toISO(),
+};
+
+// ==============  Vaults  =============
+
+export const defaultVaultAddress: string = 'dydx1pzaql7h3tkt9uet8yht80me5td6gh0aprf58yk';
+
+export const defaultVault: VaultCreateObject = {
+  address: defaultVaultAddress,
+  clobPairId: '0',
+  status: VaultStatus.QUOTING,
+  createdAt: createdDateTime.toISO(),
+  updatedAt: createdDateTime.toISO(),
+};

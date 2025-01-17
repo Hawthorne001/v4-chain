@@ -10,8 +10,8 @@ import {
   liquidityTierRefresher,
   LiquidityTiersFromDatabase,
   LiquidityTiersMap,
+  MarketFromDatabase,
   MarketMessageContents,
-  MarketsMap,
   OraclePriceFromDatabase,
   OrderFromDatabase,
   OrderSubaccountMessageContents,
@@ -21,6 +21,7 @@ import {
   PerpetualPositionFromDatabase,
   PerpetualPositionSubaccountMessageContents,
   PositionSide,
+  protocolTranslations,
   SubaccountMessageContents,
   SubaccountTable,
   TradingMarketMessageContents,
@@ -50,6 +51,7 @@ export function addPositionsToContents(
   perpetualMarketsMapping: PerpetualMarketsMap,
   assetPositions: AssetPositionFromDatabase[],
   assetsMap: AssetsMap,
+  blockHeight: string,
 ): SubaccountMessageContents {
   return {
     ...contents,
@@ -63,6 +65,7 @@ export function addPositionsToContents(
       assetPositions,
       assetsMap,
     ),
+    blockHeight,
   };
 }
 
@@ -131,7 +134,7 @@ export function generateAssetPositionsContents(
 export function getPnl(
   updateObject: UpdatedPerpetualPositionSubaccountKafkaObject,
   perpetualMarket: PerpetualMarketFromDatabase,
-  marketIdToMarket: MarketsMap,
+  market: MarketFromDatabase,
 ): { realizedPnl: string | undefined, unrealizedPnl: string | undefined } {
   let realizedPnl: string | undefined;
   let unrealizedPnl: string | undefined;
@@ -143,7 +146,11 @@ export function getPnl(
       .mul(updateObject.sumClose)
       .plus(updateObject.settledFunding)
       .toFixed();
-    unrealizedPnl = helpers.getUnrealizedPnl(updateObject, perpetualMarket, marketIdToMarket);
+    unrealizedPnl = helpers.getUnrealizedPnl(
+      updateObject,
+      perpetualMarket,
+      market,
+    );
   }
   return { realizedPnl, unrealizedPnl };
 }
@@ -158,11 +165,11 @@ export function getPnl(
 export function annotateWithPnl(
   updateObject: UpdatedPerpetualPositionSubaccountKafkaObject,
   perpetualMarketMap: PerpetualMarketsMap,
-  marketIdToMarket: MarketsMap,
+  market: MarketFromDatabase,
 ): UpdatedPerpetualPositionSubaccountKafkaObject {
   return {
     ...updateObject,
-    ...getPnl(updateObject, perpetualMarketMap[updateObject.perpetualId], marketIdToMarket),
+    ...getPnl(updateObject, perpetualMarketMap[updateObject.perpetualId], market),
   };
 }
 
@@ -224,6 +231,7 @@ export function convertPerpetualPosition(
  * @param subaccountId to generate the websocket message for
  * @param senderSubaccountId
  * @param recipientSubaccountId
+ * @param blockHeight: latest block height processed by Indexer
  */
 export function generateTransferContents(
   transfer: TransferFromDatabase,
@@ -231,6 +239,7 @@ export function generateTransferContents(
   subaccountId: SubaccountId,
   senderSubaccountId?: SubaccountId,
   recipientSubaccountId?: SubaccountId,
+  blockHeight?: string,
 ): SubaccountMessageContents {
   return {
     transfers: {
@@ -254,6 +263,7 @@ export function generateTransferContents(
       createdAtHeight: transfer.createdAtHeight,
       transactionHash: transfer.transactionHash,
     },
+    blockHeight,
   };
 }
 
@@ -319,6 +329,7 @@ export function generatePerpetualMarketMessage(
         atomicResolution: perpetualMarket.atomicResolution,
         subticksPerTick: perpetualMarket.subticksPerTick,
         stepBaseQuantums: perpetualMarket.stepBaseQuantums,
+        marketType: perpetualMarket.marketType,
         initialMarginFraction: helpers.ppmToString(Number(liquidityTier.initialMarginPpm)),
         maintenanceMarginFraction: helpers.ppmToString(
           helpers.getMaintenanceMarginPpm(
@@ -326,6 +337,16 @@ export function generatePerpetualMarketMessage(
             Number(liquidityTier.maintenanceFractionPpm),
           ),
         ),
+        openInterestLowerCap: liquidityTier.openInterestLowerCap,
+        openInterestUpperCap: liquidityTier.openInterestUpperCap,
+        tickSize: protocolTranslations.getTickSize(perpetualMarket),
+        stepSize: protocolTranslations.getStepSize(perpetualMarket),
+        priceChange24H: perpetualMarket.priceChange24H,
+        volume24H: perpetualMarket.volume24H,
+        trades24H: perpetualMarket.trades24H,
+        nextFundingRate: perpetualMarket.nextFundingRate,
+        openInterest: perpetualMarket.openInterest,
+        baseOpenInterest: perpetualMarket.baseOpenInterest,
       };
     })
     .value();

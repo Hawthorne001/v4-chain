@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"math/big"
+
 	"cosmossdk.io/log"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -28,7 +30,6 @@ import (
 	oracletypes "github.com/skip-mev/slinky/pkg/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"math/big"
 )
 
 var (
@@ -360,7 +361,7 @@ func TestPrepareProposalHandler(t *testing.T) {
 			mockClobKeeper.On("GetOperations", mock.Anything, mock.Anything).
 				Return(tc.clobResp)
 
-			ctx, _, _, _, _, _ := keepertest.PricesKeepers(t)
+			ctx, _, _, _, _, _, _ := keepertest.PricesKeepers(t)
 
 			handler := prepare.PrepareProposalHandler(
 				mockTxConfig,
@@ -384,7 +385,6 @@ func TestPrepareProposalHandler(t *testing.T) {
 
 func TestPrepareProposalHandler_OtherTxs(t *testing.T) {
 	encodingCfg := encoding.GetTestEncodingCfg()
-
 	tests := map[string]struct {
 		txs [][]byte
 
@@ -440,7 +440,7 @@ func TestPrepareProposalHandler_OtherTxs(t *testing.T) {
 			mockBridgeKeeper.On("GetAcknowledgeBridges", mock.Anything, mock.Anything).
 				Return(constants.MsgAcknowledgeBridges_Ids0_1_Height0)
 
-			ctx, _, _, _, _, _ := keepertest.PricesKeepers(t)
+			ctx, _, _, _, _, _, _ := keepertest.PricesKeepers(t)
 
 			handler := prepare.PrepareProposalHandler(
 				encodingCfg.TxConfig,

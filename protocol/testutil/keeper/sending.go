@@ -57,7 +57,39 @@ func SendingKeepersWithSubaccountsKeeper(t testing.TB, saKeeper types.Subaccount
 		// Define necessary keepers here for unit tests
 		epochsKeeper, _ := createEpochsKeeper(stateStore, db, cdc)
 		blockTimeKeeper, _ := createBlockTimeKeeper(stateStore, db, cdc)
-		ks.PricesKeeper, _, _, _, mockTimeProvider = createPricesKeeper(stateStore, db, cdc, transientStoreKey)
+		ks.AccountKeeper, _ = createAccountKeeper(
+			stateStore,
+			db,
+			cdc,
+			registry)
+		ks.BankKeeper, _ = createBankKeeper(stateStore, db, cdc, ks.AccountKeeper)
+		stakingKeeper, _ := createStakingKeeper(
+			stateStore,
+			db,
+			cdc,
+			ks.AccountKeeper,
+			ks.BankKeeper,
+		)
+		statsKeeper, _ := createStatsKeeper(
+			stateStore,
+			epochsKeeper,
+			db,
+			cdc,
+			stakingKeeper,
+		)
+		affiliatesKeeper, _ := createAffiliatesKeeper(stateStore, db, cdc, statsKeeper, transientStoreKey, true)
+		vaultKeeper, _ := createVaultKeeper(stateStore, db, cdc, transientStoreKey)
+		feetiersKeeper, _ := createFeeTiersKeeper(stateStore, statsKeeper, vaultKeeper, affiliatesKeeper, db, cdc)
+		revShareKeeper, _, _ := createRevShareKeeper(stateStore, db, cdc, affiliatesKeeper, feetiersKeeper)
+		marketMapKeeper, _ := createMarketMapKeeper(stateStore, db, cdc)
+		ks.PricesKeeper, _, _, mockTimeProvider = createPricesKeeper(
+			stateStore,
+			db,
+			cdc,
+			transientStoreKey,
+			revShareKeeper,
+			marketMapKeeper,
+		)
 		ks.PerpetualsKeeper, _ = createPerpetualsKeeper(
 			stateStore,
 			db,
@@ -74,8 +106,6 @@ func SendingKeepersWithSubaccountsKeeper(t testing.TB, saKeeper types.Subaccount
 			transientStoreKey,
 			true,
 		)
-		ks.AccountKeeper, _ = createAccountKeeper(stateStore, db, cdc, registry)
-		ks.BankKeeper, _ = createBankKeeper(stateStore, db, cdc, ks.AccountKeeper)
 		if saKeeper == nil {
 			ks.SubaccountsKeeper, _ = createSubaccountsKeeper(
 				stateStore,

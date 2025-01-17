@@ -65,13 +65,17 @@ func (k Keeper) UpdateMarketPrices(
 		updatedMarketPrices = append(updatedMarketPrices, marketPrice)
 
 		// Report the oracle price.
-		updatedPrice, _ := lib.BigMulPow10(
-			new(big.Int).SetUint64(update.Price),
-			marketPrice.Exponent,
-		).Float32()
+		p10, inverse := lib.BigPow10(marketPrice.Exponent)
+		updatePrice := new(big.Int).SetUint64(update.Price)
+		var result float32
+		if inverse {
+			result, _ = new(big.Rat).SetFrac(updatePrice, p10).Float32()
+		} else {
+			result, _ = new(big.Rat).SetInt(updatePrice.Mul(updatePrice, p10)).Float32()
+		}
 		telemetry.SetGaugeWithLabels(
 			[]string{types.ModuleName, metrics.CurrentMarketPrices},
-			updatedPrice,
+			result,
 			[]gometrics.Label{ // To track per market, include the id as a label.
 				pricefeedmetrics.GetLabelForMarketId(marketPrice.Id),
 			},
@@ -92,6 +96,20 @@ func (k Keeper) UpdateMarketPrices(
 				pricefeedmetrics.GetLabelForMarketId(marketPrice.Id),
 			},
 		)
+
+		// If GRPC streaming is on, emit a price update to stream.
+		if k.GetFullNodeStreamingManager().Enabled() {
+			if k.GetFullNodeStreamingManager().TracksMarketId(marketPrice.Id) {
+				k.GetFullNodeStreamingManager().SendPriceUpdate(
+					ctx,
+					types.StreamPriceUpdate{
+						MarketId: marketPrice.Id,
+						Price:    marketPrice,
+						Snapshot: false,
+					},
+				)
+			}
+		}
 	}
 
 	// Generate indexer events.
@@ -162,6 +180,7 @@ func (k Keeper) GetMarketIdToValidIndexPrice(
 ) map[uint32]types.MarketPrice {
 	allMarketParams := k.GetAllMarketParams(ctx)
 	marketIdToValidIndexPrice := k.indexPriceCache.GetValidMedianPrices(
+		k.Logger(ctx),
 		allMarketParams,
 		k.timeProvider.Now(),
 	)
@@ -169,12 +188,45 @@ func (k Keeper) GetMarketIdToValidIndexPrice(
 	ret := make(map[uint32]types.MarketPrice)
 	for _, marketParam := range allMarketParams {
 		if indexPrice, exists := marketIdToValidIndexPrice[marketParam.Id]; exists {
+			exponent, err := k.GetExponent(ctx, marketParam.Pair)
+			if err != nil {
+				k.Logger(ctx).Error(
+					"failed to get exponent for market",
+					"market id", marketParam.Id,
+					"market pair", marketParam.Pair,
+					"error", err,
+				)
+				continue
+			}
 			ret[marketParam.Id] = types.MarketPrice{
 				Id:       marketParam.Id,
 				Price:    indexPrice,
-				Exponent: marketParam.Exponent,
+				Exponent: exponent,
 			}
 		}
 	}
 	return ret
+}
+
+// GetStreamPriceUpdate returns a stream price update from its id.
+func (k Keeper) GetStreamPriceUpdate(
+	ctx sdk.Context,
+	id uint32,
+	snapshot bool,
+) (
+	val types.StreamPriceUpdate,
+) {
+	price, err := k.GetMarketPrice(ctx, id)
+	if err != nil {
+		k.Logger(ctx).Error(
+			"failed to get market price for streaming",
+			"market id", id,
+			"error", err,
+		)
+	}
+	return types.StreamPriceUpdate{
+		MarketId: id,
+		Price:    price,
+		Snapshot: snapshot,
+	}
 }

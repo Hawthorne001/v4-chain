@@ -1,27 +1,34 @@
+import { stats } from '@dydxprotocol-indexer/base';
 import {
   FillFromDatabase,
   FillModel,
   Liquidity,
+  MarketFromDatabase,
+  MarketModel,
   OrderFromDatabase,
   OrderModel,
+  OrderStatus,
   OrderTable,
   PerpetualMarketFromDatabase,
   PerpetualMarketModel,
+  perpetualMarketRefresher,
   PerpetualPositionFromDatabase,
   PerpetualPositionModel,
   SubaccountTable,
-  OrderStatus,
+  UpdatedPerpetualPositionSubaccountKafkaObject,
 } from '@dydxprotocol-indexer/postgres';
 import { StateFilledQuantumsCache } from '@dydxprotocol-indexer/redis';
 import { isStatefulOrder } from '@dydxprotocol-indexer/v4-proto-parser';
 import {
-  IndexerOrderId, IndexerSubaccountId, IndexerOrder,
+  IndexerOrder, IndexerOrderId, IndexerSubaccountId,
 } from '@dydxprotocol-indexer/v4-protos';
 import Long from 'long';
 import * as pg from 'pg';
 
+import config from '../../config';
 import { STATEFUL_ORDER_ORDER_FILL_EVENT_TYPE, SUBACCOUNT_ORDER_FILL_EVENT_TYPE } from '../../constants';
-import { convertPerpetualPosition } from '../../helpers/kafka-helper';
+import { annotateWithPnl, convertPerpetualPosition } from '../../helpers/kafka-helper';
+import { sendOrderFilledNotification } from '../../helpers/notifications/notifications-functions';
 import { redisClient } from '../../helpers/redis/redis-controller';
 import { orderFillWithLiquidityToOrderFillEventWithOrder } from '../../helpers/translation-helper';
 import { OrderFillWithLiquidity } from '../../lib/translated-types';
@@ -70,6 +77,8 @@ export class OrderHandler extends AbstractOrderFillHandler<OrderFillWithLiquidit
       resultRow[field].fill) as FillFromDatabase;
     const perpetualMarket: PerpetualMarketFromDatabase = PerpetualMarketModel.fromJson(
       resultRow[field].perpetual_market) as PerpetualMarketFromDatabase;
+    const market: MarketFromDatabase = MarketModel.fromJson(
+      resultRow[field].market) as MarketFromDatabase;
     const position: PerpetualPositionFromDatabase = PerpetualPositionModel.fromJson(
       resultRow[field].perpetual_position) as PerpetualPositionFromDatabase;
 
@@ -79,11 +88,16 @@ export class OrderHandler extends AbstractOrderFillHandler<OrderFillWithLiquidit
     } else {
       subaccountId = castedOrderFillEventMessage.order.orderId!.subaccountId!;
     }
+    const positionUpdate: UpdatedPerpetualPositionSubaccountKafkaObject = annotateWithPnl(
+      convertPerpetualPosition(position),
+      perpetualMarketRefresher.getPerpetualMarketsMap(),
+      market,
+    );
     kafkaEvents.push(
       this.generateConsolidatedKafkaEvent(
         subaccountId,
         order,
-        convertPerpetualPosition(position),
+        positionUpdate,
         fill,
         perpetualMarket,
       ),
@@ -104,6 +118,11 @@ export class OrderHandler extends AbstractOrderFillHandler<OrderFillWithLiquidit
       redisClient,
     );
 
+    // If order is filled, send a notification to firebase
+    if (order.status === OrderStatus.FILLED) {
+      await sendOrderFilledNotification(order, perpetualMarket);
+    }
+
     // If the order is stateful and fully-filled, send an order removal to vulcan. We only do this
     // for stateful orders as we are guaranteed a stateful order cannot be replaced until the next
     // block.
@@ -115,6 +134,13 @@ export class OrderHandler extends AbstractOrderFillHandler<OrderFillWithLiquidit
       kafkaEvents.push(this.generateTradeKafkaEventFromTakerOrderFill(fill));
       return kafkaEvents;
     }
+
+    // Handle latency from resultRow
+    stats.timing(
+      `${config.SERVICE_NAME}.handle_order_fill_event.sql_latency`,
+      Number(resultRow.latency),
+      this.generateTimingStatsOptions(),
+    );
 
     return kafkaEvents;
   }

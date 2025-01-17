@@ -6,9 +6,9 @@ import { dbHelpers, storeHelpers } from '@dydxprotocol-indexer/postgres';
 
 export type PostgresFunction = {
   // The name of the script
-  readonly name: string;
+  readonly name: string,
   // The contents of the script
-  readonly script: string;
+  readonly script: string,
 };
 
 /**
@@ -36,13 +36,17 @@ const HANDLER_SCRIPTS: string[] = [
   'dydx_market_create_handler.sql',
   'dydx_market_modify_handler.sql',
   'dydx_market_price_update_handler.sql',
-  'dydx_perpetual_market_handler.sql',
+  'dydx_perpetual_market_v1_handler.sql',
+  'dydx_perpetual_market_v2_handler.sql',
+  'dydx_register_affiliate_handler.sql',
   'dydx_stateful_order_handler.sql',
   'dydx_subaccount_update_handler.sql',
   'dydx_trading_rewards_handler.sql',
   'dydx_transfer_handler.sql',
   'dydx_update_clob_pair_handler.sql',
-  'dydx_update_perpetual_handler.sql',
+  'dydx_update_perpetual_v1_handler.sql',
+  'dydx_update_perpetual_v2_handler.sql',
+  'dydx_vault_upsert_handler.sql',
 ];
 
 const DB_SETUP_SCRIPTS: string[] = [
@@ -63,6 +67,7 @@ const HELPER_SCRIPTS: string[] = [
   'dydx_get_fee_from_liquidity.sql',
   'dydx_get_order_status.sql',
   'dydx_get_perpetual_market_for_clob_pair.sql',
+  'dydx_get_market_for_id.sql',
   'dydx_get_total_filled_from_liquidity.sql',
   'dydx_get_weighted_average.sql',
   'dydx_liquidation_fill_handler_per_order.sql',
@@ -86,6 +91,8 @@ const HELPER_SCRIPTS: string[] = [
   'dydx_uuid_from_trading_rewards_parts.sql',
   'dydx_uuid_from_transaction_parts.sql',
   'dydx_uuid_from_transfer_parts.sql',
+  'dydx_protocol_market_type_to_perpetual_market_type.sql',
+  'dydx_protocol_vault_status_to_vault_status.sql',
 ];
 
 const MAIN_SCRIPTS: string[] = [

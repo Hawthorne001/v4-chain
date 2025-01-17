@@ -28,6 +28,12 @@ func ConvertOrderRemovalReasonToIndexerOrderRemovalReason(
 		reason = sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_FOK_ORDER_COULD_NOT_BE_FULLY_FULLED
 	case clobtypes.OrderRemoval_REMOVAL_REASON_CONDITIONAL_IOC_WOULD_REST_ON_BOOK:
 		reason = sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_IMMEDIATE_OR_CANCEL_WOULD_REST_ON_BOOK
+	case clobtypes.OrderRemoval_REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS:
+		reason = sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS
+	case clobtypes.OrderRemoval_REMOVAL_REASON_PERMISSIONED_KEY_EXPIRED:
+		// This is a special case where the order is no longer valid because the permissioned key used to placed
+		// the order has expired.
+		reason = sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_EXPIRED
 	default:
 		panic("ConvertOrderRemovalReasonToIndexerOrderRemovalReason: unspecified removal reason not allowed")
 	}
@@ -49,6 +55,8 @@ func GetOrderRemovalReason(
 		return sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_FOK_ORDER_COULD_NOT_BE_FULLY_FULLED, nil
 	case errors.Is(orderError, clobtypes.ErrOrderWouldExceedMaxOpenOrdersEquityTierLimit):
 		return sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_EQUITY_TIER, nil
+	case errors.Is(orderError, clobtypes.ErrWouldViolateIsolatedSubaccountConstraints):
+		return sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS, nil
 	}
 
 	switch orderStatus {
@@ -60,6 +68,8 @@ func GetOrderRemovalReason(
 		return sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_IMMEDIATE_OR_CANCEL_WOULD_REST_ON_BOOK, nil
 	case clobtypes.ReduceOnlyResized:
 		return sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_REDUCE_ONLY_RESIZE, nil
+	case clobtypes.ViolatesIsolatedSubaccountConstraints:
+		return sharedtypes.OrderRemovalReason_ORDER_REMOVAL_REASON_VIOLATES_ISOLATED_SUBACCOUNT_CONSTRAINTS, nil
 	default:
 		return 0, fmt.Errorf("unrecognized order status %d and error \"%w\"", orderStatus, orderError)
 	}

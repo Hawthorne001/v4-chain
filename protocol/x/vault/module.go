@@ -1,8 +1,10 @@
 package vault
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"cosmossdk.io/core/appmodule"
 
@@ -12,8 +14,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	cdctypes "github.com/cosmos/cosmos-sdk/codec/types"
+	"github.com/cosmos/cosmos-sdk/telemetry"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/dydxprotocol/v4-chain/protocol/lib"
 	"github.com/dydxprotocol/v4-chain/protocol/x/vault/client/cli"
 	"github.com/dydxprotocol/v4-chain/protocol/x/vault/keeper"
 	"github.com/dydxprotocol/v4-chain/protocol/x/vault/types"
@@ -24,6 +28,8 @@ var (
 	_ module.HasGenesisBasics = AppModuleBasic{}
 
 	_ appmodule.AppModule        = AppModule{}
+	_ appmodule.HasBeginBlocker  = AppModule{}
+	_ appmodule.HasEndBlocker    = AppModule{}
 	_ module.HasConsensusVersion = AppModule{}
 	_ module.HasGenesis          = AppModule{}
 	_ module.HasServices         = AppModule{}
@@ -75,7 +81,12 @@ func (AppModuleBasic) ValidateGenesis(cdc codec.JSONCodec, config client.TxEncod
 }
 
 // RegisterGRPCGatewayRoutes registers the gRPC Gateway routes for the module.
-func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *runtime.ServeMux) {}
+func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *runtime.ServeMux) {
+	err := types.RegisterQueryHandlerClient(context.Background(), mux, types.NewQueryClient(clientCtx))
+	if err != nil {
+		panic(err)
+	}
+}
 
 // GetTxCmd returns the root Tx command for the module. The subcommands of this root command are used by end-users to
 // generate new transactions containing messages defined in the module.
@@ -141,3 +152,23 @@ func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) json.Raw
 // consensus-breaking change introduced by the module. To avoid wrong/empty versions, the initial version should
 // be set to 1.
 func (AppModule) ConsensusVersion() uint64 { return 1 }
+
+// BeginBlock executes all ABCI BeginBlock logic respective to the vault module.
+func (am AppModule) BeginBlock(ctx context.Context) error {
+	defer telemetry.ModuleMeasureSince(am.Name(), time.Now(), telemetry.MetricKeyBeginBlocker)
+	BeginBlocker(
+		lib.UnwrapSDKContext(ctx, types.ModuleName),
+		&am.keeper,
+	)
+	return nil
+}
+
+// EndBlock executes all ABCI EndBlock logic respective to the vault module.
+func (am AppModule) EndBlock(ctx context.Context) error {
+	defer telemetry.ModuleMeasureSince(am.Name(), time.Now(), telemetry.MetricKeyEndBlocker)
+	EndBlocker(
+		lib.UnwrapSDKContext(ctx, types.ModuleName),
+		&am.keeper,
+	)
+	return nil
+}

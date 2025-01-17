@@ -1,11 +1,12 @@
 package flags
 
 import (
+	"time"
+
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	oracleconfig "github.com/skip-mev/slinky/oracle/config"
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
-	"time"
 )
 
 // List of CLI flags for Server and Client.
@@ -22,9 +23,10 @@ const (
 	FlagBridgeDaemonLoopDelayMs    = "bridge-daemon-loop-delay-ms"
 	FlagBridgeDaemonEthRpcEndpoint = "bridge-daemon-eth-rpc-endpoint"
 
-	FlagLiquidationDaemonEnabled        = "liquidation-daemon-enabled"
-	FlagLiquidationDaemonLoopDelayMs    = "liquidation-daemon-loop-delay-ms"
-	FlagLiquidationDaemonQueryPageLimit = "liquidation-daemon-query-page-limit"
+	FlagLiquidationDaemonEnabled           = "liquidation-daemon-enabled"
+	FlagLiquidationDaemonLoopDelayMs       = "liquidation-daemon-loop-delay-ms"
+	FlagLiquidationDaemonQueryPageLimit    = "liquidation-daemon-query-page-limit"
+	FlagLiquidationDaemonResponsePageLimit = "liquidation-daemon-response-page-limit"
 
 	// Oracle flags
 	FlagOracleEnabled                 = "oracle.enabled"
@@ -62,6 +64,8 @@ type LiquidationFlags struct {
 	LoopDelayMs uint32
 	// QueryPageLimit configures the pagination limit for fetching subaccounts.
 	QueryPageLimit uint64
+	// ResponsePageLimit configures the pagination limit for the response to application.
+	ResponsePageLimit uint64
 }
 
 // PriceFlags contains configuration flags for the Price Daemon.
@@ -102,20 +106,21 @@ func GetDefaultDaemonFlags() DaemonFlags {
 				EthRpcEndpoint: "",
 			},
 			Liquidation: LiquidationFlags{
-				Enabled:        true,
-				LoopDelayMs:    1_600,
-				QueryPageLimit: 1_000,
+				Enabled:           true,
+				LoopDelayMs:       1_600,
+				QueryPageLimit:    1_000,
+				ResponsePageLimit: 2_000,
 			},
 			Price: PriceFlags{
-				Enabled:     true,
+				Enabled:     false,
 				LoopDelayMs: 3_000,
 			},
 			Slinky: SlinkyFlags{
 				AppConfig: oracleconfig.AppConfig{
-					OracleAddress:           "localhost:8080",
-					ClientTimeout:           time.Second * 2,
-					MetricsEnabled:          false,
-					PrometheusServerAddress: "",
+					Enabled:        true,
+					OracleAddress:  "localhost:8080",
+					ClientTimeout:  time.Second * 2,
+					MetricsEnabled: true,
 				},
 			},
 		}
@@ -183,6 +188,11 @@ func AddDaemonFlagsToCmd(
 		df.Liquidation.QueryPageLimit,
 		"Limit on the number of items to fetch per query in the Liquidation Daemon task loop.",
 	)
+	cmd.Flags().Uint64(
+		FlagLiquidationDaemonResponsePageLimit,
+		df.Liquidation.ResponsePageLimit,
+		"Limit on the number of items to send to the main application in the Liquidation Daemon task loop.",
+	)
 
 	// Price Daemon.
 	cmd.Flags().Bool(
@@ -216,11 +226,6 @@ func AddDaemonFlagsToCmd(
 		FlagOracleMetricsEnabled,
 		df.Slinky.AppConfig.MetricsEnabled,
 		"Enable the oracle metrics reporting for Slinky.",
-	)
-	cmd.Flags().String(
-		FlagOraclePrometheusServerAddress,
-		df.Slinky.AppConfig.PrometheusServerAddress,
-		"The address of the exposed prometheus address for Slinky metrics.",
 	)
 }
 
@@ -281,6 +286,11 @@ func GetDaemonFlagValuesFromOptions(
 			result.Liquidation.QueryPageLimit = v
 		}
 	}
+	if option := appOpts.Get(FlagLiquidationDaemonResponsePageLimit); option != nil {
+		if v, err := cast.ToUint64E(option); err == nil {
+			result.Liquidation.ResponsePageLimit = v
+		}
+	}
 
 	// Price Daemon.
 	if option := appOpts.Get(FlagPriceDaemonEnabled); option != nil {
@@ -313,11 +323,6 @@ func GetDaemonFlagValuesFromOptions(
 	if option := appOpts.Get(FlagOracleMetricsEnabled); option != nil {
 		if v, err := cast.ToBoolE(option); err == nil {
 			result.Slinky.AppConfig.MetricsEnabled = v
-		}
-	}
-	if option := appOpts.Get(FlagOraclePrometheusServerAddress); option != nil {
-		if v, err := cast.ToStringE(option); err == nil {
-			result.Slinky.AppConfig.PrometheusServerAddress = v
 		}
 	}
 

@@ -30,8 +30,14 @@ import {
   PerpetualMarketTable,
   IsoString,
   fillTypeToTradeType,
+  OrderSubaccountMessageContents,
+  MarketFromDatabase,
+  MarketTable,
+  MarketsMap,
+  MarketColumns,
+  UpdatedPerpetualPositionSubaccountKafkaObject,
 } from '@dydxprotocol-indexer/postgres';
-import { getOrderIdHash } from '@dydxprotocol-indexer/v4-proto-parser';
+import { getOrderIdHash, ORDER_FLAG_CONDITIONAL } from '@dydxprotocol-indexer/v4-proto-parser';
 import {
   LiquidationOrderV1,
   MarketMessage,
@@ -49,18 +55,21 @@ import {
   OffChainUpdateV1,
   IndexerOrderId,
   PerpetualMarketCreateEventV1,
+  PerpetualMarketCreateEventV2,
   DeleveragingEventV1,
+  protoTimestampToDate,
+  PerpetualMarketType,
 } from '@dydxprotocol-indexer/v4-protos';
-import { Message, ProducerRecord } from 'kafkajs';
+import { IHeaders, Message, ProducerRecord } from 'kafkajs';
 import _ from 'lodash';
 
 import {
+  annotateWithPnl,
   convertPerpetualPosition,
   generateFillSubaccountMessage,
   generatePerpetualMarketMessage,
   generatePerpetualPositionsContents,
 } from '../../src/helpers/kafka-helper';
-import { protoTimestampToDate } from '../../src/lib/helper';
 import { DydxIndexerSubtypes, VulcanMessage } from '../../src/lib/types';
 
 // TX Hash is SHA256, so is of length 64 hexadecimal without the '0x'.
@@ -318,10 +327,12 @@ export function expectVulcanKafkaMessage({
   producerSendMock,
   orderId,
   offchainUpdate,
+  headers,
 }: {
   producerSendMock: jest.SpyInstance,
   orderId: IndexerOrderId,
   offchainUpdate: OffChainUpdateV1,
+  headers?: IHeaders,
 }): void {
   expect(producerSendMock.mock.calls.length).toBeGreaterThanOrEqual(1);
   expect(producerSendMock.mock.calls[0].length).toBeGreaterThanOrEqual(1);
@@ -339,7 +350,6 @@ export function expectVulcanKafkaMessage({
     vulcanProducerRecord.messages,
     (message: Message): VulcanMessage => {
       expect(Buffer.isBuffer(message.value));
-
       const messageValueBinary: Uint8Array = new Uint8Array(
         // Can assume Buffer, since we check above that it is a buffer
         message.value as Buffer,
@@ -348,6 +358,7 @@ export function expectVulcanKafkaMessage({
       return {
         key: message.key as Buffer,
         value: OffChainUpdateV1.decode(messageValueBinary),
+        headers: message.headers,
       };
     },
   );
@@ -355,6 +366,7 @@ export function expectVulcanKafkaMessage({
   expect(vulcanMessages).toContainEqual({
     key: getOrderIdHash(orderId),
     value: offchainUpdate,
+    headers,
   });
 }
 
@@ -530,6 +542,7 @@ export async function expectFillInDatabase({
   orderFlags,
   clientMetadata,
   fee,
+  affiliateRevShare,
   hasOrderId = true,
 }: {
   subaccountId: string,
@@ -548,6 +561,7 @@ export async function expectFillInDatabase({
   orderFlags: string,
   clientMetadata: string | null,
   fee: string,
+  affiliateRevShare: string,
   hasOrderId?: boolean,
 }): Promise<void> {
   const fillId: string = FillTable.uuid(eventId, liquidity);
@@ -570,6 +584,7 @@ export async function expectFillInDatabase({
     createdAtHeight,
     clientMetadata,
     fee,
+    affiliateRevShare,
   }));
 }
 
@@ -669,15 +684,30 @@ export async function expectFillSubaccountKafkaMessageFromLiquidationEvent(
   expect(fill).toBeDefined();
   expect(position).toBeDefined();
 
+  const markets: MarketFromDatabase[] = await MarketTable.findAll(
+    {},
+    [],
+  );
+  const marketIdToMarket: MarketsMap = _.keyBy(
+    markets,
+    MarketColumns.id,
+  );
+  const positionUpdate = annotateWithPnl(
+    convertPerpetualPosition(position!),
+    perpetualMarketRefresher.getPerpetualMarketsMap(),
+    marketIdToMarket[parseInt(position!.perpetualId, 10)],
+  );
+
   const contents: SubaccountMessageContents = {
     fills: [
       generateFillSubaccountMessage(fill!, ticker),
     ],
     perpetualPositions: generatePerpetualPositionsContents(
       subaccountIdProto,
-      [convertPerpetualPosition(position!)],
+      [positionUpdate],
       perpetualMarketRefresher.getPerpetualMarketsMap(),
     ),
+    blockHeight,
   };
 
   expectSubaccountKafkaMessage({
@@ -690,6 +720,10 @@ export async function expectFillSubaccountKafkaMessageFromLiquidationEvent(
   });
 }
 
+function isConditionalOrder(order: OrderFromDatabase): boolean {
+  return Number(order.orderFlags) === ORDER_FLAG_CONDITIONAL;
+}
+
 export function expectOrderSubaccountKafkaMessage(
   producerSendMock: jest.SpyInstance,
   subaccountIdProto: IndexerSubaccountId,
@@ -699,17 +733,36 @@ export function expectOrderSubaccountKafkaMessage(
   eventIndex: number = 0,
   ticker: string = defaultPerpetualMarketTicker,
 ): void {
+  const {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    triggerPrice, totalFilled, goodTilBlock, ...orderWithoutUnwantedFields
+  } = order!;
+  let orderObject: OrderSubaccountMessageContents;
+
+  if (isConditionalOrder(order)) {
+    orderObject = {
+      ...order!,
+      timeInForce: apiTranslations.orderTIFToAPITIF(order!.timeInForce),
+      postOnly: apiTranslations.isOrderTIFPostOnly(order!.timeInForce),
+      goodTilBlock: order!.goodTilBlock,
+      goodTilBlockTime: order!.goodTilBlockTime,
+      ticker,
+    };
+  } else {
+    orderObject = {
+      ...orderWithoutUnwantedFields!,
+      timeInForce: apiTranslations.orderTIFToAPITIF(order!.timeInForce),
+      postOnly: apiTranslations.isOrderTIFPostOnly(order!.timeInForce),
+      goodTilBlockTime: order!.goodTilBlockTime,
+      ticker,
+    };
+  }
+
   const contents: SubaccountMessageContents = {
     orders: [
-      {
-        ...order!,
-        timeInForce: apiTranslations.orderTIFToAPITIF(order!.timeInForce),
-        postOnly: apiTranslations.isOrderTIFPostOnly(order!.timeInForce),
-        goodTilBlock: order!.goodTilBlock,
-        goodTilBlockTime: order!.goodTilBlockTime,
-        ticker,
-      },
+      orderObject,
     ],
+    blockHeight,
   };
 
   expectSubaccountKafkaMessage({
@@ -769,12 +822,26 @@ export async function expectOrderFillAndPositionSubaccountKafkaMessageFromIds(
     fills: [
       generateFillSubaccountMessage(fill!, perpetualMarket!.ticker),
     ],
+    blockHeight,
   };
 
   if (position !== undefined) {
+    const markets: MarketFromDatabase[] = await MarketTable.findAll(
+      {},
+      [],
+    );
+    const marketIdToMarket: MarketsMap = _.keyBy(
+      markets,
+      MarketColumns.id,
+    );
+    const positionUpdate: UpdatedPerpetualPositionSubaccountKafkaObject = annotateWithPnl(
+      convertPerpetualPosition(position),
+      perpetualMarketRefresher.getPerpetualMarketsMap(),
+      marketIdToMarket[parseInt(position.perpetualId, 10)],
+    );
     contents.perpetualPositions = generatePerpetualPositionsContents(
       subaccountIdProto,
-      [convertPerpetualPosition(position)],
+      [positionUpdate],
       perpetualMarketRefresher.getPerpetualMarketsMap(),
     );
   }
@@ -860,7 +927,7 @@ export const HARDCODED_PERPETUAL_MARKET_VALUES: Object = {
   openInterest: '0',
 };
 
-export function expectPerpetualMarket(
+export function expectPerpetualMarketV1(
   perpetualMarket: PerpetualMarketFromDatabase,
   perpetual: PerpetualMarketCreateEventV1,
 ): void {
@@ -877,5 +944,42 @@ export function expectPerpetualMarket(
     subticksPerTick: perpetual.subticksPerTick,
     stepBaseQuantums: Number(perpetual.stepBaseQuantums),
     liquidityTierId: perpetual.liquidityTier,
+    marketType: 'CROSS',
   }));
+}
+
+export function expectPerpetualMarketV2(
+  perpetualMarket: PerpetualMarketFromDatabase,
+  perpetual: PerpetualMarketCreateEventV2,
+): void {
+  // TODO(IND-219): Set initialMarginFraction/maintenanceMarginFraction using LiquidityTier
+  expect(perpetualMarket).toEqual(expect.objectContaining({
+    ...HARDCODED_PERPETUAL_MARKET_VALUES,
+    id: perpetual.id.toString(),
+    status: PerpetualMarketStatus.INITIALIZING,
+    clobPairId: perpetual.clobPairId.toString(),
+    ticker: perpetual.ticker,
+    marketId: perpetual.marketId,
+    quantumConversionExponent: perpetual.quantumConversionExponent,
+    atomicResolution: perpetual.atomicResolution,
+    subticksPerTick: perpetual.subticksPerTick,
+    stepBaseQuantums: Number(perpetual.stepBaseQuantums),
+    liquidityTierId: perpetual.liquidityTier,
+    marketType: eventPerpetualMarketTypeToIndexerPerpetualMarketType(
+      perpetual.marketType,
+    ),
+  }));
+}
+
+export function eventPerpetualMarketTypeToIndexerPerpetualMarketType(
+  perpetualMarketType: PerpetualMarketType,
+): string {
+  switch (perpetualMarketType) {
+    case PerpetualMarketType.PERPETUAL_MARKET_TYPE_CROSS:
+      return 'CROSS';
+    case PerpetualMarketType.PERPETUAL_MARKET_TYPE_ISOLATED:
+      return 'ISOLATED';
+    default:
+      throw new Error(`Unknown perpetual market type: ${perpetualMarketType}`);
+  }
 }

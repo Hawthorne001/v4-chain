@@ -5,9 +5,9 @@ set -eo pipefail
 # This file should be run as part of `docker-compose.yml`.
 
 source "./genesis.sh"
+source "./version.sh"
 
 CHAIN_ID="localdydxprotocol"
-PREUPGRADE_VERSION="v4.0.0-rc1"
 
 # Define mnemonics for all validators.
 MNEMONICS=(
@@ -100,7 +100,7 @@ create_validators() {
 		# Using "*" as a subscript results in a single arg: "dydx1... dydx1... dydx1..."
 		# Using "@" as a subscript results in separate args: "dydx1..." "dydx1..." "dydx1..."
 		# Note: `edit_genesis` must be called before `add-genesis-account` or `update_genesis_use_test_exchange`.
-		edit_genesis "$VAL_CONFIG_DIR" "${TEST_ACCOUNTS[*]}" "${FAUCET_ACCOUNTS[*]}" "" "" "" ""
+		edit_genesis "$VAL_CONFIG_DIR" "${TEST_ACCOUNTS[*]}" "${FAUCET_ACCOUNTS[*]}" "" "" "" "" "" ""
 		# Configure the genesis file to only use the test exchange to compute index prices.
 		update_genesis_use_test_exchange "$VAL_CONFIG_DIR"
 
@@ -169,7 +169,7 @@ download_preupgrade_binary() {
 			exit 1
 			;;
 	esac
-	tar_url="https://github.com/dydxprotocol/v4-chain/releases/download/protocol%2F$PREUPGRADE_VERSION/dydxprotocold-$PREUPGRADE_VERSION-linux-$url_arch.tar.gz"
+	tar_url="https://github.com/dydxprotocol/v4-chain/releases/download/protocol%2F$PREUPGRADE_VERSION_FULL_NAME/dydxprotocold-$PREUPGRADE_VERSION_FULL_NAME-linux-$url_arch.tar.gz"
 	tar_path='/tmp/dydxprotocold/dydxprotocold.tar.gz'
 	mkdir -p /tmp/dydxprotocold
 	curl -vL $tar_url -o $tar_path

@@ -16,18 +16,23 @@ import (
 	ibcclient "github.com/cosmos/ibc-go/v8/modules/core/02-client/types" //nolint:staticcheck
 	ibcconn "github.com/cosmos/ibc-go/v8/modules/core/03-connection/types"
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
+	accountplus "github.com/dydxprotocol/v4-chain/protocol/x/accountplus/types"
+	affiliates "github.com/dydxprotocol/v4-chain/protocol/x/affiliates/types"
 	blocktime "github.com/dydxprotocol/v4-chain/protocol/x/blocktime/types"
 	bridge "github.com/dydxprotocol/v4-chain/protocol/x/bridge/types"
 	clob "github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 	delaymsg "github.com/dydxprotocol/v4-chain/protocol/x/delaymsg/types"
 	feetiers "github.com/dydxprotocol/v4-chain/protocol/x/feetiers/types"
 	govplus "github.com/dydxprotocol/v4-chain/protocol/x/govplus/types"
+	listing "github.com/dydxprotocol/v4-chain/protocol/x/listing/types"
 	perpetuals "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/types"
 	prices "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
 	ratelimit "github.com/dydxprotocol/v4-chain/protocol/x/ratelimit/types"
+	revshare "github.com/dydxprotocol/v4-chain/protocol/x/revshare/types"
 	rewards "github.com/dydxprotocol/v4-chain/protocol/x/rewards/types"
 	sending "github.com/dydxprotocol/v4-chain/protocol/x/sending/types"
 	stats "github.com/dydxprotocol/v4-chain/protocol/x/stats/types"
+	vault "github.com/dydxprotocol/v4-chain/protocol/x/vault/types"
 	vest "github.com/dydxprotocol/v4-chain/protocol/x/vest/types"
 )
 
@@ -102,9 +107,21 @@ var (
 
 	// Custom modules
 	InternalMsgSamplesDydxCustom = map[string]sdk.Msg{
+		// affiliates
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateTiers":             &affiliates.MsgUpdateAffiliateTiers{},
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateTiersResponse":     nil,
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateWhitelist":         &affiliates.MsgUpdateAffiliateWhitelist{},
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateWhitelistResponse": nil,
+
+		// accountplus
+		"/dydxprotocol.accountplus.MsgSetActiveState":         &accountplus.MsgSetActiveState{},
+		"/dydxprotocol.accountplus.MsgSetActiveStateResponse": nil,
+
 		// blocktime
-		"/dydxprotocol.blocktime.MsgUpdateDowntimeParams":         &blocktime.MsgUpdateDowntimeParams{},
-		"/dydxprotocol.blocktime.MsgUpdateDowntimeParamsResponse": nil,
+		"/dydxprotocol.blocktime.MsgUpdateDowntimeParams":          &blocktime.MsgUpdateDowntimeParams{},
+		"/dydxprotocol.blocktime.MsgUpdateDowntimeParamsResponse":  nil,
+		"/dydxprotocol.blocktime.MsgUpdateSynchronyParams":         &blocktime.MsgUpdateSynchronyParams{},
+		"/dydxprotocol.blocktime.MsgUpdateSynchronyParamsResponse": nil,
 
 		// bridge
 		"/dydxprotocol.bridge.MsgCompleteBridge":              &bridge.MsgCompleteBridge{},
@@ -140,6 +157,14 @@ var (
 		"/dydxprotocol.govplus.MsgSlashValidator":         &govplus.MsgSlashValidator{},
 		"/dydxprotocol.govplus.MsgSlashValidatorResponse": nil,
 
+		// listing
+		"/dydxprotocol.listing.MsgSetMarketsHardCap":                       &listing.MsgSetMarketsHardCap{},
+		"/dydxprotocol.listing.MsgSetMarketsHardCapResponse":               nil,
+		"/dydxprotocol.listing.MsgSetListingVaultDepositParams":            &listing.MsgSetListingVaultDepositParams{},
+		"/dydxprotocol.listing.MsgSetListingVaultDepositParamsResponse":    nil,
+		"/dydxprotocol.listing.MsgUpgradeIsolatedPerpetualToCross":         &listing.MsgUpgradeIsolatedPerpetualToCross{},
+		"/dydxprotocol.listing.MsgUpgradeIsolatedPerpetualToCrossResponse": nil,
+
 		// perpetuals
 		"/dydxprotocol.perpetuals.MsgCreatePerpetual":               &perpetuals.MsgCreatePerpetual{},
 		"/dydxprotocol.perpetuals.MsgCreatePerpetualResponse":       nil,
@@ -160,6 +185,14 @@ var (
 		"/dydxprotocol.ratelimit.MsgSetLimitParams":         &ratelimit.MsgSetLimitParams{},
 		"/dydxprotocol.ratelimit.MsgSetLimitParamsResponse": nil,
 
+		// revshare
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevShareDetailsForMarket":         &revshare.MsgSetMarketMapperRevShareDetailsForMarket{}, //nolint:lll
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevShareDetailsForMarketResponse": nil,
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevenueShare":                     &revshare.MsgSetMarketMapperRevenueShare{}, //nolint:lll
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevenueShareResponse":             nil,
+		"/dydxprotocol.revshare.MsgUpdateUnconditionalRevShareConfig":               &revshare.MsgUpdateUnconditionalRevShareConfig{}, //nolint:lll
+		"/dydxprotocol.revshare.MsgUpdateUnconditionalRevShareConfigResponse":       nil,
+
 		// rewards
 		"/dydxprotocol.rewards.MsgUpdateParams":         &rewards.MsgUpdateParams{},
 		"/dydxprotocol.rewards.MsgUpdateParamsResponse": nil,
@@ -171,6 +204,14 @@ var (
 		// stats
 		"/dydxprotocol.stats.MsgUpdateParams":         &stats.MsgUpdateParams{},
 		"/dydxprotocol.stats.MsgUpdateParamsResponse": nil,
+
+		// vault
+		"/dydxprotocol.vault.MsgUnlockShares":                       &vault.MsgUnlockShares{},
+		"/dydxprotocol.vault.MsgUnlockSharesResponse":               nil,
+		"/dydxprotocol.vault.MsgUpdateDefaultQuotingParams":         &vault.MsgUpdateDefaultQuotingParams{},
+		"/dydxprotocol.vault.MsgUpdateDefaultQuotingParamsResponse": nil,
+		"/dydxprotocol.vault.MsgUpdateOperatorParams":               &vault.MsgUpdateOperatorParams{},
+		"/dydxprotocol.vault.MsgUpdateOperatorParamsResponse":       nil,
 
 		// vest
 		"/dydxprotocol.vest.MsgSetVestEntry":            &vest.MsgSetVestEntry{},

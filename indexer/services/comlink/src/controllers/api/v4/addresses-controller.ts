@@ -1,4 +1,7 @@
-import { stats } from '@dydxprotocol-indexer/base';
+import { logger, NodeEnv, stats } from '@dydxprotocol-indexer/base';
+import {
+  createNotification, NotificationType, NotificationDynamicFieldKey, sendFirebaseMessage,
+} from '@dydxprotocol-indexer/notifications';
 import {
   AssetPositionFromDatabase,
   BlockTable,
@@ -12,64 +15,55 @@ import {
   AssetPositionTable,
   AssetTable,
   AssetFromDatabase,
-  AssetColumns,
   MarketTable,
   MarketFromDatabase,
-  MarketsMap,
-  MarketColumns,
-  PerpetualMarketsMap,
-  perpetualMarketRefresher,
   Options,
   FundingIndexUpdatesTable,
   FundingIndexMap,
   WalletTable,
   WalletFromDatabase,
+  perpetualMarketRefresher,
+  FirebaseNotificationTokenTable,
 } from '@dydxprotocol-indexer/postgres';
 import Big from 'big.js';
 import express from 'express';
 import {
   matchedData,
 } from 'express-validator';
-import _ from 'lodash';
 import {
   Route, Get, Path, Controller,
+  Post,
+  Body,
 } from 'tsoa';
 
 import { getReqRateLimiter } from '../../../caches/rate-limiters';
 import config from '../../../config';
+import { AccountVerificationRequiredAction, validateSignature, validateSignatureKeplr } from '../../../helpers/compliance/compliance-utils';
 import { complianceAndGeoCheck } from '../../../lib/compliance-and-geo-check';
-import { NotFoundError } from '../../../lib/errors';
+import { DatabaseError, NotFoundError } from '../../../lib/errors';
 import {
-  adjustUSDCAssetPosition,
-  calculateEquityAndFreeCollateral,
-  filterAssetPositions,
-  filterPositionsByLatestEventIdPerPerpetual,
   getFundingIndexMaps,
-  getTotalUnsettledFunding,
   handleControllerError,
-  getPerpetualPositionsWithUpdatedFunding,
-  initializePerpetualPositionsWithFunding,
+  getChildSubaccountIds,
+  getSubaccountResponse,
 } from '../../../lib/helpers';
 import { rateLimiterMiddleware } from '../../../lib/rate-limit';
-import { CheckAddressSchema, CheckSubaccountSchema } from '../../../lib/validation/schemas';
+import {
+  CheckAddressSchema,
+  CheckParentSubaccountSchema,
+  CheckSubaccountSchema,
+  RegisterTokenValidationSchema,
+} from '../../../lib/validation/schemas';
 import { handleValidationErrors } from '../../../request-helpers/error-handler';
 import ExportResponseCodeStats from '../../../request-helpers/export-response-code-stats';
 import {
-  assetPositionToResponseObject,
-  perpetualPositionToResponseObject,
-  subaccountToResponseObject,
-} from '../../../request-helpers/request-transformer';
-import {
   AddressRequest,
-  PerpetualPositionsMap,
-  PerpetualPositionResponseObject,
   SubaccountRequest,
   SubaccountResponseObject,
-  AssetById,
-  AssetPositionResponseObject,
-  AssetPositionsMap,
-  PerpetualPositionWithFunding,
   AddressResponse,
+  ParentSubaccountResponse,
+  ParentSubaccountRequest,
+  RegisterTokenRequest,
 } from '../../../types';
 
 const router: express.Router = express.Router();
@@ -133,26 +127,17 @@ class AddressesController extends Controller {
             subaccount.updatedAtHeight,
           ),
         ]);
-        const unsettledFunding: Big = getTotalUnsettledFunding(
-          perpetualPositions,
-          latestFundingIndexMap,
-          lastUpdatedFundingIndexMap,
-        );
-
-        const updatedPerpetualPositions:
-        PerpetualPositionWithFunding[] = getPerpetualPositionsWithUpdatedFunding(
-          initializePerpetualPositionsWithFunding(perpetualPositions),
-          latestFundingIndexMap,
-          lastUpdatedFundingIndexMap,
-        );
 
         return getSubaccountResponse(
           subaccount,
-          updatedPerpetualPositions,
+          perpetualPositions,
           assetPositions,
           assets,
           markets,
-          unsettledFunding,
+          perpetualMarketRefresher.getPerpetualMarketsMap(),
+          latestBlock.blockHeight,
+          latestFundingIndexMap,
+          lastUpdatedFundingIndexMap,
         );
       },
     ));
@@ -218,28 +203,162 @@ class AddressesController extends Controller {
       lastUpdatedFundingIndexMap: FundingIndexMap,
       latestFundingIndexMap: FundingIndexMap,
     } = await getFundingIndexMaps(subaccount, latestBlock);
-    const unsettledFunding: Big = getTotalUnsettledFunding(
-      perpetualPositions,
-      latestFundingIndexMap,
-      lastUpdatedFundingIndexMap,
-    );
 
-    const updatedPerpetualPositions:
-    PerpetualPositionWithFunding[] = getPerpetualPositionsWithUpdatedFunding(
-      initializePerpetualPositionsWithFunding(perpetualPositions),
-      latestFundingIndexMap,
-      lastUpdatedFundingIndexMap,
-    );
-
-    const subaccountResponse: SubaccountResponseObject = await getSubaccountResponse(
+    const subaccountResponse: SubaccountResponseObject = getSubaccountResponse(
       subaccount,
-      updatedPerpetualPositions,
+      perpetualPositions,
       assetPositions,
       assets,
       markets,
-      unsettledFunding,
+      perpetualMarketRefresher.getPerpetualMarketsMap(),
+      latestBlock.blockHeight,
+      latestFundingIndexMap,
+      lastUpdatedFundingIndexMap,
     );
     return subaccountResponse;
+  }
+
+  @Get('/:address/parentSubaccountNumber/:parentSubaccountNumber')
+  public async getParentSubaccount(
+    @Path() address: string,
+      @Path() parentSubaccountNumber: number,
+  ): Promise<ParentSubaccountResponse> {
+
+    const childSubaccountIds: string[] = getChildSubaccountIds(address, parentSubaccountNumber);
+
+    // TODO(IND-189): Use a transaction across all the DB queries
+    const [subaccounts, latestBlock]: [
+      SubaccountFromDatabase[],
+      BlockFromDatabase,
+    ] = await Promise.all([
+      SubaccountTable.findAll(
+        {
+          id: childSubaccountIds,
+          address,
+        },
+        [],
+      ),
+      BlockTable.getLatest(),
+    ]);
+
+    if (subaccounts.length === 0) {
+      throw new NotFoundError(`No subaccounts found for address ${address} and parentSubaccountNumber ${parentSubaccountNumber}`);
+    }
+
+    const latestFundingIndexMap: FundingIndexMap = await FundingIndexUpdatesTable
+      .findFundingIndexMap(
+        latestBlock.blockHeight,
+      );
+
+    const [assets, markets]: [AssetFromDatabase[], MarketFromDatabase[]] = await Promise.all([
+      AssetTable.findAll(
+        {},
+        [],
+      ),
+      MarketTable.findAll(
+        {},
+        [],
+      ),
+    ]);
+    const subaccountResponses: SubaccountResponseObject[] = await Promise.all(subaccounts.map(
+      async (subaccount: SubaccountFromDatabase): Promise<SubaccountResponseObject> => {
+        const [
+          perpetualPositions,
+          assetPositions,
+          lastUpdatedFundingIndexMap,
+        ] = await Promise.all([
+          getOpenPerpetualPositionsForSubaccount(
+            subaccount.id,
+          ),
+          getAssetPositionsForSubaccount(
+            subaccount.id,
+          ),
+          FundingIndexUpdatesTable.findFundingIndexMap(
+            subaccount.updatedAtHeight,
+          ),
+        ]);
+
+        return getSubaccountResponse(
+          subaccount,
+          perpetualPositions,
+          assetPositions,
+          assets,
+          markets,
+          perpetualMarketRefresher.getPerpetualMarketsMap(),
+          latestBlock.blockHeight,
+          latestFundingIndexMap,
+          lastUpdatedFundingIndexMap,
+        );
+      },
+    ));
+
+    return {
+      address,
+      parentSubaccountNumber,
+      equity: subaccountResponses.reduce(
+        (acc: Big, subaccount: SubaccountResponseObject): Big => acc.plus(subaccount.equity),
+        Big(0),
+      ).toString(),
+      freeCollateral: subaccountResponses.reduce(
+        // eslint-disable-next-line max-len
+        (acc: Big, subaccount: SubaccountResponseObject): Big => acc.plus(subaccount.freeCollateral),
+        Big(0),
+      ).toString(),
+      childSubaccounts: subaccountResponses,
+    };
+  }
+
+  @Post('/:address/registerToken')
+  public async registerToken(
+    @Path() address: string,
+      @Body() body: { token: string, language: string },
+  ): Promise<void> {
+    const { token, language } = body;
+    const wallet = await WalletTable.findById(address);
+    if (!wallet) {
+      throw new NotFoundError(`No wallet found with address: ${address}`);
+    }
+    try {
+      // Register the new token
+      await FirebaseNotificationTokenTable.registerToken(
+        token,
+        wallet.address,
+        language,
+      );
+    } catch (error) {
+      throw new DatabaseError(`Error registering token: ${error}`);
+    }
+  }
+
+  @Post('/:address/testNotification')
+  public async testNotification(
+    @Path() address: string,
+  ): Promise<void> {
+    try {
+      const wallet = await WalletTable.findById(address);
+      if (!wallet) {
+        throw new NotFoundError(`No wallet found for address: ${address}`);
+      }
+      const allTokens = await FirebaseNotificationTokenTable.findAll(
+        { address: wallet.address }, [],
+      );
+      if (allTokens.length === 0) {
+        throw new NotFoundError(`No tokens found for address: ${address}`);
+      }
+
+      const notification = createNotification(NotificationType.ORDER_FILLED, {
+        [NotificationDynamicFieldKey.MARKET]: 'BTC/USD',
+        [NotificationDynamicFieldKey.AMOUNT]: '100',
+        [NotificationDynamicFieldKey.AVERAGE_PRICE]: '1000',
+      });
+      await sendFirebaseMessage(allTokens, notification);
+    } catch (error) {
+      logger.error({
+        at: 'addresses-controller#testNotification',
+        message: error.message,
+        error,
+      });
+    }
   }
 }
 
@@ -251,6 +370,7 @@ router.get(
   complianceAndGeoCheck,
   ExportResponseCodeStats({ controllerName }),
   async (req: express.Request, res: express.Response) => {
+    const start: number = Date.now();
     const {
       address,
     }: {
@@ -271,6 +391,11 @@ router.get(
         error,
         req,
         res,
+      );
+    } finally {
+      stats.timing(
+        `${config.SERVICE_NAME}.${controllerName}.get_addresses.timing`,
+        Date.now() - start,
       );
     }
   },
@@ -313,108 +438,140 @@ router.get(
       );
     } finally {
       stats.timing(
-        `${config.SERVICE_NAME}.${controllerName}.get_addresses.timing`,
+        `${config.SERVICE_NAME}.${controllerName}.get_subaccount.timing`,
         Date.now() - start,
       );
     }
   },
 );
 
-/**
- * Gets subaccount response objects given the subaccount, perpetual positions and perpetual markets
- * @param subaccount Subaccount to get response for, from the database
- * @param positions List of perpetual positions held by the subaccount, from the database
- * @param markets List of perpetual markets, from the database
- * @param assetPositions List of asset positions held by the subaccount, from the database
- * @param assets List of assets from the database
- * @param unsettledFunding Total unsettled funding across all open perpetual positions for the
- *                         subaccount
- * @returns Response object for the subaccount
- */
-async function getSubaccountResponse(
-  subaccount: SubaccountFromDatabase,
-  perpetualPositions: PerpetualPositionWithFunding[],
-  assetPositions: AssetPositionFromDatabase[],
-  assets: AssetFromDatabase[],
-  markets: MarketFromDatabase[],
-  unsettledFunding: Big,
-): Promise<SubaccountResponseObject> {
-  const perpetualMarketsMap: PerpetualMarketsMap = perpetualMarketRefresher
-    .getPerpetualMarketsMap();
-  const marketIdToMarket: MarketsMap = _.keyBy(
-    markets,
-    MarketColumns.id,
-  );
+router.get(
+  '/:address/parentSubaccountNumber/:parentSubaccountNumber',
+  rateLimiterMiddleware(getReqRateLimiter),
+  ...CheckParentSubaccountSchema,
+  handleValidationErrors,
+  complianceAndGeoCheck,
+  ExportResponseCodeStats({ controllerName }),
+  async (req: express.Request, res: express.Response) => {
+    const start: number = Date.now();
+    const {
+      address,
+      parentSubaccountNumber,
+    }: {
+      address: string,
+      parentSubaccountNumber: number,
+    } = matchedData(req) as ParentSubaccountRequest;
 
-  const filteredPerpetualPositions: PerpetualPositionWithFunding[
-  ] = await filterPositionsByLatestEventIdPerPerpetual(perpetualPositions);
+    // The schema checks allow subaccountNumber to be a string, but we know it's a number here.
+    const parentSubaccountNum = +parentSubaccountNumber;
 
-  const perpetualPositionResponses:
-  PerpetualPositionResponseObject[] = filteredPerpetualPositions.map(
-    (perpetualPosition: PerpetualPositionWithFunding): PerpetualPositionResponseObject => {
-      return perpetualPositionToResponseObject(
-        perpetualPosition,
-        perpetualMarketsMap,
-        marketIdToMarket,
+    try {
+      const controller: AddressesController = new AddressesController();
+      const subaccountResponse: ParentSubaccountResponse = await controller.getParentSubaccount(
+        address,
+        parentSubaccountNum,
       );
-    },
-  );
 
-  const perpetualPositionsMap: PerpetualPositionsMap = _.keyBy(
-    perpetualPositionResponses,
-    'market',
-  );
-
-  const assetIdToAsset: AssetById = _.keyBy(
-    assets,
-    AssetColumns.id,
-  );
-
-  const sortedAssetPositions:
-  AssetPositionFromDatabase[] = filterAssetPositions(assetPositions);
-
-  const assetPositionResponses: AssetPositionResponseObject[] = sortedAssetPositions.map(
-    (assetPosition: AssetPositionFromDatabase): AssetPositionResponseObject => {
-      return assetPositionToResponseObject(
-        assetPosition,
-        assetIdToAsset,
+      return res.send({
+        subaccount: subaccountResponse,
+      });
+    } catch (error) {
+      return handleControllerError(
+        'AddressesController GET /:address/parentSubaccountNumber/:parentSubaccountNumber',
+        'Addresses subaccount error',
+        error,
+        req,
+        res,
       );
-    },
-  );
+    } finally {
+      stats.timing(
+        `${config.SERVICE_NAME}.${controllerName}.get_parentSubaccount.timing`,
+        Date.now() - start,
+      );
+    }
+  },
+);
 
-  const assetPositionsMap: AssetPositionsMap = _.keyBy(
-    assetPositionResponses,
-    'symbol',
-  );
-  const {
-    assetPositionsMap: adjustedAssetPositionsMap,
-    adjustedUSDCAssetPositionSize,
-  }: {
-    assetPositionsMap: AssetPositionsMap,
-    adjustedUSDCAssetPositionSize: string,
-  } = adjustUSDCAssetPosition(assetPositionsMap, unsettledFunding);
+router.post(
+  '/:address/registerToken',
+  CheckAddressSchema,
+  RegisterTokenValidationSchema,
+  handleValidationErrors,
+  ExportResponseCodeStats({ controllerName }),
+  async (req: express.Request, res: express.Response) => {
+    const start: number = Date.now();
+    const {
+      address, token, language = 'en', timestamp, message, signedMessage, pubKey, walletIsKeplr,
+    } = matchedData(req) as RegisterTokenRequest;
 
-  const {
-    equity,
-    freeCollateral,
-  }: {
-    equity: string,
-    freeCollateral: string,
-  } = calculateEquityAndFreeCollateral(
-    filteredPerpetualPositions,
-    perpetualMarketsMap,
-    marketIdToMarket,
-    adjustedUSDCAssetPositionSize,
-  );
+    try {
+      const failedValidationResponse = walletIsKeplr
+        ? validateSignatureKeplr(
+          res, address, message, signedMessage, pubKey,
+        )
+        : await validateSignature(
+          res,
+          AccountVerificationRequiredAction.REGISTER_TOKEN,
+          address,
+          timestamp,
+          message,
+          signedMessage,
+          pubKey,
+          '',
+        );
+      if (failedValidationResponse) {
+        return failedValidationResponse;
+      }
 
-  return subaccountToResponseObject({
-    subaccount,
-    equity,
-    freeCollateral,
-    openPerpetualPositions: perpetualPositionsMap,
-    assetPositions: adjustedAssetPositionsMap,
-  });
-}
+      const controller: AddressesController = new AddressesController();
+      await controller.registerToken(address, { token, language });
+      return res.status(200).send({});
+    } catch (error) {
+      return handleControllerError(
+        'AddressesController POST /:address/registerToken',
+        'Addresses error',
+        error,
+        req,
+        res,
+      );
+    } finally {
+      stats.timing(
+        `${config.SERVICE_NAME}.${controllerName}.post_registerToken.timing`,
+        Date.now() - start,
+      );
+    }
+  },
+);
+
+router.post(
+  '/:address/testNotification',
+  rateLimiterMiddleware(getReqRateLimiter),
+  ...CheckAddressSchema,
+  handleValidationErrors,
+  ExportResponseCodeStats({ controllerName }),
+  async (req: express.Request, res: express.Response) => {
+    // This endpoint should only be avaliable in testnet / staging
+    if (config.NODE_ENV === NodeEnv.PRODUCTION) {
+      return res.status(404).send();
+    }
+
+    const { address } = matchedData(req) as AddressRequest;
+
+    try {
+      const controller: AddressesController = new AddressesController();
+      await controller.testNotification(address);
+      return res.status(200).send({ message: 'Test notification sent successfully' });
+    } catch (error) {
+      return handleControllerError(
+        'AddressesController POST /:address/testNotification',
+        'Test notification error',
+        error,
+        req,
+        res,
+      );
+    }
+  },
+);
 
 // eslint-disable-next-line  @typescript-eslint/require-await
 async function getOpenPerpetualPositionsForSubaccount(

@@ -11,7 +11,9 @@ import (
 	_ "github.com/cosmos/gogoproto/gogoproto"
 	grpc1 "github.com/cosmos/gogoproto/grpc"
 	proto "github.com/cosmos/gogoproto/proto"
-	types "github.com/dydxprotocol/v4-chain/protocol/indexer/off_chain_updates/types"
+	types2 "github.com/dydxprotocol/v4-chain/protocol/indexer/off_chain_updates/types"
+	types1 "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
+	types "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
@@ -568,6 +570,117 @@ func (m *QueryBlockRateLimitConfigurationResponse) GetBlockRateLimitConfig() Blo
 	return BlockRateLimitConfiguration{}
 }
 
+// QueryStatefulOrderRequest is a request message for StatefulOrder.
+type QueryStatefulOrderRequest struct {
+	// Order id to query.
+	OrderId OrderId `protobuf:"bytes,1,opt,name=order_id,json=orderId,proto3" json:"order_id"`
+}
+
+func (m *QueryStatefulOrderRequest) Reset()         { *m = QueryStatefulOrderRequest{} }
+func (m *QueryStatefulOrderRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryStatefulOrderRequest) ProtoMessage()    {}
+func (*QueryStatefulOrderRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3365c195b25c5bc0, []int{10}
+}
+func (m *QueryStatefulOrderRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryStatefulOrderRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryStatefulOrderRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryStatefulOrderRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryStatefulOrderRequest.Merge(m, src)
+}
+func (m *QueryStatefulOrderRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryStatefulOrderRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryStatefulOrderRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryStatefulOrderRequest proto.InternalMessageInfo
+
+func (m *QueryStatefulOrderRequest) GetOrderId() OrderId {
+	if m != nil {
+		return m.OrderId
+	}
+	return OrderId{}
+}
+
+// QueryStatefulOrderResponse is a response message that contains the stateful
+// order.
+type QueryStatefulOrderResponse struct {
+	// Stateful order placement.
+	OrderPlacement LongTermOrderPlacement `protobuf:"bytes,1,opt,name=order_placement,json=orderPlacement,proto3" json:"order_placement"`
+	// Fill amounts.
+	FillAmount uint64 `protobuf:"varint,2,opt,name=fill_amount,json=fillAmount,proto3" json:"fill_amount,omitempty"`
+	// Triggered status.
+	Triggered bool `protobuf:"varint,3,opt,name=triggered,proto3" json:"triggered,omitempty"`
+}
+
+func (m *QueryStatefulOrderResponse) Reset()         { *m = QueryStatefulOrderResponse{} }
+func (m *QueryStatefulOrderResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryStatefulOrderResponse) ProtoMessage()    {}
+func (*QueryStatefulOrderResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3365c195b25c5bc0, []int{11}
+}
+func (m *QueryStatefulOrderResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryStatefulOrderResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryStatefulOrderResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryStatefulOrderResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryStatefulOrderResponse.Merge(m, src)
+}
+func (m *QueryStatefulOrderResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryStatefulOrderResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryStatefulOrderResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryStatefulOrderResponse proto.InternalMessageInfo
+
+func (m *QueryStatefulOrderResponse) GetOrderPlacement() LongTermOrderPlacement {
+	if m != nil {
+		return m.OrderPlacement
+	}
+	return LongTermOrderPlacement{}
+}
+
+func (m *QueryStatefulOrderResponse) GetFillAmount() uint64 {
+	if m != nil {
+		return m.FillAmount
+	}
+	return 0
+}
+
+func (m *QueryStatefulOrderResponse) GetTriggered() bool {
+	if m != nil {
+		return m.Triggered
+	}
+	return false
+}
+
 // QueryLiquidationsConfigurationRequest is a request message for
 // LiquidationsConfiguration.
 type QueryLiquidationsConfigurationRequest struct {
@@ -577,7 +690,7 @@ func (m *QueryLiquidationsConfigurationRequest) Reset()         { *m = QueryLiqu
 func (m *QueryLiquidationsConfigurationRequest) String() string { return proto.CompactTextString(m) }
 func (*QueryLiquidationsConfigurationRequest) ProtoMessage()    {}
 func (*QueryLiquidationsConfigurationRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_3365c195b25c5bc0, []int{10}
+	return fileDescriptor_3365c195b25c5bc0, []int{12}
 }
 func (m *QueryLiquidationsConfigurationRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -618,7 +731,7 @@ func (m *QueryLiquidationsConfigurationResponse) Reset() {
 func (m *QueryLiquidationsConfigurationResponse) String() string { return proto.CompactTextString(m) }
 func (*QueryLiquidationsConfigurationResponse) ProtoMessage()    {}
 func (*QueryLiquidationsConfigurationResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_3365c195b25c5bc0, []int{11}
+	return fileDescriptor_3365c195b25c5bc0, []int{13}
 }
 func (m *QueryLiquidationsConfigurationResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -654,18 +767,104 @@ func (m *QueryLiquidationsConfigurationResponse) GetLiquidationsConfig() Liquida
 	return LiquidationsConfig{}
 }
 
+// QueryNextClobPairIdRequest is a request message for the next clob pair id
+type QueryNextClobPairIdRequest struct {
+}
+
+func (m *QueryNextClobPairIdRequest) Reset()         { *m = QueryNextClobPairIdRequest{} }
+func (m *QueryNextClobPairIdRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryNextClobPairIdRequest) ProtoMessage()    {}
+func (*QueryNextClobPairIdRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3365c195b25c5bc0, []int{14}
+}
+func (m *QueryNextClobPairIdRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryNextClobPairIdRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryNextClobPairIdRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryNextClobPairIdRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryNextClobPairIdRequest.Merge(m, src)
+}
+func (m *QueryNextClobPairIdRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryNextClobPairIdRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryNextClobPairIdRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryNextClobPairIdRequest proto.InternalMessageInfo
+
+// QueryNextClobPairIdResponse is a response message for the next clob pair id
+type QueryNextClobPairIdResponse struct {
+	NextClobPairId uint32 `protobuf:"varint,1,opt,name=next_clob_pair_id,json=nextClobPairId,proto3" json:"next_clob_pair_id,omitempty"`
+}
+
+func (m *QueryNextClobPairIdResponse) Reset()         { *m = QueryNextClobPairIdResponse{} }
+func (m *QueryNextClobPairIdResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryNextClobPairIdResponse) ProtoMessage()    {}
+func (*QueryNextClobPairIdResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3365c195b25c5bc0, []int{15}
+}
+func (m *QueryNextClobPairIdResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryNextClobPairIdResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryNextClobPairIdResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryNextClobPairIdResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryNextClobPairIdResponse.Merge(m, src)
+}
+func (m *QueryNextClobPairIdResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryNextClobPairIdResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryNextClobPairIdResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryNextClobPairIdResponse proto.InternalMessageInfo
+
+func (m *QueryNextClobPairIdResponse) GetNextClobPairId() uint32 {
+	if m != nil {
+		return m.NextClobPairId
+	}
+	return 0
+}
+
 // StreamOrderbookUpdatesRequest is a request message for the
 // StreamOrderbookUpdates method.
 type StreamOrderbookUpdatesRequest struct {
 	// Clob pair ids to stream orderbook updates for.
 	ClobPairId []uint32 `protobuf:"varint,1,rep,packed,name=clob_pair_id,json=clobPairId,proto3" json:"clob_pair_id,omitempty"`
+	// Subaccount ids to stream subaccount updates for.
+	SubaccountIds []*types.SubaccountId `protobuf:"bytes,2,rep,name=subaccount_ids,json=subaccountIds,proto3" json:"subaccount_ids,omitempty"`
+	// Market ids for price updates.
+	MarketIds []uint32 `protobuf:"varint,3,rep,packed,name=market_ids,json=marketIds,proto3" json:"market_ids,omitempty"`
 }
 
 func (m *StreamOrderbookUpdatesRequest) Reset()         { *m = StreamOrderbookUpdatesRequest{} }
 func (m *StreamOrderbookUpdatesRequest) String() string { return proto.CompactTextString(m) }
 func (*StreamOrderbookUpdatesRequest) ProtoMessage()    {}
 func (*StreamOrderbookUpdatesRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_3365c195b25c5bc0, []int{12}
+	return fileDescriptor_3365c195b25c5bc0, []int{16}
 }
 func (m *StreamOrderbookUpdatesRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -701,23 +900,32 @@ func (m *StreamOrderbookUpdatesRequest) GetClobPairId() []uint32 {
 	return nil
 }
 
+func (m *StreamOrderbookUpdatesRequest) GetSubaccountIds() []*types.SubaccountId {
+	if m != nil {
+		return m.SubaccountIds
+	}
+	return nil
+}
+
+func (m *StreamOrderbookUpdatesRequest) GetMarketIds() []uint32 {
+	if m != nil {
+		return m.MarketIds
+	}
+	return nil
+}
+
 // StreamOrderbookUpdatesResponse is a response message for the
 // StreamOrderbookUpdates method.
 type StreamOrderbookUpdatesResponse struct {
-	// Orderbook updates for the clob pair.
-	Updates []types.OffChainUpdateV1 `protobuf:"bytes,1,rep,name=updates,proto3" json:"updates"`
-	// Snapshot indicates if the response is from a snapshot of the orderbook.
-	// This is true for the initial response and false for all subsequent updates.
-	// Note that if the snapshot is true, then all previous entries should be
-	// discarded and the orderbook should be resynced.
-	Snapshot bool `protobuf:"varint,2,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	// Batch of updates for the clob pair.
+	Updates []StreamUpdate `protobuf:"bytes,1,rep,name=updates,proto3" json:"updates"`
 }
 
 func (m *StreamOrderbookUpdatesResponse) Reset()         { *m = StreamOrderbookUpdatesResponse{} }
 func (m *StreamOrderbookUpdatesResponse) String() string { return proto.CompactTextString(m) }
 func (*StreamOrderbookUpdatesResponse) ProtoMessage()    {}
 func (*StreamOrderbookUpdatesResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_3365c195b25c5bc0, []int{13}
+	return fileDescriptor_3365c195b25c5bc0, []int{17}
 }
 func (m *StreamOrderbookUpdatesResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -746,18 +954,460 @@ func (m *StreamOrderbookUpdatesResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_StreamOrderbookUpdatesResponse proto.InternalMessageInfo
 
-func (m *StreamOrderbookUpdatesResponse) GetUpdates() []types.OffChainUpdateV1 {
+func (m *StreamOrderbookUpdatesResponse) GetUpdates() []StreamUpdate {
 	if m != nil {
 		return m.Updates
 	}
 	return nil
 }
 
-func (m *StreamOrderbookUpdatesResponse) GetSnapshot() bool {
+// StreamUpdate is an update that will be pushed through the
+// GRPC stream.
+type StreamUpdate struct {
+	// Block height of the update.
+	BlockHeight uint32 `protobuf:"varint,1,opt,name=block_height,json=blockHeight,proto3" json:"block_height,omitempty"`
+	// Exec mode of the update.
+	ExecMode uint32 `protobuf:"varint,2,opt,name=exec_mode,json=execMode,proto3" json:"exec_mode,omitempty"`
+	// Contains one of an StreamOrderbookUpdate,
+	// StreamOrderbookFill, StreamTakerOrderStatus.
+	//
+	// Types that are valid to be assigned to UpdateMessage:
+	//
+	//	*StreamUpdate_OrderbookUpdate
+	//	*StreamUpdate_OrderFill
+	//	*StreamUpdate_TakerOrder
+	//	*StreamUpdate_SubaccountUpdate
+	//	*StreamUpdate_PriceUpdate
+	UpdateMessage isStreamUpdate_UpdateMessage `protobuf_oneof:"update_message"`
+}
+
+func (m *StreamUpdate) Reset()         { *m = StreamUpdate{} }
+func (m *StreamUpdate) String() string { return proto.CompactTextString(m) }
+func (*StreamUpdate) ProtoMessage()    {}
+func (*StreamUpdate) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3365c195b25c5bc0, []int{18}
+}
+func (m *StreamUpdate) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *StreamUpdate) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_StreamUpdate.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *StreamUpdate) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StreamUpdate.Merge(m, src)
+}
+func (m *StreamUpdate) XXX_Size() int {
+	return m.Size()
+}
+func (m *StreamUpdate) XXX_DiscardUnknown() {
+	xxx_messageInfo_StreamUpdate.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StreamUpdate proto.InternalMessageInfo
+
+type isStreamUpdate_UpdateMessage interface {
+	isStreamUpdate_UpdateMessage()
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type StreamUpdate_OrderbookUpdate struct {
+	OrderbookUpdate *StreamOrderbookUpdate `protobuf:"bytes,3,opt,name=orderbook_update,json=orderbookUpdate,proto3,oneof" json:"orderbook_update,omitempty"`
+}
+type StreamUpdate_OrderFill struct {
+	OrderFill *StreamOrderbookFill `protobuf:"bytes,4,opt,name=order_fill,json=orderFill,proto3,oneof" json:"order_fill,omitempty"`
+}
+type StreamUpdate_TakerOrder struct {
+	TakerOrder *StreamTakerOrder `protobuf:"bytes,5,opt,name=taker_order,json=takerOrder,proto3,oneof" json:"taker_order,omitempty"`
+}
+type StreamUpdate_SubaccountUpdate struct {
+	SubaccountUpdate *types.StreamSubaccountUpdate `protobuf:"bytes,6,opt,name=subaccount_update,json=subaccountUpdate,proto3,oneof" json:"subaccount_update,omitempty"`
+}
+type StreamUpdate_PriceUpdate struct {
+	PriceUpdate *types1.StreamPriceUpdate `protobuf:"bytes,7,opt,name=price_update,json=priceUpdate,proto3,oneof" json:"price_update,omitempty"`
+}
+
+func (*StreamUpdate_OrderbookUpdate) isStreamUpdate_UpdateMessage()  {}
+func (*StreamUpdate_OrderFill) isStreamUpdate_UpdateMessage()        {}
+func (*StreamUpdate_TakerOrder) isStreamUpdate_UpdateMessage()       {}
+func (*StreamUpdate_SubaccountUpdate) isStreamUpdate_UpdateMessage() {}
+func (*StreamUpdate_PriceUpdate) isStreamUpdate_UpdateMessage()      {}
+
+func (m *StreamUpdate) GetUpdateMessage() isStreamUpdate_UpdateMessage {
+	if m != nil {
+		return m.UpdateMessage
+	}
+	return nil
+}
+
+func (m *StreamUpdate) GetBlockHeight() uint32 {
+	if m != nil {
+		return m.BlockHeight
+	}
+	return 0
+}
+
+func (m *StreamUpdate) GetExecMode() uint32 {
+	if m != nil {
+		return m.ExecMode
+	}
+	return 0
+}
+
+func (m *StreamUpdate) GetOrderbookUpdate() *StreamOrderbookUpdate {
+	if x, ok := m.GetUpdateMessage().(*StreamUpdate_OrderbookUpdate); ok {
+		return x.OrderbookUpdate
+	}
+	return nil
+}
+
+func (m *StreamUpdate) GetOrderFill() *StreamOrderbookFill {
+	if x, ok := m.GetUpdateMessage().(*StreamUpdate_OrderFill); ok {
+		return x.OrderFill
+	}
+	return nil
+}
+
+func (m *StreamUpdate) GetTakerOrder() *StreamTakerOrder {
+	if x, ok := m.GetUpdateMessage().(*StreamUpdate_TakerOrder); ok {
+		return x.TakerOrder
+	}
+	return nil
+}
+
+func (m *StreamUpdate) GetSubaccountUpdate() *types.StreamSubaccountUpdate {
+	if x, ok := m.GetUpdateMessage().(*StreamUpdate_SubaccountUpdate); ok {
+		return x.SubaccountUpdate
+	}
+	return nil
+}
+
+func (m *StreamUpdate) GetPriceUpdate() *types1.StreamPriceUpdate {
+	if x, ok := m.GetUpdateMessage().(*StreamUpdate_PriceUpdate); ok {
+		return x.PriceUpdate
+	}
+	return nil
+}
+
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*StreamUpdate) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*StreamUpdate_OrderbookUpdate)(nil),
+		(*StreamUpdate_OrderFill)(nil),
+		(*StreamUpdate_TakerOrder)(nil),
+		(*StreamUpdate_SubaccountUpdate)(nil),
+		(*StreamUpdate_PriceUpdate)(nil),
+	}
+}
+
+// StreamOrderbookUpdate provides information on an orderbook update. Used in
+// the full node GRPC stream.
+type StreamOrderbookUpdate struct {
+	// Snapshot indicates if the response is from a snapshot of the orderbook.
+	// All updates should be ignored until snapshot is recieved.
+	// If the snapshot is true, then all previous entries should be
+	// discarded and the orderbook should be resynced.
+	Snapshot bool `protobuf:"varint,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	// Orderbook updates for the clob pair. Can contain order place, removals,
+	// or updates.
+	Updates []types2.OffChainUpdateV1 `protobuf:"bytes,2,rep,name=updates,proto3" json:"updates"`
+}
+
+func (m *StreamOrderbookUpdate) Reset()         { *m = StreamOrderbookUpdate{} }
+func (m *StreamOrderbookUpdate) String() string { return proto.CompactTextString(m) }
+func (*StreamOrderbookUpdate) ProtoMessage()    {}
+func (*StreamOrderbookUpdate) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3365c195b25c5bc0, []int{19}
+}
+func (m *StreamOrderbookUpdate) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *StreamOrderbookUpdate) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_StreamOrderbookUpdate.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *StreamOrderbookUpdate) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StreamOrderbookUpdate.Merge(m, src)
+}
+func (m *StreamOrderbookUpdate) XXX_Size() int {
+	return m.Size()
+}
+func (m *StreamOrderbookUpdate) XXX_DiscardUnknown() {
+	xxx_messageInfo_StreamOrderbookUpdate.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StreamOrderbookUpdate proto.InternalMessageInfo
+
+func (m *StreamOrderbookUpdate) GetSnapshot() bool {
 	if m != nil {
 		return m.Snapshot
 	}
 	return false
+}
+
+func (m *StreamOrderbookUpdate) GetUpdates() []types2.OffChainUpdateV1 {
+	if m != nil {
+		return m.Updates
+	}
+	return nil
+}
+
+// StreamOrderbookFill provides information on an orderbook fill. Used in
+// the full node GRPC stream.
+type StreamOrderbookFill struct {
+	// Clob match. Provides information on which orders were matched
+	// and the type of order.
+	ClobMatch *ClobMatch `protobuf:"bytes,1,opt,name=clob_match,json=clobMatch,proto3" json:"clob_match,omitempty"`
+	// All orders involved in the specified clob match. Used to look up
+	// price of a match through a given maker order id.
+	Orders []Order `protobuf:"bytes,2,rep,name=orders,proto3" json:"orders"`
+	// Resulting fill amounts for each order in the orders array.
+	FillAmounts []uint64 `protobuf:"varint,3,rep,packed,name=fill_amounts,json=fillAmounts,proto3" json:"fill_amounts,omitempty"`
+}
+
+func (m *StreamOrderbookFill) Reset()         { *m = StreamOrderbookFill{} }
+func (m *StreamOrderbookFill) String() string { return proto.CompactTextString(m) }
+func (*StreamOrderbookFill) ProtoMessage()    {}
+func (*StreamOrderbookFill) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3365c195b25c5bc0, []int{20}
+}
+func (m *StreamOrderbookFill) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *StreamOrderbookFill) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_StreamOrderbookFill.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *StreamOrderbookFill) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StreamOrderbookFill.Merge(m, src)
+}
+func (m *StreamOrderbookFill) XXX_Size() int {
+	return m.Size()
+}
+func (m *StreamOrderbookFill) XXX_DiscardUnknown() {
+	xxx_messageInfo_StreamOrderbookFill.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StreamOrderbookFill proto.InternalMessageInfo
+
+func (m *StreamOrderbookFill) GetClobMatch() *ClobMatch {
+	if m != nil {
+		return m.ClobMatch
+	}
+	return nil
+}
+
+func (m *StreamOrderbookFill) GetOrders() []Order {
+	if m != nil {
+		return m.Orders
+	}
+	return nil
+}
+
+func (m *StreamOrderbookFill) GetFillAmounts() []uint64 {
+	if m != nil {
+		return m.FillAmounts
+	}
+	return nil
+}
+
+// StreamTakerOrder provides information on a taker order that was attempted
+// to be matched on the orderbook.
+// It is intended to be used only in full node streaming.
+type StreamTakerOrder struct {
+	// The taker order that was matched on the orderbook. Can be a
+	// regular order or a liquidation order.
+	//
+	// Types that are valid to be assigned to TakerOrder:
+	//
+	//	*StreamTakerOrder_Order
+	//	*StreamTakerOrder_LiquidationOrder
+	TakerOrder isStreamTakerOrder_TakerOrder `protobuf_oneof:"taker_order"`
+	// Information on the taker order after it is matched on the book,
+	// either successfully or unsuccessfully.
+	TakerOrderStatus *StreamTakerOrderStatus `protobuf:"bytes,3,opt,name=taker_order_status,json=takerOrderStatus,proto3" json:"taker_order_status,omitempty"`
+}
+
+func (m *StreamTakerOrder) Reset()         { *m = StreamTakerOrder{} }
+func (m *StreamTakerOrder) String() string { return proto.CompactTextString(m) }
+func (*StreamTakerOrder) ProtoMessage()    {}
+func (*StreamTakerOrder) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3365c195b25c5bc0, []int{21}
+}
+func (m *StreamTakerOrder) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *StreamTakerOrder) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_StreamTakerOrder.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *StreamTakerOrder) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StreamTakerOrder.Merge(m, src)
+}
+func (m *StreamTakerOrder) XXX_Size() int {
+	return m.Size()
+}
+func (m *StreamTakerOrder) XXX_DiscardUnknown() {
+	xxx_messageInfo_StreamTakerOrder.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StreamTakerOrder proto.InternalMessageInfo
+
+type isStreamTakerOrder_TakerOrder interface {
+	isStreamTakerOrder_TakerOrder()
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type StreamTakerOrder_Order struct {
+	Order *Order `protobuf:"bytes,1,opt,name=order,proto3,oneof" json:"order,omitempty"`
+}
+type StreamTakerOrder_LiquidationOrder struct {
+	LiquidationOrder *StreamLiquidationOrder `protobuf:"bytes,2,opt,name=liquidation_order,json=liquidationOrder,proto3,oneof" json:"liquidation_order,omitempty"`
+}
+
+func (*StreamTakerOrder_Order) isStreamTakerOrder_TakerOrder()            {}
+func (*StreamTakerOrder_LiquidationOrder) isStreamTakerOrder_TakerOrder() {}
+
+func (m *StreamTakerOrder) GetTakerOrder() isStreamTakerOrder_TakerOrder {
+	if m != nil {
+		return m.TakerOrder
+	}
+	return nil
+}
+
+func (m *StreamTakerOrder) GetOrder() *Order {
+	if x, ok := m.GetTakerOrder().(*StreamTakerOrder_Order); ok {
+		return x.Order
+	}
+	return nil
+}
+
+func (m *StreamTakerOrder) GetLiquidationOrder() *StreamLiquidationOrder {
+	if x, ok := m.GetTakerOrder().(*StreamTakerOrder_LiquidationOrder); ok {
+		return x.LiquidationOrder
+	}
+	return nil
+}
+
+func (m *StreamTakerOrder) GetTakerOrderStatus() *StreamTakerOrderStatus {
+	if m != nil {
+		return m.TakerOrderStatus
+	}
+	return nil
+}
+
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*StreamTakerOrder) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*StreamTakerOrder_Order)(nil),
+		(*StreamTakerOrder_LiquidationOrder)(nil),
+	}
+}
+
+// StreamTakerOrderStatus is a representation of a taker order
+// after it is attempted to be matched on the orderbook.
+// It is intended to be used only in full node streaming.
+type StreamTakerOrderStatus struct {
+	// The state of the taker order after attempting to match it against the
+	// orderbook. Possible enum values can be found here:
+	// https://github.com/dydxprotocol/v4-chain/blob/main/protocol/x/clob/types/orderbook.go#L105
+	OrderStatus uint32 `protobuf:"varint,1,opt,name=order_status,json=orderStatus,proto3" json:"order_status,omitempty"`
+	// The amount of remaining (non-matched) base quantums of this taker order.
+	RemainingQuantums uint64 `protobuf:"varint,2,opt,name=remaining_quantums,json=remainingQuantums,proto3" json:"remaining_quantums,omitempty"`
+	// The amount of base quantums that were *optimistically* filled for this
+	// taker order when the order is matched against the orderbook. Note that if
+	// any quantums of this order were optimistically filled or filled in state
+	// before this invocation of the matching loop, this value will not include
+	// them.
+	OptimisticallyFilledQuantums uint64 `protobuf:"varint,3,opt,name=optimistically_filled_quantums,json=optimisticallyFilledQuantums,proto3" json:"optimistically_filled_quantums,omitempty"`
+}
+
+func (m *StreamTakerOrderStatus) Reset()         { *m = StreamTakerOrderStatus{} }
+func (m *StreamTakerOrderStatus) String() string { return proto.CompactTextString(m) }
+func (*StreamTakerOrderStatus) ProtoMessage()    {}
+func (*StreamTakerOrderStatus) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3365c195b25c5bc0, []int{22}
+}
+func (m *StreamTakerOrderStatus) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *StreamTakerOrderStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_StreamTakerOrderStatus.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *StreamTakerOrderStatus) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StreamTakerOrderStatus.Merge(m, src)
+}
+func (m *StreamTakerOrderStatus) XXX_Size() int {
+	return m.Size()
+}
+func (m *StreamTakerOrderStatus) XXX_DiscardUnknown() {
+	xxx_messageInfo_StreamTakerOrderStatus.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StreamTakerOrderStatus proto.InternalMessageInfo
+
+func (m *StreamTakerOrderStatus) GetOrderStatus() uint32 {
+	if m != nil {
+		return m.OrderStatus
+	}
+	return 0
+}
+
+func (m *StreamTakerOrderStatus) GetRemainingQuantums() uint64 {
+	if m != nil {
+		return m.RemainingQuantums
+	}
+	return 0
+}
+
+func (m *StreamTakerOrderStatus) GetOptimisticallyFilledQuantums() uint64 {
+	if m != nil {
+		return m.OptimisticallyFilledQuantums
+	}
+	return 0
 }
 
 func init() {
@@ -772,84 +1422,136 @@ func init() {
 	proto.RegisterType((*QueryEquityTierLimitConfigurationResponse)(nil), "dydxprotocol.clob.QueryEquityTierLimitConfigurationResponse")
 	proto.RegisterType((*QueryBlockRateLimitConfigurationRequest)(nil), "dydxprotocol.clob.QueryBlockRateLimitConfigurationRequest")
 	proto.RegisterType((*QueryBlockRateLimitConfigurationResponse)(nil), "dydxprotocol.clob.QueryBlockRateLimitConfigurationResponse")
+	proto.RegisterType((*QueryStatefulOrderRequest)(nil), "dydxprotocol.clob.QueryStatefulOrderRequest")
+	proto.RegisterType((*QueryStatefulOrderResponse)(nil), "dydxprotocol.clob.QueryStatefulOrderResponse")
 	proto.RegisterType((*QueryLiquidationsConfigurationRequest)(nil), "dydxprotocol.clob.QueryLiquidationsConfigurationRequest")
 	proto.RegisterType((*QueryLiquidationsConfigurationResponse)(nil), "dydxprotocol.clob.QueryLiquidationsConfigurationResponse")
+	proto.RegisterType((*QueryNextClobPairIdRequest)(nil), "dydxprotocol.clob.QueryNextClobPairIdRequest")
+	proto.RegisterType((*QueryNextClobPairIdResponse)(nil), "dydxprotocol.clob.QueryNextClobPairIdResponse")
 	proto.RegisterType((*StreamOrderbookUpdatesRequest)(nil), "dydxprotocol.clob.StreamOrderbookUpdatesRequest")
 	proto.RegisterType((*StreamOrderbookUpdatesResponse)(nil), "dydxprotocol.clob.StreamOrderbookUpdatesResponse")
+	proto.RegisterType((*StreamUpdate)(nil), "dydxprotocol.clob.StreamUpdate")
+	proto.RegisterType((*StreamOrderbookUpdate)(nil), "dydxprotocol.clob.StreamOrderbookUpdate")
+	proto.RegisterType((*StreamOrderbookFill)(nil), "dydxprotocol.clob.StreamOrderbookFill")
+	proto.RegisterType((*StreamTakerOrder)(nil), "dydxprotocol.clob.StreamTakerOrder")
+	proto.RegisterType((*StreamTakerOrderStatus)(nil), "dydxprotocol.clob.StreamTakerOrderStatus")
 }
 
 func init() { proto.RegisterFile("dydxprotocol/clob/query.proto", fileDescriptor_3365c195b25c5bc0) }
 
 var fileDescriptor_3365c195b25c5bc0 = []byte{
-	// 1073 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x56, 0xcf, 0x6f, 0xdc, 0x44,
-	0x14, 0xce, 0x24, 0xa5, 0x4d, 0xa7, 0x80, 0x60, 0xd2, 0xa4, 0x8b, 0x93, 0x6c, 0xb6, 0x86, 0x24,
-	0x9b, 0x54, 0xd8, 0x49, 0x5a, 0xa1, 0x92, 0xa2, 0x4a, 0x49, 0x04, 0x11, 0x52, 0x43, 0x17, 0x53,
-	0x02, 0x82, 0x4a, 0xd6, 0xac, 0x3d, 0xbb, 0x19, 0xc5, 0xf6, 0x38, 0xf6, 0xd8, 0x4a, 0x84, 0x10,
-	0x12, 0x07, 0x2e, 0x70, 0x40, 0x42, 0x82, 0x03, 0x47, 0xee, 0xfc, 0x07, 0x08, 0xb8, 0xf5, 0x58,
-	0x89, 0x0b, 0x07, 0x84, 0x50, 0xc2, 0x99, 0xbf, 0x01, 0x79, 0x3c, 0xbb, 0x5d, 0xc7, 0x3f, 0x36,
-	0xc9, 0x65, 0xd7, 0x9e, 0xf9, 0xde, 0xf3, 0xf7, 0xbd, 0xf7, 0xfc, 0x8d, 0xe1, 0xac, 0x7d, 0x64,
-	0x1f, 0xfa, 0x01, 0xe3, 0xcc, 0x62, 0x8e, 0x6e, 0x39, 0xac, 0xad, 0x1f, 0x44, 0x24, 0x38, 0xd2,
-	0xc4, 0x1a, 0x7a, 0x79, 0x70, 0x5b, 0x4b, 0xb6, 0x95, 0xeb, 0x5d, 0xd6, 0x65, 0x62, 0x49, 0x4f,
-	0xae, 0x52, 0xa0, 0x32, 0xd3, 0x65, 0xac, 0xeb, 0x10, 0x1d, 0xfb, 0x54, 0xc7, 0x9e, 0xc7, 0x38,
-	0xe6, 0x94, 0x79, 0xa1, 0xdc, 0x5d, 0xb6, 0x58, 0xe8, 0xb2, 0x50, 0x6f, 0xe3, 0x90, 0xa4, 0xf9,
-	0xf5, 0x78, 0xb5, 0x4d, 0x38, 0x5e, 0xd5, 0x7d, 0xdc, 0xa5, 0x9e, 0x00, 0x4b, 0xac, 0x9e, 0x67,
-	0xd4, 0x76, 0x98, 0xb5, 0x6f, 0x06, 0x98, 0x13, 0xd3, 0xa1, 0x2e, 0xe5, 0xa6, 0xc5, 0xbc, 0x0e,
-	0xed, 0xca, 0x80, 0x9b, 0xf9, 0x80, 0xe4, 0xc7, 0xf4, 0x31, 0x0d, 0x24, 0x64, 0x25, 0x0f, 0x21,
-	0x07, 0x11, 0xe5, 0x47, 0x26, 0xa7, 0x24, 0x28, 0x4a, 0x7a, 0x2b, 0x1f, 0xe1, 0xd0, 0x83, 0x88,
-	0xda, 0xa9, 0xae, 0x2c, 0x78, 0x3a, 0x0f, 0x76, 0x49, 0x2c, 0x37, 0xef, 0x67, 0x36, 0xa9, 0x67,
-	0x93, 0x43, 0x12, 0xe8, 0xac, 0xd3, 0x31, 0xad, 0x3d, 0x4c, 0x3d, 0x33, 0xf2, 0x6d, 0xcc, 0x49,
-	0x98, 0x5f, 0x49, 0xe3, 0xd5, 0x25, 0x78, 0xe3, 0xfd, 0xa4, 0x62, 0xdb, 0x84, 0x6f, 0x39, 0xac,
-	0xdd, 0xc2, 0x34, 0x30, 0xc8, 0x41, 0x44, 0x42, 0x8e, 0x5e, 0x84, 0xa3, 0xd4, 0xae, 0x81, 0x06,
-	0x68, 0xbe, 0x60, 0x8c, 0x52, 0x5b, 0xfd, 0x08, 0x4e, 0x0a, 0xe8, 0x33, 0x5c, 0xe8, 0x33, 0x2f,
-	0x24, 0xe8, 0x3e, 0xbc, 0xda, 0x2f, 0x89, 0xc0, 0x5f, 0x5b, 0x9b, 0xd6, 0x72, 0xad, 0xd5, 0x7a,
-	0x71, 0x9b, 0x97, 0x9e, 0xfc, 0x3d, 0x37, 0x62, 0x8c, 0x5b, 0xf2, 0x5e, 0xc5, 0x92, 0xc3, 0x86,
-	0xe3, 0x9c, 0xe6, 0xf0, 0x0e, 0x84, 0xcf, 0x5a, 0x28, 0x73, 0x2f, 0x68, 0x69, 0xbf, 0xb5, 0xa4,
-	0xdf, 0x5a, 0x3a, 0x4f, 0xb2, 0xdf, 0x5a, 0x0b, 0x77, 0x89, 0x8c, 0x35, 0x06, 0x22, 0xd5, 0x9f,
-	0x00, 0xac, 0x65, 0xc8, 0x6f, 0x38, 0x4e, 0x19, 0xff, 0xb1, 0x73, 0xf2, 0x47, 0xdb, 0x19, 0x92,
-	0xa3, 0x82, 0xe4, 0xe2, 0x50, 0x92, 0xe9, 0xc3, 0x33, 0x2c, 0xff, 0x02, 0x70, 0x6e, 0x87, 0xc4,
-	0xef, 0x31, 0x9b, 0x3c, 0x62, 0xc9, 0xef, 0x16, 0x76, 0xac, 0xc8, 0x11, 0x9b, 0xbd, 0x8a, 0x3c,
-	0x86, 0x53, 0xe9, 0xc0, 0xfa, 0x01, 0xf3, 0x59, 0x48, 0x02, 0xd3, 0xc5, 0xdc, 0xda, 0x23, 0x61,
-	0xbf, 0x3a, 0x79, 0xe6, 0xbb, 0xd8, 0x49, 0x46, 0x8b, 0x05, 0x3b, 0x24, 0xde, 0x49, 0xd1, 0xc6,
-	0x75, 0x91, 0xa5, 0x25, 0x93, 0xc8, 0x55, 0xf4, 0x29, 0x9c, 0x8c, 0x7b, 0x60, 0xd3, 0x25, 0xb1,
-	0xe9, 0x12, 0x1e, 0x50, 0x2b, 0xec, 0xab, 0xca, 0x27, 0xcf, 0x10, 0xde, 0x49, 0xe1, 0xc6, 0x44,
-	0x3c, 0xf8, 0xc8, 0x74, 0x51, 0xfd, 0x0f, 0xc0, 0x46, 0xb9, 0x3c, 0xd9, 0x8c, 0x2e, 0xbc, 0x12,
-	0x90, 0x30, 0x72, 0x78, 0x28, 0x5b, 0xb1, 0x3d, 0xec, 0x99, 0x05, 0x59, 0x12, 0xc0, 0x86, 0x67,
-	0xef, 0x32, 0x27, 0x72, 0x49, 0x8b, 0x04, 0x49, 0xeb, 0x64, 0xdb, 0x7a, 0xd9, 0x15, 0x0c, 0x27,
-	0x0a, 0x50, 0xa8, 0x01, 0x9f, 0xef, 0x0f, 0x83, 0xd9, 0x9f, 0x7f, 0xd8, 0x6b, 0xf6, 0xbb, 0x36,
-	0x7a, 0x09, 0x8e, 0xb9, 0x24, 0x16, 0x15, 0x19, 0x35, 0x92, 0x4b, 0x34, 0x05, 0x2f, 0xc7, 0x22,
-	0x49, 0x6d, 0xac, 0x01, 0x9a, 0x97, 0x0c, 0x79, 0xa7, 0x2e, 0xc3, 0xa6, 0x18, 0xba, 0xb7, 0x85,
-	0x1b, 0x3c, 0xa2, 0x24, 0x78, 0x90, 0x78, 0xc1, 0x96, 0x78, 0xbb, 0xa3, 0x60, 0xb0, 0xaf, 0xea,
-	0x8f, 0x00, 0x2e, 0x9d, 0x01, 0x2c, 0xab, 0xe4, 0xc1, 0x5a, 0x99, 0xc5, 0xc8, 0x39, 0xd0, 0x0b,
-	0xca, 0x56, 0x95, 0x5a, 0x96, 0x67, 0x92, 0x14, 0x61, 0xd4, 0x25, 0xb8, 0x28, 0xc8, 0x6d, 0x26,
-	0x43, 0x63, 0x60, 0x4e, 0xca, 0x85, 0xfc, 0x00, 0xa4, 0xea, 0x4a, 0xac, 0xd4, 0xb1, 0x0f, 0x6f,
-	0x94, 0xd8, 0xaf, 0x94, 0xa1, 0x15, 0xc8, 0xa8, 0x48, 0x2c, 0x55, 0xa4, 0xc3, 0x7d, 0x0a, 0xa2,
-	0x2e, 0xc2, 0x79, 0x41, 0xec, 0xc1, 0x80, 0xd5, 0x16, 0x4a, 0xf8, 0x0a, 0xc0, 0x85, 0x61, 0x48,
-	0x29, 0xe0, 0x31, 0x9c, 0x28, 0x70, 0x6e, 0x49, 0x7e, 0xbe, 0x80, 0x7c, 0x3e, 0xa5, 0xe4, 0x8c,
-	0x9c, 0xdc, 0x8e, 0xba, 0x01, 0x67, 0x3f, 0xe0, 0x01, 0xc1, 0xee, 0xc3, 0xc0, 0x26, 0x41, 0x9b,
-	0xb1, 0xfd, 0x0f, 0x53, 0xf7, 0xee, 0xb9, 0x41, 0x7e, 0x5a, 0xc7, 0xb2, 0xd3, 0xaa, 0x7e, 0x0f,
-	0x60, 0xbd, 0x2c, 0x87, 0xd4, 0xf0, 0x31, 0xbc, 0x22, 0x0f, 0x05, 0xf9, 0xca, 0xdd, 0xcd, 0xf2,
-	0x96, 0xa7, 0x8a, 0x96, 0x3f, 0x43, 0x1e, 0x76, 0x3a, 0x5b, 0xc9, 0x42, 0x9a, 0x71, 0x77, 0xb5,
-	0xf7, 0x8e, 0xc9, 0x7d, 0xa4, 0xc0, 0xf1, 0xd0, 0xc3, 0x7e, 0xb8, 0xc7, 0xb8, 0x78, 0x5f, 0xc6,
-	0x8d, 0xfe, 0xfd, 0xda, 0xcf, 0x57, 0xe1, 0x73, 0xa2, 0xc8, 0xe8, 0x6b, 0x00, 0xc7, 0x7b, 0xe6,
-	0x8a, 0x96, 0x0b, 0x6a, 0x56, 0x72, 0x42, 0x29, 0xcd, 0x32, 0xec, 0xe9, 0x23, 0x4a, 0x5d, 0xfa,
-	0xf2, 0x8f, 0x7f, 0xbf, 0x1b, 0x7d, 0x15, 0xdd, 0xd4, 0x2b, 0x8e, 0x73, 0xfd, 0x33, 0x6a, 0x7f,
-	0x8e, 0xbe, 0x01, 0xf0, 0xda, 0xc0, 0x29, 0x51, 0x4e, 0x28, 0x7f, 0x5c, 0x29, 0xb7, 0x86, 0x11,
-	0x1a, 0x38, 0x76, 0xd4, 0xd7, 0x04, 0xa7, 0x3a, 0x9a, 0xa9, 0xe2, 0x84, 0x7e, 0x05, 0xb0, 0x56,
-	0x66, 0x77, 0x68, 0xed, 0x5c, 0xde, 0x98, 0x72, 0xbc, 0x7d, 0x01, 0x3f, 0x55, 0xd7, 0x05, 0xd7,
-	0x3b, 0xeb, 0x60, 0x59, 0xd5, 0xf5, 0xc2, 0xef, 0x11, 0xd3, 0x63, 0x36, 0x31, 0x39, 0x4b, 0xff,
-	0xad, 0x01, 0x92, 0xbf, 0x03, 0x38, 0x53, 0xe5, 0x3c, 0xe8, 0x5e, 0x59, 0xd5, 0xce, 0xe0, 0x9b,
-	0xca, 0x5b, 0x17, 0x0b, 0x96, 0xba, 0x16, 0x84, 0xae, 0x06, 0xaa, 0xeb, 0x95, 0xdf, 0x70, 0xe8,
-	0x17, 0x00, 0xa7, 0x2b, 0x6c, 0x07, 0xad, 0x97, 0xb1, 0x18, 0x6e, 0x98, 0xca, 0xbd, 0x0b, 0xc5,
-	0x4a, 0x01, 0xf3, 0x42, 0xc0, 0x1c, 0x9a, 0xad, 0xfc, 0xb0, 0x45, 0xbf, 0x01, 0xf8, 0x4a, 0xa9,
-	0x99, 0xa1, 0xbb, 0x65, 0x0c, 0x86, 0x39, 0xa5, 0xf2, 0xe6, 0x05, 0x22, 0x25, 0x73, 0x4d, 0x30,
-	0x6f, 0xa2, 0x05, 0xfd, 0x4c, 0x1f, 0xc3, 0xe8, 0x0b, 0x38, 0x55, 0xec, 0x63, 0x68, 0xa5, 0x80,
-	0x44, 0xa5, 0x6d, 0x2a, 0xab, 0xe7, 0x88, 0x48, 0xe9, 0xae, 0x80, 0xcd, 0xd6, 0x93, 0xe3, 0x3a,
-	0x78, 0x7a, 0x5c, 0x07, 0xff, 0x1c, 0xd7, 0xc1, 0xb7, 0x27, 0xf5, 0x91, 0xa7, 0x27, 0xf5, 0x91,
-	0x3f, 0x4f, 0xea, 0x23, 0x9f, 0xbc, 0xd1, 0xa5, 0x7c, 0x2f, 0x6a, 0x6b, 0x16, 0x73, 0xb3, 0x62,
-	0xe2, 0x3b, 0xaf, 0x0b, 0xc3, 0xd4, 0xfb, 0x2b, 0x87, 0xa9, 0x40, 0x7e, 0xe4, 0x93, 0xb0, 0x7d,
-	0x59, 0x2c, 0xdf, 0xfe, 0x3f, 0x00, 0x00, 0xff, 0xff, 0x3b, 0xb1, 0xe8, 0xed, 0x27, 0x0d, 0x00,
-	0x00,
+	// 1770 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x58, 0x4d, 0x6c, 0xdc, 0xc6,
+	0x15, 0x5e, 0x4a, 0xb2, 0x2d, 0xbd, 0xb5, 0x14, 0x69, 0x1c, 0x3b, 0x9b, 0x95, 0xbc, 0x92, 0xe9,
+	0x58, 0xd6, 0x3a, 0xf1, 0x52, 0x56, 0x82, 0x20, 0xb5, 0x8b, 0x14, 0x96, 0x5b, 0x59, 0x42, 0xad,
+	0x44, 0xa1, 0x14, 0x47, 0x68, 0x03, 0x10, 0xb3, 0xe4, 0x68, 0x35, 0x10, 0xc9, 0x59, 0x91, 0xc3,
+	0x85, 0x84, 0xa2, 0x28, 0xd0, 0x43, 0x2e, 0x6d, 0x81, 0x02, 0x3d, 0xf4, 0x50, 0xf4, 0xd4, 0x73,
+	0xd1, 0x5e, 0x7a, 0xec, 0xdf, 0x2d, 0x47, 0x03, 0xbd, 0xf4, 0x50, 0x14, 0x85, 0xdd, 0x73, 0x8f,
+	0x3d, 0x07, 0x9c, 0x19, 0xee, 0x92, 0x4b, 0x72, 0x25, 0xeb, 0x22, 0x71, 0xde, 0xbc, 0xf7, 0xcd,
+	0xf7, 0x66, 0xde, 0xbc, 0xf7, 0x66, 0xe1, 0xa6, 0x73, 0xea, 0x9c, 0x74, 0x03, 0xc6, 0x99, 0xcd,
+	0x5c, 0xc3, 0x76, 0x59, 0xdb, 0x38, 0x8e, 0x48, 0x70, 0xda, 0x12, 0x32, 0x34, 0x97, 0x9e, 0x6e,
+	0xc5, 0xd3, 0xf5, 0x37, 0x3b, 0xac, 0xc3, 0x84, 0xc8, 0x88, 0xbf, 0xa4, 0x62, 0x7d, 0xa1, 0xc3,
+	0x58, 0xc7, 0x25, 0x06, 0xee, 0x52, 0x03, 0xfb, 0x3e, 0xe3, 0x98, 0x53, 0xe6, 0x87, 0x6a, 0xf6,
+	0x9e, 0xcd, 0x42, 0x8f, 0x85, 0x46, 0x1b, 0x87, 0x44, 0xe2, 0x1b, 0xbd, 0x07, 0x6d, 0xc2, 0xf1,
+	0x03, 0xa3, 0x8b, 0x3b, 0xd4, 0x17, 0xca, 0x4a, 0xd7, 0xc8, 0x33, 0x6a, 0xbb, 0xcc, 0x3e, 0xb2,
+	0x02, 0xcc, 0x89, 0xe5, 0x52, 0x8f, 0x72, 0xcb, 0x66, 0xfe, 0x01, 0xed, 0x28, 0x83, 0x5b, 0x79,
+	0x83, 0xf8, 0x8f, 0xd5, 0xc5, 0x34, 0x50, 0x2a, 0xab, 0x79, 0x15, 0x72, 0x1c, 0x51, 0x7e, 0x6a,
+	0x71, 0x4a, 0x82, 0x22, 0xd0, 0x82, 0x7d, 0x61, 0x81, 0x43, 0x12, 0xc0, 0xc5, 0xfc, 0xb4, 0x87,
+	0xb9, 0x7d, 0x48, 0x12, 0x8f, 0xdf, 0xcd, 0x2b, 0xb8, 0xf4, 0x38, 0xa2, 0x8e, 0xdc, 0x97, 0xec,
+	0x62, 0xf3, 0x05, 0x68, 0xa4, 0xa7, 0x26, 0x3f, 0xce, 0x4c, 0x52, 0xdf, 0x21, 0x27, 0x24, 0x30,
+	0xd8, 0xc1, 0x81, 0x65, 0x1f, 0x62, 0xea, 0x5b, 0x51, 0xd7, 0xc1, 0x9c, 0x84, 0x79, 0x89, 0xb2,
+	0x5f, 0xc9, 0xd8, 0x87, 0x51, 0x1b, 0xdb, 0x36, 0x8b, 0x7c, 0x1e, 0x1a, 0x21, 0x0f, 0x08, 0xf6,
+	0xa8, 0x9f, 0xd0, 0x68, 0x96, 0x6b, 0xf6, 0xbf, 0x95, 0xea, 0xed, 0x8c, 0x6a, 0x37, 0xa0, 0x36,
+	0xc9, 0xe1, 0xe9, 0x4d, 0x78, 0xeb, 0xb3, 0xf8, 0xac, 0x9f, 0x12, 0xfe, 0xc4, 0x65, 0xed, 0x1d,
+	0x4c, 0x03, 0x93, 0x1c, 0x47, 0x24, 0xe4, 0x68, 0x06, 0xc6, 0xa8, 0x53, 0xd3, 0x96, 0xb4, 0x95,
+	0x69, 0x73, 0x8c, 0x3a, 0xfa, 0x17, 0x70, 0x5d, 0xa8, 0x0e, 0xf4, 0xc2, 0x2e, 0xf3, 0x43, 0x82,
+	0x3e, 0x86, 0xa9, 0xfe, 0x61, 0x0a, 0xfd, 0xea, 0xda, 0x7c, 0x2b, 0x17, 0x94, 0xad, 0xc4, 0x6e,
+	0x7d, 0xe2, 0xeb, 0x7f, 0x2f, 0x56, 0xcc, 0x49, 0x5b, 0x8d, 0x75, 0xac, 0x38, 0x3c, 0x76, 0xdd,
+	0x61, 0x0e, 0x1b, 0x00, 0x83, 0xe0, 0x53, 0xd8, 0xcb, 0x2d, 0x19, 0xa9, 0xad, 0x38, 0x52, 0x5b,
+	0xf2, 0x26, 0xa8, 0x48, 0x6d, 0xed, 0xe0, 0x0e, 0x51, 0xb6, 0x66, 0xca, 0x52, 0xff, 0x9d, 0x06,
+	0xb5, 0x0c, 0xf9, 0xc7, 0xae, 0x5b, 0xc6, 0x7f, 0xfc, 0x35, 0xf9, 0xa3, 0xa7, 0x19, 0x92, 0x63,
+	0x82, 0xe4, 0xdd, 0x33, 0x49, 0xca, 0xc5, 0x33, 0x2c, 0xff, 0xa5, 0xc1, 0xe2, 0x36, 0xe9, 0x7d,
+	0xc2, 0x1c, 0xb2, 0xc7, 0xe2, 0xbf, 0x4f, 0xb0, 0x6b, 0x47, 0xae, 0x98, 0x4c, 0x76, 0xe4, 0x4b,
+	0xb8, 0x21, 0xaf, 0x5a, 0x37, 0x60, 0x5d, 0x16, 0x92, 0xc0, 0x52, 0x41, 0xdd, 0xdf, 0x9d, 0x3c,
+	0xf3, 0xe7, 0xd8, 0x8d, 0x83, 0x9a, 0x05, 0xdb, 0xa4, 0xb7, 0x2d, 0xb5, 0xcd, 0x37, 0x05, 0xca,
+	0x8e, 0x02, 0x51, 0x52, 0xf4, 0x43, 0xb8, 0xde, 0x4b, 0x94, 0x2d, 0x8f, 0xf4, 0x2c, 0x8f, 0xf0,
+	0x80, 0xda, 0x61, 0xdf, 0xab, 0x3c, 0x78, 0x86, 0xf0, 0xb6, 0x54, 0x37, 0xaf, 0xf5, 0xd2, 0x4b,
+	0x4a, 0xa1, 0xfe, 0x3f, 0x0d, 0x96, 0xca, 0xdd, 0x53, 0x87, 0xd1, 0x81, 0x2b, 0x01, 0x09, 0x23,
+	0x97, 0x87, 0xea, 0x28, 0x9e, 0x9e, 0xb5, 0x66, 0x01, 0x4a, 0xac, 0xf0, 0xd8, 0x77, 0x9e, 0x33,
+	0x37, 0xf2, 0xc8, 0x0e, 0x09, 0xe2, 0xa3, 0x53, 0xc7, 0x96, 0xa0, 0xd7, 0x31, 0x5c, 0x2b, 0xd0,
+	0x42, 0x4b, 0x70, 0xb5, 0x1f, 0x0c, 0x56, 0x3f, 0xfe, 0x21, 0x39, 0xec, 0x2d, 0x07, 0xcd, 0xc2,
+	0xb8, 0x47, 0x7a, 0x62, 0x47, 0xc6, 0xcc, 0xf8, 0x13, 0xdd, 0x80, 0xcb, 0x3d, 0x01, 0x52, 0x1b,
+	0x5f, 0xd2, 0x56, 0x26, 0x4c, 0x35, 0xd2, 0xef, 0xc1, 0x8a, 0x08, 0xba, 0xef, 0x89, 0x3c, 0xb6,
+	0x47, 0x49, 0xf0, 0x2c, 0xce, 0x62, 0x4f, 0x44, 0x5e, 0x89, 0x82, 0xf4, 0xb9, 0xea, 0xbf, 0xd1,
+	0xa0, 0x79, 0x0e, 0x65, 0xb5, 0x4b, 0x3e, 0xd4, 0xca, 0x92, 0xa3, 0x8a, 0x03, 0xa3, 0x60, 0xdb,
+	0x46, 0x41, 0xab, 0xed, 0xb9, 0x4e, 0x8a, 0x74, 0xf4, 0x26, 0xdc, 0x15, 0xe4, 0xd6, 0xe3, 0xa0,
+	0x31, 0x31, 0x27, 0xe5, 0x8e, 0xfc, 0x5a, 0x53, 0x5e, 0x8f, 0xd4, 0x55, 0x7e, 0x1c, 0xc1, 0x5b,
+	0x25, 0x85, 0x43, 0xb9, 0xd1, 0x2a, 0x70, 0x63, 0x04, 0xb0, 0xf2, 0x42, 0x06, 0xf7, 0x90, 0x8a,
+	0xbe, 0x0f, 0x6f, 0x0b, 0x62, 0xbb, 0x1c, 0x73, 0x72, 0x10, 0xb9, 0x9f, 0xc6, 0xc5, 0x22, 0xb9,
+	0x57, 0x8f, 0x60, 0x52, 0x14, 0x8f, 0xe4, 0xcc, 0xab, 0x6b, 0xf5, 0x82, 0xa5, 0x85, 0xc9, 0x96,
+	0x93, 0xc4, 0x12, 0x93, 0x43, 0xfd, 0x4f, 0x1a, 0xd4, 0x8b, 0xa0, 0x95, 0x97, 0xfb, 0xf0, 0x86,
+	0xc4, 0xee, 0xba, 0xd8, 0x26, 0x1e, 0xf1, 0xb9, 0x5a, 0xa2, 0x59, 0xb0, 0xc4, 0x33, 0xe6, 0x77,
+	0xf6, 0x48, 0xe0, 0x09, 0x88, 0x9d, 0xc4, 0x40, 0xad, 0x38, 0xc3, 0x32, 0x52, 0xb4, 0x08, 0xd5,
+	0x03, 0xea, 0xba, 0x16, 0xf6, 0xe2, 0xc4, 0x2f, 0x62, 0x72, 0xc2, 0x84, 0x58, 0xf4, 0x58, 0x48,
+	0xd0, 0x02, 0x4c, 0xf1, 0x80, 0x76, 0x3a, 0x24, 0x20, 0x8e, 0x88, 0xce, 0x49, 0x73, 0x20, 0xd0,
+	0xef, 0xc2, 0x1d, 0x41, 0xfb, 0x59, 0xaa, 0xec, 0x15, 0x1e, 0xea, 0x57, 0x1a, 0x2c, 0x9f, 0xa5,
+	0xa9, 0x9c, 0xfd, 0x12, 0xae, 0x15, 0x54, 0x51, 0xe5, 0xf0, 0x9d, 0x22, 0x87, 0x73, 0x90, 0xca,
+	0x59, 0xe4, 0xe6, 0x66, 0xf4, 0x05, 0xb5, 0xd1, 0x9f, 0x90, 0x93, 0x7e, 0xc1, 0xda, 0x72, 0x12,
+	0x9a, 0x9b, 0x30, 0x5f, 0x38, 0xab, 0xa8, 0x35, 0x61, 0xce, 0x27, 0x27, 0xdc, 0x2a, 0xb8, 0xe0,
+	0x33, 0x7e, 0xc6, 0x44, 0xff, 0x83, 0x06, 0x37, 0x77, 0x45, 0xad, 0x14, 0xe7, 0xd0, 0x66, 0xec,
+	0xe8, 0x73, 0x59, 0xb2, 0x93, 0x80, 0xc9, 0x27, 0x8a, 0xf1, 0xa1, 0x44, 0xb1, 0x0d, 0x33, 0x83,
+	0xa2, 0x6c, 0x51, 0x27, 0xce, 0xa2, 0xe3, 0xf9, 0x14, 0x9d, 0x2a, 0xe2, 0xad, 0xdd, 0xfe, 0xf7,
+	0x96, 0x63, 0x4e, 0x87, 0xa9, 0x51, 0x88, 0x6e, 0x02, 0x78, 0x38, 0x38, 0x22, 0x12, 0x6a, 0x5c,
+	0x2c, 0x37, 0x25, 0x25, 0x5b, 0x4e, 0xa8, 0x63, 0x68, 0x94, 0x11, 0x56, 0xee, 0x7f, 0x07, 0xae,
+	0xa8, 0xb6, 0x43, 0xa5, 0xd6, 0xc5, 0x82, 0xd3, 0x90, 0x18, 0xd2, 0x34, 0x09, 0x73, 0x65, 0xa5,
+	0xff, 0x7f, 0x1c, 0xae, 0xa6, 0xe7, 0xd1, 0x2d, 0xb8, 0x2a, 0xaf, 0xef, 0x21, 0xa1, 0x9d, 0x43,
+	0xae, 0xf6, 0xb2, 0x2a, 0x64, 0x9b, 0x42, 0x84, 0xe6, 0x61, 0x8a, 0x9c, 0x10, 0xdb, 0xf2, 0x98,
+	0x43, 0x44, 0x7c, 0x4e, 0x9b, 0x93, 0xb1, 0x60, 0x9b, 0x39, 0x04, 0x7d, 0x0e, 0xb3, 0x2c, 0x61,
+	0xab, 0x5a, 0x22, 0x11, 0xa4, 0xd5, 0xb5, 0x95, 0x52, 0x6a, 0x43, 0xee, 0x6d, 0x56, 0xcc, 0x37,
+	0x58, 0x56, 0x14, 0x17, 0x64, 0x79, 0xdf, 0xe2, 0x8b, 0x50, 0x9b, 0x28, 0xad, 0x8b, 0x43, 0x80,
+	0x1b, 0xd4, 0x75, 0x37, 0x2b, 0xe6, 0x94, 0xb0, 0x8d, 0x07, 0x68, 0x03, 0xaa, 0x1c, 0x1f, 0x91,
+	0xc0, 0x12, 0xa2, 0xda, 0x25, 0x81, 0x74, 0xbb, 0x14, 0x69, 0x2f, 0xd6, 0x15, 0x70, 0x9b, 0x15,
+	0x13, 0x78, 0x7f, 0x84, 0x2c, 0x98, 0x4b, 0x45, 0x82, 0x72, 0xf4, 0xb2, 0x40, 0x5b, 0x1d, 0x11,
+	0x0c, 0x02, 0x74, 0x10, 0x12, 0x7d, 0x87, 0x67, 0xc3, 0x21, 0x19, 0xfa, 0x3e, 0x5c, 0x15, 0x0d,
+	0x5e, 0x82, 0x7d, 0xa5, 0xc8, 0x67, 0xd9, 0x02, 0x2a, 0xd8, 0x9d, 0x78, 0xd0, 0x47, 0xac, 0x76,
+	0x07, 0xc3, 0xf5, 0x59, 0x98, 0x91, 0x30, 0x96, 0x47, 0xc2, 0x10, 0x77, 0x88, 0xfe, 0x0b, 0x0d,
+	0xae, 0x17, 0xee, 0x3e, 0xaa, 0xc3, 0x64, 0xe8, 0xe3, 0x6e, 0x78, 0xc8, 0xe4, 0xe9, 0x4f, 0x9a,
+	0xfd, 0x31, 0xda, 0x1f, 0xc4, 0x9b, 0x0c, 0xfc, 0x8f, 0xb2, 0x7c, 0x54, 0x9f, 0xdc, 0xca, 0x77,
+	0xc5, 0x9f, 0x1e, 0x1c, 0x3c, 0x89, 0x05, 0x72, 0x91, 0xe7, 0x0f, 0x86, 0x03, 0xf1, 0xf7, 0x1a,
+	0x5c, 0x2b, 0x38, 0x3c, 0xf4, 0x08, 0xc4, 0xfd, 0x93, 0x2d, 0x91, 0x4a, 0x39, 0x0b, 0x25, 0xad,
+	0x9c, 0x68, 0x79, 0x4c, 0xd1, 0xf9, 0x89, 0x4f, 0xf4, 0x21, 0x5c, 0x16, 0xc7, 0x9c, 0xb0, 0xad,
+	0x95, 0xe5, 0x7f, 0xc5, 0x46, 0x69, 0xc7, 0x97, 0x20, 0x95, 0x83, 0xe5, 0xcd, 0x9c, 0x30, 0xab,
+	0x83, 0x24, 0x1c, 0xea, 0x5f, 0x8d, 0xc1, 0xec, 0x70, 0x88, 0xa0, 0x55, 0xb8, 0x24, 0xc3, 0x4a,
+	0xf2, 0x2c, 0x5d, 0x6e, 0xb3, 0x62, 0x4a, 0x45, 0xb4, 0x0f, 0x73, 0xa9, 0x94, 0xa8, 0x82, 0x72,
+	0xac, 0xb4, 0x92, 0xc8, 0x15, 0x53, 0xe9, 0x35, 0x81, 0x9b, 0x75, 0x87, 0x64, 0xe8, 0x0b, 0x40,
+	0xa9, 0x40, 0xb7, 0x42, 0x8e, 0x79, 0x14, 0xaa, 0xab, 0xd8, 0x3c, 0x47, 0xbc, 0xef, 0x0a, 0x03,
+	0x73, 0x96, 0x0f, 0x49, 0xd6, 0xa7, 0x33, 0x37, 0x48, 0xff, 0xa3, 0x06, 0x37, 0x8a, 0x6d, 0xe3,
+	0x6d, 0xcc, 0x2c, 0xae, 0x72, 0x09, 0x4b, 0xa9, 0xdc, 0x07, 0x14, 0x10, 0x0f, 0x53, 0x9f, 0xfa,
+	0x1d, 0xeb, 0x38, 0xc2, 0x3e, 0x8f, 0xbc, 0x50, 0x15, 0xbd, 0xb9, 0xfe, 0xcc, 0x67, 0x6a, 0x02,
+	0x7d, 0x17, 0x1a, 0xac, 0xcb, 0xa9, 0x47, 0x43, 0x4e, 0x6d, 0xec, 0xba, 0xa7, 0x22, 0x1f, 0x10,
+	0x67, 0x60, 0x2a, 0xdb, 0xb5, 0x85, 0xac, 0xd6, 0x86, 0x50, 0x4a, 0x50, 0xd6, 0xfe, 0x52, 0x85,
+	0x4b, 0xa2, 0xa8, 0xa0, 0x9f, 0x69, 0x30, 0x99, 0x94, 0x08, 0x74, 0xaf, 0x60, 0x57, 0x4a, 0x5e,
+	0x52, 0xf5, 0x95, 0x32, 0xdd, 0xe1, 0xa7, 0x94, 0xde, 0xfc, 0xe9, 0x3f, 0xfe, 0xfb, 0xab, 0xb1,
+	0xdb, 0xe8, 0x96, 0x31, 0xe2, 0xc1, 0x6c, 0xfc, 0x88, 0x3a, 0x3f, 0x46, 0x3f, 0xd7, 0xa0, 0x9a,
+	0x7a, 0xcd, 0x94, 0x13, 0xca, 0x3f, 0xab, 0xea, 0xef, 0x9e, 0x45, 0x28, 0xf5, 0x3c, 0xd2, 0xdf,
+	0x11, 0x9c, 0x1a, 0x68, 0x61, 0x14, 0x27, 0xf4, 0x57, 0x0d, 0x6a, 0x65, 0x6d, 0x39, 0x5a, 0x7b,
+	0xad, 0x1e, 0x5e, 0x72, 0x7c, 0xff, 0x02, 0x7d, 0xbf, 0xfe, 0x50, 0x70, 0xfd, 0xe0, 0xa1, 0x76,
+	0x4f, 0x37, 0x8c, 0xc2, 0x17, 0xbb, 0xe5, 0x33, 0x87, 0x58, 0x9c, 0xc9, 0xff, 0x76, 0x8a, 0xe4,
+	0xdf, 0x35, 0x58, 0x18, 0xd5, 0x21, 0xa3, 0x47, 0x65, 0xbb, 0x76, 0x8e, 0xfe, 0xbe, 0xfe, 0xed,
+	0x8b, 0x19, 0x2b, 0xbf, 0x96, 0x85, 0x5f, 0x4b, 0xa8, 0x61, 0x8c, 0xfc, 0x95, 0x04, 0xfd, 0x59,
+	0x83, 0xf9, 0x11, 0xed, 0x31, 0x7a, 0x58, 0xc6, 0xe2, 0xec, 0xc6, 0xbe, 0xfe, 0xe8, 0x42, 0xb6,
+	0xca, 0x81, 0x3b, 0xc2, 0x81, 0x45, 0x74, 0x73, 0xe4, 0x4f, 0x47, 0xe8, 0x6f, 0x1a, 0xbc, 0x5d,
+	0xda, 0x62, 0xa2, 0x8f, 0xca, 0x18, 0x9c, 0xd5, 0xbf, 0xd6, 0xbf, 0x75, 0x01, 0x4b, 0xc5, 0xbc,
+	0x25, 0x98, 0xaf, 0xa0, 0x65, 0xe3, 0x5c, 0x3f, 0x17, 0x21, 0x1f, 0xa6, 0x33, 0xaf, 0x00, 0xf4,
+	0x5e, 0xd9, 0xda, 0x45, 0xef, 0x90, 0xfa, 0xfd, 0x73, 0x6a, 0x2b, 0x76, 0x15, 0xf4, 0x5b, 0x0d,
+	0x66, 0xb2, 0xfd, 0x2e, 0x2a, 0xc5, 0x28, 0xec, 0x9a, 0xeb, 0xad, 0xf3, 0xaa, 0xab, 0x35, 0xdf,
+	0x13, 0x3b, 0xb2, 0x8c, 0xde, 0x29, 0xd8, 0x91, 0x5c, 0x7f, 0x8d, 0x7e, 0x92, 0x64, 0xfc, 0xe1,
+	0xbe, 0x14, 0xad, 0x9e, 0xb7, 0xc7, 0x4b, 0x7a, 0xee, 0xfa, 0x83, 0xd7, 0xb0, 0x90, 0x64, 0x57,
+	0xb5, 0xf5, 0x9d, 0xaf, 0x5f, 0x36, 0xb4, 0x17, 0x2f, 0x1b, 0xda, 0x7f, 0x5e, 0x36, 0xb4, 0x5f,
+	0xbe, 0x6a, 0x54, 0x5e, 0xbc, 0x6a, 0x54, 0xfe, 0xf9, 0xaa, 0x51, 0xf9, 0xc1, 0x87, 0x1d, 0xca,
+	0x0f, 0xa3, 0x76, 0xcb, 0x66, 0x5e, 0xd6, 0x95, 0xde, 0x07, 0xf7, 0x45, 0x43, 0x62, 0xf4, 0x25,
+	0x27, 0xd2, 0x3d, 0x7e, 0xda, 0x25, 0x61, 0xfb, 0xb2, 0x10, 0xbf, 0xff, 0x4d, 0x00, 0x00, 0x00,
+	0xff, 0xff, 0x9d, 0x29, 0x28, 0xfb, 0x99, 0x15, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -876,7 +1578,12 @@ type QueryClient interface {
 	BlockRateLimitConfiguration(ctx context.Context, in *QueryBlockRateLimitConfigurationRequest, opts ...grpc.CallOption) (*QueryBlockRateLimitConfigurationResponse, error)
 	// Queries LiquidationsConfiguration.
 	LiquidationsConfiguration(ctx context.Context, in *QueryLiquidationsConfigurationRequest, opts ...grpc.CallOption) (*QueryLiquidationsConfigurationResponse, error)
-	// Streams orderbook updates.
+	// Queries the stateful order for a given order id.
+	StatefulOrder(ctx context.Context, in *QueryStatefulOrderRequest, opts ...grpc.CallOption) (*QueryStatefulOrderResponse, error)
+	// Queries the next clob pair id.
+	NextClobPairId(ctx context.Context, in *QueryNextClobPairIdRequest, opts ...grpc.CallOption) (*QueryNextClobPairIdResponse, error)
+	// Streams orderbook updates. Updates contain orderbook data
+	// such as order placements, updates, and fills.
 	StreamOrderbookUpdates(ctx context.Context, in *StreamOrderbookUpdatesRequest, opts ...grpc.CallOption) (Query_StreamOrderbookUpdatesClient, error)
 }
 
@@ -942,6 +1649,24 @@ func (c *queryClient) LiquidationsConfiguration(ctx context.Context, in *QueryLi
 	return out, nil
 }
 
+func (c *queryClient) StatefulOrder(ctx context.Context, in *QueryStatefulOrderRequest, opts ...grpc.CallOption) (*QueryStatefulOrderResponse, error) {
+	out := new(QueryStatefulOrderResponse)
+	err := c.cc.Invoke(ctx, "/dydxprotocol.clob.Query/StatefulOrder", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *queryClient) NextClobPairId(ctx context.Context, in *QueryNextClobPairIdRequest, opts ...grpc.CallOption) (*QueryNextClobPairIdResponse, error) {
+	out := new(QueryNextClobPairIdResponse)
+	err := c.cc.Invoke(ctx, "/dydxprotocol.clob.Query/NextClobPairId", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *queryClient) StreamOrderbookUpdates(ctx context.Context, in *StreamOrderbookUpdatesRequest, opts ...grpc.CallOption) (Query_StreamOrderbookUpdatesClient, error) {
 	stream, err := c.cc.NewStream(ctx, &_Query_serviceDesc.Streams[0], "/dydxprotocol.clob.Query/StreamOrderbookUpdates", opts...)
 	if err != nil {
@@ -988,7 +1713,12 @@ type QueryServer interface {
 	BlockRateLimitConfiguration(context.Context, *QueryBlockRateLimitConfigurationRequest) (*QueryBlockRateLimitConfigurationResponse, error)
 	// Queries LiquidationsConfiguration.
 	LiquidationsConfiguration(context.Context, *QueryLiquidationsConfigurationRequest) (*QueryLiquidationsConfigurationResponse, error)
-	// Streams orderbook updates.
+	// Queries the stateful order for a given order id.
+	StatefulOrder(context.Context, *QueryStatefulOrderRequest) (*QueryStatefulOrderResponse, error)
+	// Queries the next clob pair id.
+	NextClobPairId(context.Context, *QueryNextClobPairIdRequest) (*QueryNextClobPairIdResponse, error)
+	// Streams orderbook updates. Updates contain orderbook data
+	// such as order placements, updates, and fills.
 	StreamOrderbookUpdates(*StreamOrderbookUpdatesRequest, Query_StreamOrderbookUpdatesServer) error
 }
 
@@ -1013,6 +1743,12 @@ func (*UnimplementedQueryServer) BlockRateLimitConfiguration(ctx context.Context
 }
 func (*UnimplementedQueryServer) LiquidationsConfiguration(ctx context.Context, req *QueryLiquidationsConfigurationRequest) (*QueryLiquidationsConfigurationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LiquidationsConfiguration not implemented")
+}
+func (*UnimplementedQueryServer) StatefulOrder(ctx context.Context, req *QueryStatefulOrderRequest) (*QueryStatefulOrderResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StatefulOrder not implemented")
+}
+func (*UnimplementedQueryServer) NextClobPairId(ctx context.Context, req *QueryNextClobPairIdRequest) (*QueryNextClobPairIdResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NextClobPairId not implemented")
 }
 func (*UnimplementedQueryServer) StreamOrderbookUpdates(req *StreamOrderbookUpdatesRequest, srv Query_StreamOrderbookUpdatesServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamOrderbookUpdates not implemented")
@@ -1130,6 +1866,42 @@ func _Query_LiquidationsConfiguration_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Query_StatefulOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryStatefulOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).StatefulOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/dydxprotocol.clob.Query/StatefulOrder",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).StatefulOrder(ctx, req.(*QueryStatefulOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Query_NextClobPairId_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryNextClobPairIdRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).NextClobPairId(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/dydxprotocol.clob.Query/NextClobPairId",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).NextClobPairId(ctx, req.(*QueryNextClobPairIdRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Query_StreamOrderbookUpdates_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(StreamOrderbookUpdatesRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -1178,6 +1950,14 @@ var _Query_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LiquidationsConfiguration",
 			Handler:    _Query_LiquidationsConfiguration_Handler,
+		},
+		{
+			MethodName: "StatefulOrder",
+			Handler:    _Query_StatefulOrder_Handler,
+		},
+		{
+			MethodName: "NextClobPairId",
+			Handler:    _Query_NextClobPairId_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -1570,6 +2350,87 @@ func (m *QueryBlockRateLimitConfigurationResponse) MarshalToSizedBuffer(dAtA []b
 	return len(dAtA) - i, nil
 }
 
+func (m *QueryStatefulOrderRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryStatefulOrderRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryStatefulOrderRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.OrderId.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintQuery(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *QueryStatefulOrderResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryStatefulOrderResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryStatefulOrderResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Triggered {
+		i--
+		if m.Triggered {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.FillAmount != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.FillAmount))
+		i--
+		dAtA[i] = 0x10
+	}
+	{
+		size, err := m.OrderPlacement.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintQuery(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func (m *QueryLiquidationsConfigurationRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1626,6 +2487,57 @@ func (m *QueryLiquidationsConfigurationResponse) MarshalToSizedBuffer(dAtA []byt
 	return len(dAtA) - i, nil
 }
 
+func (m *QueryNextClobPairIdRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryNextClobPairIdRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryNextClobPairIdRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *QueryNextClobPairIdResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryNextClobPairIdResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryNextClobPairIdResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.NextClobPairId != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.NextClobPairId))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *StreamOrderbookUpdatesRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1646,21 +2558,53 @@ func (m *StreamOrderbookUpdatesRequest) MarshalToSizedBuffer(dAtA []byte) (int, 
 	_ = i
 	var l int
 	_ = l
+	if len(m.MarketIds) > 0 {
+		dAtA12 := make([]byte, len(m.MarketIds)*10)
+		var j11 int
+		for _, num := range m.MarketIds {
+			for num >= 1<<7 {
+				dAtA12[j11] = uint8(uint64(num)&0x7f | 0x80)
+				num >>= 7
+				j11++
+			}
+			dAtA12[j11] = uint8(num)
+			j11++
+		}
+		i -= j11
+		copy(dAtA[i:], dAtA12[:j11])
+		i = encodeVarintQuery(dAtA, i, uint64(j11))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.SubaccountIds) > 0 {
+		for iNdEx := len(m.SubaccountIds) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.SubaccountIds[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintQuery(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
 	if len(m.ClobPairId) > 0 {
-		dAtA10 := make([]byte, len(m.ClobPairId)*10)
-		var j9 int
+		dAtA14 := make([]byte, len(m.ClobPairId)*10)
+		var j13 int
 		for _, num := range m.ClobPairId {
 			for num >= 1<<7 {
-				dAtA10[j9] = uint8(uint64(num)&0x7f | 0x80)
+				dAtA14[j13] = uint8(uint64(num)&0x7f | 0x80)
 				num >>= 7
-				j9++
+				j13++
 			}
-			dAtA10[j9] = uint8(num)
-			j9++
+			dAtA14[j13] = uint8(num)
+			j13++
 		}
-		i -= j9
-		copy(dAtA[i:], dAtA10[:j9])
-		i = encodeVarintQuery(dAtA, i, uint64(j9))
+		i -= j13
+		copy(dAtA[i:], dAtA14[:j13])
+		i = encodeVarintQuery(dAtA, i, uint64(j13))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -1687,16 +2631,6 @@ func (m *StreamOrderbookUpdatesResponse) MarshalToSizedBuffer(dAtA []byte) (int,
 	_ = i
 	var l int
 	_ = l
-	if m.Snapshot {
-		i--
-		if m.Snapshot {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i--
-		dAtA[i] = 0x10
-	}
 	if len(m.Updates) > 0 {
 		for iNdEx := len(m.Updates) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -1710,6 +2644,391 @@ func (m *StreamOrderbookUpdatesResponse) MarshalToSizedBuffer(dAtA []byte) (int,
 			i--
 			dAtA[i] = 0xa
 		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *StreamUpdate) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StreamUpdate) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamUpdate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.UpdateMessage != nil {
+		{
+			size := m.UpdateMessage.Size()
+			i -= size
+			if _, err := m.UpdateMessage.MarshalTo(dAtA[i:]); err != nil {
+				return 0, err
+			}
+		}
+	}
+	if m.ExecMode != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.ExecMode))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.BlockHeight != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.BlockHeight))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *StreamUpdate_OrderbookUpdate) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamUpdate_OrderbookUpdate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.OrderbookUpdate != nil {
+		{
+			size, err := m.OrderbookUpdate.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	return len(dAtA) - i, nil
+}
+func (m *StreamUpdate_OrderFill) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamUpdate_OrderFill) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.OrderFill != nil {
+		{
+			size, err := m.OrderFill.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x22
+	}
+	return len(dAtA) - i, nil
+}
+func (m *StreamUpdate_TakerOrder) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamUpdate_TakerOrder) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.TakerOrder != nil {
+		{
+			size, err := m.TakerOrder.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
+	}
+	return len(dAtA) - i, nil
+}
+func (m *StreamUpdate_SubaccountUpdate) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamUpdate_SubaccountUpdate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.SubaccountUpdate != nil {
+		{
+			size, err := m.SubaccountUpdate.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x32
+	}
+	return len(dAtA) - i, nil
+}
+func (m *StreamUpdate_PriceUpdate) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamUpdate_PriceUpdate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.PriceUpdate != nil {
+		{
+			size, err := m.PriceUpdate.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x3a
+	}
+	return len(dAtA) - i, nil
+}
+func (m *StreamOrderbookUpdate) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StreamOrderbookUpdate) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamOrderbookUpdate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Updates) > 0 {
+		for iNdEx := len(m.Updates) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Updates[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintQuery(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if m.Snapshot {
+		i--
+		if m.Snapshot {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *StreamOrderbookFill) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StreamOrderbookFill) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamOrderbookFill) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.FillAmounts) > 0 {
+		dAtA21 := make([]byte, len(m.FillAmounts)*10)
+		var j20 int
+		for _, num := range m.FillAmounts {
+			for num >= 1<<7 {
+				dAtA21[j20] = uint8(uint64(num)&0x7f | 0x80)
+				num >>= 7
+				j20++
+			}
+			dAtA21[j20] = uint8(num)
+			j20++
+		}
+		i -= j20
+		copy(dAtA[i:], dAtA21[:j20])
+		i = encodeVarintQuery(dAtA, i, uint64(j20))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.Orders) > 0 {
+		for iNdEx := len(m.Orders) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Orders[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintQuery(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if m.ClobMatch != nil {
+		{
+			size, err := m.ClobMatch.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *StreamTakerOrder) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StreamTakerOrder) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamTakerOrder) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.TakerOrderStatus != nil {
+		{
+			size, err := m.TakerOrderStatus.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.TakerOrder != nil {
+		{
+			size := m.TakerOrder.Size()
+			i -= size
+			if _, err := m.TakerOrder.MarshalTo(dAtA[i:]); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *StreamTakerOrder_Order) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamTakerOrder_Order) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.Order != nil {
+		{
+			size, err := m.Order.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+func (m *StreamTakerOrder_LiquidationOrder) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamTakerOrder_LiquidationOrder) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.LiquidationOrder != nil {
+		{
+			size, err := m.LiquidationOrder.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	return len(dAtA) - i, nil
+}
+func (m *StreamTakerOrderStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StreamTakerOrderStatus) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StreamTakerOrderStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.OptimisticallyFilledQuantums != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.OptimisticallyFilledQuantums))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.RemainingQuantums != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.RemainingQuantums))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.OrderStatus != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.OrderStatus))
+		i--
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -1870,6 +3189,34 @@ func (m *QueryBlockRateLimitConfigurationResponse) Size() (n int) {
 	return n
 }
 
+func (m *QueryStatefulOrderRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.OrderId.Size()
+	n += 1 + l + sovQuery(uint64(l))
+	return n
+}
+
+func (m *QueryStatefulOrderResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.OrderPlacement.Size()
+	n += 1 + l + sovQuery(uint64(l))
+	if m.FillAmount != 0 {
+		n += 1 + sovQuery(uint64(m.FillAmount))
+	}
+	if m.Triggered {
+		n += 2
+	}
+	return n
+}
+
 func (m *QueryLiquidationsConfigurationRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1890,6 +3237,27 @@ func (m *QueryLiquidationsConfigurationResponse) Size() (n int) {
 	return n
 }
 
+func (m *QueryNextClobPairIdRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *QueryNextClobPairIdResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.NextClobPairId != 0 {
+		n += 1 + sovQuery(uint64(m.NextClobPairId))
+	}
+	return n
+}
+
 func (m *StreamOrderbookUpdatesRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1899,6 +3267,19 @@ func (m *StreamOrderbookUpdatesRequest) Size() (n int) {
 	if len(m.ClobPairId) > 0 {
 		l = 0
 		for _, e := range m.ClobPairId {
+			l += sovQuery(uint64(e))
+		}
+		n += 1 + sovQuery(uint64(l)) + l
+	}
+	if len(m.SubaccountIds) > 0 {
+		for _, e := range m.SubaccountIds {
+			l = e.Size()
+			n += 1 + l + sovQuery(uint64(l))
+		}
+	}
+	if len(m.MarketIds) > 0 {
+		l = 0
+		for _, e := range m.MarketIds {
 			l += sovQuery(uint64(e))
 		}
 		n += 1 + sovQuery(uint64(l)) + l
@@ -1918,8 +3299,185 @@ func (m *StreamOrderbookUpdatesResponse) Size() (n int) {
 			n += 1 + l + sovQuery(uint64(l))
 		}
 	}
+	return n
+}
+
+func (m *StreamUpdate) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.BlockHeight != 0 {
+		n += 1 + sovQuery(uint64(m.BlockHeight))
+	}
+	if m.ExecMode != 0 {
+		n += 1 + sovQuery(uint64(m.ExecMode))
+	}
+	if m.UpdateMessage != nil {
+		n += m.UpdateMessage.Size()
+	}
+	return n
+}
+
+func (m *StreamUpdate_OrderbookUpdate) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.OrderbookUpdate != nil {
+		l = m.OrderbookUpdate.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+func (m *StreamUpdate_OrderFill) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.OrderFill != nil {
+		l = m.OrderFill.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+func (m *StreamUpdate_TakerOrder) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.TakerOrder != nil {
+		l = m.TakerOrder.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+func (m *StreamUpdate_SubaccountUpdate) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.SubaccountUpdate != nil {
+		l = m.SubaccountUpdate.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+func (m *StreamUpdate_PriceUpdate) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.PriceUpdate != nil {
+		l = m.PriceUpdate.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+func (m *StreamOrderbookUpdate) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
 	if m.Snapshot {
 		n += 2
+	}
+	if len(m.Updates) > 0 {
+		for _, e := range m.Updates {
+			l = e.Size()
+			n += 1 + l + sovQuery(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *StreamOrderbookFill) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ClobMatch != nil {
+		l = m.ClobMatch.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	if len(m.Orders) > 0 {
+		for _, e := range m.Orders {
+			l = e.Size()
+			n += 1 + l + sovQuery(uint64(l))
+		}
+	}
+	if len(m.FillAmounts) > 0 {
+		l = 0
+		for _, e := range m.FillAmounts {
+			l += sovQuery(uint64(e))
+		}
+		n += 1 + sovQuery(uint64(l)) + l
+	}
+	return n
+}
+
+func (m *StreamTakerOrder) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.TakerOrder != nil {
+		n += m.TakerOrder.Size()
+	}
+	if m.TakerOrderStatus != nil {
+		l = m.TakerOrderStatus.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+
+func (m *StreamTakerOrder_Order) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Order != nil {
+		l = m.Order.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+func (m *StreamTakerOrder_LiquidationOrder) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.LiquidationOrder != nil {
+		l = m.LiquidationOrder.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+func (m *StreamTakerOrderStatus) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.OrderStatus != 0 {
+		n += 1 + sovQuery(uint64(m.OrderStatus))
+	}
+	if m.RemainingQuantums != 0 {
+		n += 1 + sovQuery(uint64(m.RemainingQuantums))
+	}
+	if m.OptimisticallyFilledQuantums != 0 {
+		n += 1 + sovQuery(uint64(m.OptimisticallyFilledQuantums))
 	}
 	return n
 }
@@ -2859,6 +4417,211 @@ func (m *QueryBlockRateLimitConfigurationResponse) Unmarshal(dAtA []byte) error 
 	}
 	return nil
 }
+func (m *QueryStatefulOrderRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryStatefulOrderRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryStatefulOrderRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OrderId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.OrderId.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryStatefulOrderResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryStatefulOrderResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryStatefulOrderResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OrderPlacement", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.OrderPlacement.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FillAmount", wireType)
+			}
+			m.FillAmount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.FillAmount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Triggered", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Triggered = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *QueryLiquidationsConfigurationRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2992,6 +4755,125 @@ func (m *QueryLiquidationsConfigurationResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *QueryNextClobPairIdRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryNextClobPairIdRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryNextClobPairIdRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryNextClobPairIdResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryNextClobPairIdResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryNextClobPairIdResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NextClobPairId", wireType)
+			}
+			m.NextClobPairId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NextClobPairId |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *StreamOrderbookUpdatesRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3097,6 +4979,116 @@ func (m *StreamOrderbookUpdatesRequest) Unmarshal(dAtA []byte) error {
 			} else {
 				return fmt.Errorf("proto: wrong wireType = %d for field ClobPairId", wireType)
 			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SubaccountIds", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SubaccountIds = append(m.SubaccountIds, &types.SubaccountId{})
+			if err := m.SubaccountIds[len(m.SubaccountIds)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType == 0 {
+				var v uint32
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowQuery
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= uint32(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.MarketIds = append(m.MarketIds, v)
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowQuery
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthQuery
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthQuery
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				var elementCount int
+				var count int
+				for _, integer := range dAtA[iNdEx:postIndex] {
+					if integer < 128 {
+						count++
+					}
+				}
+				elementCount = count
+				if elementCount != 0 && len(m.MarketIds) == 0 {
+					m.MarketIds = make([]uint32, 0, elementCount)
+				}
+				for iNdEx < postIndex {
+					var v uint32
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowQuery
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= uint32(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.MarketIds = append(m.MarketIds, v)
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field MarketIds", wireType)
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipQuery(dAtA[iNdEx:])
@@ -3176,12 +5168,325 @@ func (m *StreamOrderbookUpdatesResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Updates = append(m.Updates, types.OffChainUpdateV1{})
+			m.Updates = append(m.Updates, StreamUpdate{})
 			if err := m.Updates[len(m.Updates)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StreamUpdate) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StreamUpdate: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StreamUpdate: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BlockHeight", wireType)
+			}
+			m.BlockHeight = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.BlockHeight |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExecMode", wireType)
+			}
+			m.ExecMode = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ExecMode |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OrderbookUpdate", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &StreamOrderbookUpdate{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.UpdateMessage = &StreamUpdate_OrderbookUpdate{v}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OrderFill", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &StreamOrderbookFill{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.UpdateMessage = &StreamUpdate_OrderFill{v}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TakerOrder", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &StreamTakerOrder{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.UpdateMessage = &StreamUpdate_TakerOrder{v}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SubaccountUpdate", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &types.StreamSubaccountUpdate{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.UpdateMessage = &StreamUpdate_SubaccountUpdate{v}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PriceUpdate", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &types1.StreamPriceUpdate{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.UpdateMessage = &StreamUpdate_PriceUpdate{v}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StreamOrderbookUpdate) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StreamOrderbookUpdate: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StreamOrderbookUpdate: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Snapshot", wireType)
 			}
@@ -3201,6 +5506,499 @@ func (m *StreamOrderbookUpdatesResponse) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Snapshot = bool(v != 0)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Updates", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Updates = append(m.Updates, types2.OffChainUpdateV1{})
+			if err := m.Updates[len(m.Updates)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StreamOrderbookFill) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StreamOrderbookFill: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StreamOrderbookFill: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ClobMatch", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ClobMatch == nil {
+				m.ClobMatch = &ClobMatch{}
+			}
+			if err := m.ClobMatch.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Orders", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Orders = append(m.Orders, Order{})
+			if err := m.Orders[len(m.Orders)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType == 0 {
+				var v uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowQuery
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.FillAmounts = append(m.FillAmounts, v)
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowQuery
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthQuery
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthQuery
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				var elementCount int
+				var count int
+				for _, integer := range dAtA[iNdEx:postIndex] {
+					if integer < 128 {
+						count++
+					}
+				}
+				elementCount = count
+				if elementCount != 0 && len(m.FillAmounts) == 0 {
+					m.FillAmounts = make([]uint64, 0, elementCount)
+				}
+				for iNdEx < postIndex {
+					var v uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowQuery
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.FillAmounts = append(m.FillAmounts, v)
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field FillAmounts", wireType)
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StreamTakerOrder) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StreamTakerOrder: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StreamTakerOrder: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Order", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &Order{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.TakerOrder = &StreamTakerOrder_Order{v}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LiquidationOrder", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &StreamLiquidationOrder{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.TakerOrder = &StreamTakerOrder_LiquidationOrder{v}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TakerOrderStatus", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.TakerOrderStatus == nil {
+				m.TakerOrderStatus = &StreamTakerOrderStatus{}
+			}
+			if err := m.TakerOrderStatus.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StreamTakerOrderStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StreamTakerOrderStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StreamTakerOrderStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OrderStatus", wireType)
+			}
+			m.OrderStatus = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.OrderStatus |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RemainingQuantums", wireType)
+			}
+			m.RemainingQuantums = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RemainingQuantums |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OptimisticallyFilledQuantums", wireType)
+			}
+			m.OptimisticallyFilledQuantums = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.OptimisticallyFilledQuantums |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipQuery(dAtA[iNdEx:])

@@ -2,11 +2,13 @@ package process
 
 import (
 	"fmt"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/skip-mev/slinky/abci/ve"
+
 	"github.com/dydxprotocol/v4-chain/protocol/app/constants"
 	"github.com/dydxprotocol/v4-chain/protocol/app/prepare/prices"
 	pricestypes "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
-	"github.com/skip-mev/slinky/abci/ve"
 )
 
 // SlinkyMarketPriceDecoder wraps an existing MarketPriceDecoder with logic to verify that the MarketPriceUpdateTx
@@ -58,6 +60,7 @@ func (mpd *SlinkyMarketPriceDecoder) DecodeUpdateMarketPricesTx(
 	}
 
 	// use the underlying decoder to get the UpdateMarketPricesTx
+	// If VE are not enabled with Slinky, then there should be no price updates
 	updateMarketPrices, err := mpd.decoder.DecodeUpdateMarketPricesTx(ctx, txs)
 	if err != nil {
 		return nil, err

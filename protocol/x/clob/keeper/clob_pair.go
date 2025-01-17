@@ -1,9 +1,12 @@
 package keeper
 
 import (
-	storetypes "cosmossdk.io/store/types"
 	"fmt"
 	"sort"
+
+	gogotypes "github.com/cosmos/gogoproto/types"
+
+	storetypes "cosmossdk.io/store/types"
 
 	errorsmod "cosmossdk.io/errors"
 
@@ -12,6 +15,7 @@ import (
 	indexerevents "github.com/dydxprotocol/v4-chain/protocol/indexer/events"
 	"github.com/dydxprotocol/v4-chain/protocol/indexer/indexer_manager"
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
+	dydxlog "github.com/dydxprotocol/v4-chain/protocol/lib/log"
 	"github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 	satypes "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
 )
@@ -30,10 +34,43 @@ func clobPairKey(
 	return lib.Uint32ToKey(id.ToUint32())
 }
 
+// (Same behavior as old `CreatePerpetualClobPair`) creates the
+// objects in state and in-memory.
+// This function should ONLY be used to initialize genesis state
+// or test setups.
+// Regular CLOB logic should use `CreatePerpetualClobPair` instead.
+func (k Keeper) CreatePerpetualClobPairAndMemStructs(
+	ctx sdk.Context,
+	clobPairId uint32,
+	perpetualId uint32,
+	stepSizeBaseQuantums satypes.BaseQuantums,
+	quantumConversionExponent int32,
+	subticksPerTick uint32,
+	status types.ClobPair_Status,
+) (types.ClobPair, error) {
+	clobPair, err := k.createPerpetualClobPair(
+		ctx,
+		clobPairId,
+		perpetualId,
+		stepSizeBaseQuantums,
+		quantumConversionExponent,
+		subticksPerTick,
+		status,
+	)
+	if err != nil {
+		return types.ClobPair{}, err
+	}
+
+	k.MemClob.CreateOrderbook(clobPair)
+	k.SetClobPairIdForPerpetual(clobPair)
+
+	return clobPair, nil
+}
+
 // CreatePerpetualClobPair creates a new perpetual CLOB pair in the store.
 // Additionally, it creates an order book matching the ID of the newly created CLOB pair.
 //
-// An error will occur if any of the fields fail validation (see validateClobPair for details),
+// An error will occur if any of the fields fail validation (see ValidateClobPair for details),
 // or if the `perpetualId` cannot be found.
 // In the event of an error, the store will not be updated nor will a matching order book be created.
 //
@@ -47,26 +84,38 @@ func (k Keeper) CreatePerpetualClobPair(
 	subticksPerTick uint32,
 	status types.ClobPair_Status,
 ) (types.ClobPair, error) {
-	// If the desired CLOB pair ID is already in use, return an error.
-	if clobPair, exists := k.GetClobPair(ctx, types.ClobPairId(clobPairId)); exists {
-		return types.ClobPair{}, errorsmod.Wrapf(
-			types.ErrClobPairAlreadyExists,
-			"id=%v, existing clob pair=%v",
-			clobPairId,
-			clobPair,
-		)
+	clobPair, err := k.createPerpetualClobPair(
+		ctx,
+		clobPairId,
+		perpetualId,
+		stepSizeBaseQuantums,
+		quantumConversionExponent,
+		subticksPerTick,
+		status,
+	)
+	if err != nil {
+		return types.ClobPair{}, err
 	}
 
-	// Verify the perpetual ID is not already associated with an existing CLOB pair.
-	if clobPairId, found := k.PerpetualIdToClobPairId[perpetualId]; found {
-		return types.ClobPair{}, errorsmod.Wrapf(
-			types.ErrPerpetualAssociatedWithExistingClobPair,
-			"perpetual id=%v, existing clob pair id=%v",
-			perpetualId,
-			clobPairId,
-		)
+	// Don't stage events for the genesis block.
+	if lib.IsDeliverTxMode(ctx) {
+		if err := k.StageNewClobPairSideEffects(ctx, clobPair); err != nil {
+			return clobPair, err
+		}
 	}
 
+	return clobPair, nil
+}
+
+func (k Keeper) createPerpetualClobPair(
+	ctx sdk.Context,
+	clobPairId uint32,
+	perpetualId uint32,
+	stepSizeBaseQuantums satypes.BaseQuantums,
+	quantumConversionExponent int32,
+	subticksPerTick uint32,
+	status types.ClobPair_Status,
+) (types.ClobPair, error) {
 	clobPair := types.ClobPair{
 		Metadata: &types.ClobPair_PerpetualClobMetadata{
 			PerpetualClobMetadata: &types.PerpetualClobMetadata{
@@ -79,15 +128,22 @@ func (k Keeper) CreatePerpetualClobPair(
 		SubticksPerTick:           subticksPerTick,
 		Status:                    status,
 	}
-	if err := k.validateClobPair(ctx, &clobPair); err != nil {
-		return clobPair, err
-	}
-	perpetual, err := k.perpetualsKeeper.GetPerpetual(ctx, perpetualId)
-	if err != nil {
+	if err := k.ValidateClobPairCreation(ctx, &clobPair); err != nil {
 		return clobPair, err
 	}
 
-	k.createClobPair(ctx, clobPair)
+	// Write the `ClobPair` to state.
+	k.SetClobPair(ctx, clobPair)
+
+	perpetualId, err := clobPair.GetPerpetualId()
+	if err != nil {
+		panic(err)
+	}
+	perpetual, err := k.perpetualsKeeper.GetPerpetual(ctx, perpetualId)
+	if err != nil {
+		return types.ClobPair{}, err
+	}
+
 	k.GetIndexerEventManager().AddTxnEvent(
 		ctx,
 		indexerevents.SubtypePerpetualMarket,
@@ -95,20 +151,55 @@ func (k Keeper) CreatePerpetualClobPair(
 		indexer_manager.GetBytes(
 			indexerevents.NewPerpetualMarketCreateEvent(
 				perpetualId,
-				clobPairId,
+				clobPair.Id,
 				perpetual.Params.Ticker,
 				perpetual.Params.MarketId,
-				status,
-				quantumConversionExponent,
+				clobPair.Status,
+				clobPair.QuantumConversionExponent,
 				perpetual.Params.AtomicResolution,
-				subticksPerTick,
-				stepSizeBaseQuantums.ToUint64(),
+				clobPair.SubticksPerTick,
+				clobPair.StepBaseQuantums,
 				perpetual.Params.LiquidityTier,
+				perpetual.Params.MarketType,
 			),
 		),
 	)
 
 	return clobPair, nil
+}
+
+// ValidateClobPairCreation validates a CLOB pair's fields are suitable for CLOB pair creation
+// and that the perpetual ID is associated with an existing perpetual.
+func (k Keeper) ValidateClobPairCreation(ctx sdk.Context, clobPair *types.ClobPair) error {
+	// If the desired CLOB pair ID is already in use, return an error.
+	if clobPair, exists := k.GetClobPair(ctx, clobPair.GetClobPairId()); exists {
+		return errorsmod.Wrapf(
+			types.ErrClobPairAlreadyExists,
+			"id=%v, existing clob pair=%v",
+			clobPair.Id,
+			clobPair,
+		)
+	}
+
+	perpetualId, err := clobPair.GetPerpetualId()
+	if err != nil {
+		return errorsmod.Wrap(
+			types.ErrInvalidClobPairParameter,
+			err.Error(),
+		)
+	}
+
+	// Verify the perpetual ID is not already associated with an existing CLOB pair.
+	if clobPairId, found := k.PerpetualIdToClobPairId[perpetualId]; found {
+		return errorsmod.Wrapf(
+			types.ErrPerpetualAssociatedWithExistingClobPair,
+			"perpetual id=%v, existing clob pair id=%v",
+			perpetualId,
+			clobPairId,
+		)
+	}
+
+	return k.validateClobPair(ctx, clobPair)
 }
 
 // validateClobPair validates a CLOB pair's fields are suitable for CLOB pair creation.
@@ -153,50 +244,54 @@ func (k Keeper) validateClobPair(ctx sdk.Context, clobPair *types.ClobPair) erro
 	return nil
 }
 
-// createOrderbook creates a new orderbook in the memclob.
-func (k Keeper) createOrderbook(ctx sdk.Context, clobPair types.ClobPair) {
-	// Create the corresponding orderbook in the memclob.
-	k.MemClob.CreateOrderbook(ctx, clobPair)
-}
-
-// createClobPair creates a new `ClobPair` in the store and creates the corresponding orderbook in the memclob.
-// This function returns an error if a value for the ClobPair's id already exists in state.
-func (k Keeper) createClobPair(ctx sdk.Context, clobPair types.ClobPair) {
-	// Validate the given clob pair id is not already in use.
-	if _, exists := k.GetClobPair(ctx, clobPair.GetClobPairId()); exists {
-		panic(
-			fmt.Sprintf(
-				"ClobPair with id %+v already exists in state",
-				clobPair.GetClobPairId(),
-			),
+func (k Keeper) ApplySideEffectsForNewClobPair(
+	ctx sdk.Context,
+	clobPair types.ClobPair,
+) {
+	if created := k.MemClob.MaybeCreateOrderbook(clobPair); !created {
+		dydxlog.ErrorLog(
+			ctx,
+			"ApplySideEffectsForNewClobPair: Orderbook already exists for CLOB pair",
+			"clob_pair", clobPair,
 		)
+		return
 	}
-
-	// Write the `ClobPair` to state.
-	k.setClobPair(ctx, clobPair)
-
-	// Create the corresponding orderbook in the memclob.
-	k.createOrderbook(ctx, clobPair)
-
-	// Create the mapping between clob pair and perpetual.
-	k.SetClobPairIdForPerpetual(ctx, clobPair)
+	k.SetClobPairIdForPerpetual(clobPair)
 }
 
-// setClobPair sets a specific `ClobPair` in the store from its index.
-func (k Keeper) setClobPair(ctx sdk.Context, clobPair types.ClobPair) {
+// StageNewClobPairSideEffects stages a ClobPair creation event, so that any in-memory side effects
+// can happen later when the transaction and block is committed.
+// Note the staged event will be processed only if below are both true:
+//   - The current transaction is committed.
+//   - The current block is agreed upon and committed by consensus.
+func (k Keeper) StageNewClobPairSideEffects(ctx sdk.Context, clobPair types.ClobPair) error {
+	lib.AssertDeliverTxMode(ctx)
+
+	k.finalizeBlockEventStager.StageFinalizeBlockEvent(
+		ctx,
+		&types.ClobStagedFinalizeBlockEvent{
+			Event: &types.ClobStagedFinalizeBlockEvent_CreateClobPair{
+				CreateClobPair: &clobPair,
+			},
+		},
+	)
+
+	return nil
+}
+
+// SetClobPair sets a specific `ClobPair` in the store from its index.
+func (k Keeper) SetClobPair(ctx sdk.Context, clobPair types.ClobPair) {
 	store := k.getClobPairStore(ctx)
 	b := k.cdc.MustMarshal(&clobPair)
 	store.Set(clobPairKey(clobPair.GetClobPairId()), b)
 }
 
 // InitMemClobOrderbooks initializes the memclob with `ClobPair`s from state.
-// This is called during app initialization in `app.go`, before any ABCI calls are received.
 func (k Keeper) InitMemClobOrderbooks(ctx sdk.Context) {
 	clobPairs := k.GetAllClobPairs(ctx)
 	for _, clobPair := range clobPairs {
 		// Create the corresponding orderbook in the memclob.
-		k.createOrderbook(
-			ctx,
+		k.MemClob.MaybeCreateOrderbook(
 			clobPair,
 		)
 	}
@@ -208,14 +303,13 @@ func (k Keeper) HydrateClobPairAndPerpetualMapping(ctx sdk.Context) {
 	for _, clobPair := range clobPairs {
 		// Create the corresponding mapping between clob pair and perpetual.
 		k.SetClobPairIdForPerpetual(
-			ctx,
 			clobPair,
 		)
 	}
 }
 
 // SetClobPairIdForPerpetual sets the mapping between clob pair and perpetual.
-func (k Keeper) SetClobPairIdForPerpetual(ctx sdk.Context, clobPair types.ClobPair) {
+func (k Keeper) SetClobPairIdForPerpetual(clobPair types.ClobPair) {
 	// If this `ClobPair` is for a perpetual, add the `clobPairId` to the list of CLOB pair IDs
 	// that facilitate trading of this perpetual.
 	if perpetualClobMetadata := clobPair.GetPerpetualClobMetadata(); perpetualClobMetadata != nil {
@@ -224,6 +318,14 @@ func (k Keeper) SetClobPairIdForPerpetual(ctx sdk.Context, clobPair types.ClobPa
 		if !exists {
 			clobPairIds = make([]types.ClobPairId, 0)
 		}
+
+		for _, clobPairId := range clobPairIds {
+			if clobPairId == clobPair.GetClobPairId() {
+				// The mapping already exists, so return.
+				return
+			}
+		}
+
 		k.PerpetualIdToClobPairId[perpetualId] = append(
 			clobPairIds,
 			clobPair.GetClobPairId(),
@@ -525,7 +627,7 @@ func (k Keeper) UpdateClobPair(
 		return err
 	}
 
-	k.setClobPair(ctx, clobPair)
+	k.SetClobPair(ctx, clobPair)
 
 	// Send UpdateClobPair to indexer.
 	k.GetIndexerEventManager().AddTxnEvent(
@@ -677,4 +779,44 @@ func (k Keeper) IsPerpetualClobPairActive(
 	}
 
 	return clobPair.Status == types.ClobPair_STATUS_ACTIVE, nil
+}
+
+// GetNextClobPairID returns the next clob pair id to be used from the module store
+func (k Keeper) GetNextClobPairID(ctx sdk.Context) uint32 {
+	store := ctx.KVStore(k.storeKey)
+	b := store.Get([]byte(types.NextClobPairIDKey))
+	var result gogotypes.UInt32Value
+	k.cdc.MustUnmarshal(b, &result)
+	return result.Value
+}
+
+// SetNextClobPairID sets the next clob pair id to be used
+func (k Keeper) SetNextClobPairID(ctx sdk.Context, nextID uint32) {
+	store := ctx.KVStore(k.storeKey)
+	value := gogotypes.UInt32Value{Value: nextID}
+	store.Set([]byte(types.NextClobPairIDKey), k.cdc.MustMarshal(&value))
+}
+
+// AcquireNextClobPairID returns the next clob pair id to be used and increments
+// the next clob pair id
+func (k Keeper) AcquireNextClobPairID(ctx sdk.Context) uint32 {
+	nextID := k.GetNextClobPairID(ctx)
+	// if clob pair id already exists, increment until we find one that doesn't
+	maxAttempts, attempts := 1000, 0
+	for {
+		_, found := k.GetClobPair(ctx, types.ClobPairId(nextID))
+		if !found {
+			break
+		}
+		nextID++
+
+		// panic if we've tried too many times and are stuck in a loop
+		attempts++
+		if attempts >= maxAttempts {
+			panic("Exceeded maximum attempts to find a unique clob pair id")
+		}
+	}
+
+	k.SetNextClobPairID(ctx, nextID+1)
+	return nextID
 }

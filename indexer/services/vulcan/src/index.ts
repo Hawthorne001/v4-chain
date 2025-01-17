@@ -1,6 +1,8 @@
-import { logger, startBugsnag, wrapBackgroundTask } from '@dydxprotocol-indexer/base';
+import {
+  logger, getInstanceId, startBugsnag, setInstanceId, wrapBackgroundTask,
+} from '@dydxprotocol-indexer/base';
 import { stopConsumer, startConsumer } from '@dydxprotocol-indexer/kafka';
-import { perpetualMarketRefresher } from '@dydxprotocol-indexer/postgres';
+import { blockHeightRefresher, perpetualMarketRefresher } from '@dydxprotocol-indexer/postgres';
 
 import config from './config';
 import { connect as connectToKafka } from './helpers/kafka/kafka-controller';
@@ -18,8 +20,24 @@ async function startService(): Promise<void> {
 
   startBugsnag();
 
+  logger.info({
+    at: 'index#start',
+    message: 'Getting instance id...',
+  });
+
+  await setInstanceId();
+
+  logger.info({
+    at: 'index#start',
+    message: `Got instance id ${getInstanceId()}.`,
+  });
+
   // Initialize PerpetualMarkets cache
-  await perpetualMarketRefresher.updatePerpetualMarkets();
+  await Promise.all([
+    blockHeightRefresher.updateBlockHeight(),
+    perpetualMarketRefresher.updatePerpetualMarkets(),
+  ]);
+  wrapBackgroundTask(blockHeightRefresher.start(), true, 'startUpdateBlockHeight');
   wrapBackgroundTask(perpetualMarketRefresher.start(), true, 'startUpdatePerpetualMarkets');
 
   logger.info({

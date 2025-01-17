@@ -46,7 +46,7 @@ import {
   defaultFundingUpdateSampleEvent,
   defaultHeight,
   defaultMarketModify,
-  defaultPerpetualMarketCreateEvent,
+  defaultPerpetualMarketCreateEventV1,
   defaultPreviousHeight,
   defaultSubaccountMessage,
 } from '../helpers/constants';
@@ -135,7 +135,7 @@ describe('on-message', () => {
 
   const defaultPerpetualMarketEventBinary: Uint8Array = Uint8Array.from(
     PerpetualMarketCreateEventV1.encode(
-      defaultPerpetualMarketCreateEvent,
+      defaultPerpetualMarketCreateEventV1,
     ).finish(),
   );
 
@@ -309,7 +309,7 @@ describe('on-message', () => {
         orderBy: [[PerpetualMarketColumns.id, Ordering.ASC]],
       });
     expect(newPerpetualMarkets.length).toEqual(2);
-    expectPerpetualMarketMatchesEvent(defaultPerpetualMarketCreateEvent, newPerpetualMarkets[0]);
+    expectPerpetualMarketMatchesEvent(defaultPerpetualMarketCreateEventV1, newPerpetualMarkets[0]);
 
     expect(stats.increment).toHaveBeenCalledWith('ender.received_kafka_message', 1);
     expect(stats.timing).toHaveBeenCalledWith(
@@ -671,7 +671,7 @@ describe('on-message', () => {
       expectBlock(defaultHeight.toString(), defaultDateTime.toISO()),
     ]);
 
-    expect(producerSendMock).toHaveBeenCalledTimes(2);
+    expect(producerSendMock).toHaveBeenCalledTimes(3);
     // First message batch sent should contain the first message
     expect(producerSendMock.mock.calls[0][0].messages).toHaveLength(1);
     // Second message batch should contain the second message
@@ -761,7 +761,7 @@ describe('on-message', () => {
 
     expect(stats.increment).toHaveBeenCalledWith(`${config.SERVICE_NAME}.block_already_parsed`, 1);
     expect(stats.increment).toHaveBeenCalledWith('ender.received_kafka_message', 1);
-    expect(stats.timing).toHaveBeenCalledWith(
+    expect(stats.timing).not.toHaveBeenCalledWith(
       'ender.message_time_in_queue', expect.any(Number), 1, { topic: KafkaTopics.TO_ENDER });
   });
 

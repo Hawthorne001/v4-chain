@@ -132,6 +132,12 @@ func (o *Order) MustGetOrder() Order {
 	return *o
 }
 
+// MustGetLiquidationOrder always panics since Order is not a Liquidation Order.
+// This function is necessary for the `Order` type to implement the `MatchableOrder` interface.
+func (o *Order) MustGetLiquidationOrder() LiquidationOrder {
+	panic("MustGetLiquidationOrder: Order is not a liquidation order")
+}
+
 // MustGetLiquidatedPerpetualId always panics since there is no underlying perpetual ID for a `Order`.
 // This function is necessary for the `Order` type to implement the `MatchableOrder` interface.
 func (o *Order) MustGetLiquidatedPerpetualId() uint32 {
@@ -172,6 +178,11 @@ func (o *Order) IsStatefulOrder() bool {
 // IsConditionalOrder returns whether this order is a conditional order.
 func (o *Order) IsConditionalOrder() bool {
 	return o.OrderId.IsConditionalOrder()
+}
+
+// IsPostOnlyOrder returns whether this order is a post only order.
+func (o *Order) IsPostOnlyOrder() bool {
+	return o.GetTimeInForce() == Order_TIME_IN_FORCE_POST_ONLY
 }
 
 // CanTrigger returns if a condition order is eligible to be triggered based on a given

@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
+	marketmapmodule "github.com/skip-mev/slinky/x/marketmap"
+
 	evidencemodule "cosmossdk.io/x/evidence"
 	feegrantmodule "cosmossdk.io/x/feegrant/module"
 	"cosmossdk.io/x/upgrade"
-	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authzmodule "github.com/cosmos/cosmos-sdk/x/authz/module"
@@ -32,6 +33,8 @@ import (
 	custommodule "github.com/dydxprotocol/v4-chain/protocol/app/module"
 	"github.com/dydxprotocol/v4-chain/protocol/mocks"
 	testapp "github.com/dydxprotocol/v4-chain/protocol/testutil/app"
+	accountplusmodule "github.com/dydxprotocol/v4-chain/protocol/x/accountplus"
+	"github.com/dydxprotocol/v4-chain/protocol/x/affiliates"
 	assetsmodule "github.com/dydxprotocol/v4-chain/protocol/x/assets"
 	blocktimemodule "github.com/dydxprotocol/v4-chain/protocol/x/blocktime"
 	bridgemodule "github.com/dydxprotocol/v4-chain/protocol/x/bridge"
@@ -40,9 +43,11 @@ import (
 	epochsmodule "github.com/dydxprotocol/v4-chain/protocol/x/epochs"
 	feetiersmodule "github.com/dydxprotocol/v4-chain/protocol/x/feetiers"
 	govplusmodule "github.com/dydxprotocol/v4-chain/protocol/x/govplus"
+	listingmodule "github.com/dydxprotocol/v4-chain/protocol/x/listing"
 	perpetualsmodule "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals"
 	pricesmodule "github.com/dydxprotocol/v4-chain/protocol/x/prices"
 	ratelimitmodule "github.com/dydxprotocol/v4-chain/protocol/x/ratelimit"
+	revsharemodule "github.com/dydxprotocol/v4-chain/protocol/x/revshare"
 	rewardsmodule "github.com/dydxprotocol/v4-chain/protocol/x/rewards"
 	sendingmodule "github.com/dydxprotocol/v4-chain/protocol/x/sending"
 	statsmodule "github.com/dydxprotocol/v4-chain/protocol/x/stats"
@@ -106,6 +111,8 @@ func TestAppIsFullyInitialized(t *testing.T) {
 				"LiquidationsClient",
 				"BridgeClient",
 				"SlinkyClient",
+				"oraclePrometheusServer",
+				"WebsocketStreamingServer",
 
 				// Any default constructed type can be considered initialized if the default is what is
 				// expected. getUninitializedStructFields relies on fields being the non-default and
@@ -134,15 +141,6 @@ func TestAppPanicsWithGrpcDisabled(t *testing.T) {
 		flags.GrpcEnable: false,
 	}
 	require.Panics(t, func() { testapp.DefaultTestApp(customFlags) })
-}
-
-func TestClobKeeperMemStoreHasBeenInitialized(t *testing.T) {
-	dydxApp := testapp.DefaultTestApp(nil)
-	ctx := dydxApp.NewUncachedContext(true, tmproto.Header{})
-
-	// The memstore panics if initialized twice so initializing again outside of application
-	// start-up should cause a panic.
-	require.Panics(t, func() { dydxApp.ClobKeeper.InitMemStore(ctx) })
 }
 
 func TestBaseApp(t *testing.T) {
@@ -223,6 +221,13 @@ func TestModuleBasics(t *testing.T) {
 		epochsmodule.AppModuleBasic{},
 		ratelimitmodule.AppModuleBasic{},
 		vaultmodule.AppModuleBasic{},
+		listingmodule.AppModuleBasic{},
+		revsharemodule.AppModuleBasic{},
+		accountplusmodule.AppModuleBasic{},
+		affiliates.AppModuleBasic{},
+
+		// slinky marketmap
+		marketmapmodule.AppModuleBasic{},
 	)
 
 	app := testapp.DefaultTestApp(nil)

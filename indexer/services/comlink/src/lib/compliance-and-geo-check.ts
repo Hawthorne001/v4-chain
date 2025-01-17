@@ -3,6 +3,7 @@ import {
   isRestrictedCountryHeaders,
   INDEXER_GEOBLOCKED_PAYLOAD,
   INDEXER_COMPLIANCE_BLOCKED_PAYLOAD,
+  isWhitelistedAddress,
 } from '@dydxprotocol-indexer/compliance';
 import {
   ComplianceStatus,
@@ -13,7 +14,10 @@ import express from 'express';
 import { matchedData } from 'express-validator';
 
 import { AddressRequest, BlockedCode } from '../types';
-import { create4xxResponse } from './helpers';
+import {
+  create4xxResponse,
+  handleInternalServerError,
+} from './helpers';
 import { getIpAddr, isIndexerIp } from './utils';
 
 /**
@@ -40,23 +44,39 @@ export async function complianceAndGeoCheck(
   }
 
   const { address }: AddressRequest = matchedData(req) as AddressRequest;
+  if (isWhitelistedAddress(address)) {
+    return next();
+  }
+
   if (address !== undefined) {
-    const updatedStatus: ComplianceStatusFromDatabase[] = await ComplianceStatusTable.findAll(
-      { address: [address] },
-      [],
-      { readReplica: true },
-    );
-    if (updatedStatus.length > 0) {
-      if (updatedStatus[0].status === ComplianceStatus.CLOSE_ONLY) {
-        return next();
-      } else if (updatedStatus[0].status === ComplianceStatus.BLOCKED) {
-        return create4xxResponse(
-          res,
-          INDEXER_COMPLIANCE_BLOCKED_PAYLOAD,
-          403,
-          { code: BlockedCode.COMPLIANCE_BLOCKED },
-        );
+    try {
+      const updatedStatus: ComplianceStatusFromDatabase[] = await ComplianceStatusTable.findAll(
+        { address: [address] },
+        [],
+        { readReplica: true },
+      );
+      if (updatedStatus.length > 0) {
+        if (updatedStatus[0].status === ComplianceStatus.CLOSE_ONLY ||
+          updatedStatus[0].status === ComplianceStatus.FIRST_STRIKE_CLOSE_ONLY
+        ) {
+          return next();
+        } else if (updatedStatus[0].status === ComplianceStatus.BLOCKED) {
+          return create4xxResponse(
+            res,
+            INDEXER_COMPLIANCE_BLOCKED_PAYLOAD,
+            403,
+            { code: BlockedCode.COMPLIANCE_BLOCKED },
+          );
+        }
       }
+    } catch (error) {
+      return handleInternalServerError(
+        'complianceAndGeoCheck',
+        'complianceAndGeoCheck error',
+        error,
+        req,
+        res,
+      );
     }
   }
 

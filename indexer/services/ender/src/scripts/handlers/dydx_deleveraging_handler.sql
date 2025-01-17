@@ -23,11 +23,13 @@ CREATE OR REPLACE FUNCTION dydx_deleveraging_handler(
 DECLARE
     QUOTE_CURRENCY_ATOMIC_RESOLUTION constant numeric = -6;
     FEE constant numeric = 0;
+    AFFILIATE_REV_SHARE constant numeric = 0;
     perpetual_id bigint;
     clob_pair_id bigint;
     liquidated_subaccount_uuid uuid;
     offsetting_subaccount_uuid uuid;
     perpetual_market_record perpetual_markets%ROWTYPE;
+    market_record markets%ROWTYPE;
     liquidated_fill_record fills%ROWTYPE;
     offsetting_fill_record fills%ROWTYPE;
     liquidated_perpetual_position_record perpetual_positions%ROWTYPE;
@@ -49,6 +51,15 @@ BEGIN
             /** This should never happen and if it ever were to would indicate that the table has malformed data. */
             RAISE EXCEPTION 'Found multiple perpetual markets with perpetualId %', perpetual_id;
     END;
+    BEGIN
+        SELECT * INTO STRICT market_record FROM markets WHERE "id" = perpetual_market_record."marketId";
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE EXCEPTION 'Unable to find market with id %', perpetual_market_record."marketId";
+        WHEN TOO_MANY_ROWS THEN
+            /** This should never happen and if it ever were to would indicate that the table has malformed data. */
+            RAISE EXCEPTION 'Found multiple markets with id %', perpetual_market_record."marketId";
+    END;
     /**
       Calculate sizes, prices, and fill amounts.
 
@@ -62,8 +73,8 @@ BEGIN
 
     liquidated_subaccount_uuid = dydx_uuid_from_subaccount_id(event_data->'liquidated');
     offsetting_subaccount_uuid = dydx_uuid_from_subaccount_id(event_data->'offsetting');
-    offsetting_side = CASE WHEN (event_data->'isBuy')::bool THEN 'BUY' ELSE 'SELL' END;
-    liquidated_side = CASE WHEN offsetting_side = 'BUY' THEN 'SELL' ELSE 'BUY' END;
+    liquidated_side = CASE WHEN (event_data->'isBuy')::bool THEN 'BUY' ELSE 'SELL' END;
+    offsetting_side = CASE WHEN liquidated_side = 'BUY' THEN 'SELL' ELSE 'BUY' END;
     clob_pair_id = perpetual_market_record."clobPairId";
 
     /* Insert the associated fill records for this deleveraging event. */
@@ -71,7 +82,7 @@ BEGIN
         block_height, transaction_index, event_index);
     INSERT INTO fills
         ("id", "subaccountId", "side", "liquidity", "type", "clobPairId", "size", "price", "quoteAmount",
-         "eventId", "transactionHash", "createdAt", "createdAtHeight", "fee")
+         "eventId", "transactionHash", "createdAt", "createdAtHeight", "fee", "affiliateRevShare")
     VALUES (dydx_uuid_from_fill_event_parts(event_id, 'TAKER'),
             liquidated_subaccount_uuid,
             liquidated_side,
@@ -85,12 +96,13 @@ BEGIN
             transaction_hash,
             block_time,
             block_height,
-            FEE)
+            FEE,
+            AFFILIATE_REV_SHARE)
     RETURNING * INTO liquidated_fill_record;
 
     INSERT INTO fills
         ("id", "subaccountId", "side", "liquidity", "type", "clobPairId", "size", "price", "quoteAmount",
-         "eventId", "transactionHash", "createdAt", "createdAtHeight", "fee")
+         "eventId", "transactionHash", "createdAt", "createdAtHeight", "fee", "affiliateRevShare")
     VALUES (dydx_uuid_from_fill_event_parts(event_id, 'MAKER'),
                         offsetting_subaccount_uuid,
                         offsetting_side,
@@ -104,7 +116,8 @@ BEGIN
                         transaction_hash,
                         block_time,
                         block_height,
-                        FEE)
+                        FEE,
+                        AFFILIATE_REV_SHARE)
     RETURNING * INTO offsetting_fill_record;
 
     /* Upsert the perpetual_position records for this deleveraging event. */
@@ -129,6 +142,8 @@ BEGIN
             dydx_to_jsonb(offsetting_fill_record),
             'perpetual_market',
             dydx_to_jsonb(perpetual_market_record),
+            'market',
+            dydx_to_jsonb(market_record),
             'liquidated_perpetual_position',
             dydx_to_jsonb(liquidated_perpetual_position_record),
             'offsetting_perpetual_position',

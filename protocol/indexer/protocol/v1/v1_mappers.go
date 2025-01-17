@@ -6,7 +6,9 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/dtypes"
 	v1types "github.com/dydxprotocol/v4-chain/protocol/indexer/protocol/v1/types"
 	clobtypes "github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
+	perptypes "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/types"
 	satypes "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
+	vaulttypes "github.com/dydxprotocol/v4-chain/protocol/x/vault/types"
 )
 
 func SubaccountIdToIndexerSubaccountId(
@@ -187,4 +189,24 @@ func ConvertToClobPairStatus(status clobtypes.ClobPair_Status) v1types.ClobPairS
 			),
 		)
 	}
+}
+
+func ConvertToPerpetualMarketType(marketType perptypes.PerpetualMarketType) v1types.PerpetualMarketType {
+	switch marketType {
+	case perptypes.PerpetualMarketType_PERPETUAL_MARKET_TYPE_CROSS:
+		return v1types.PerpetualMarketType_PERPETUAL_MARKET_TYPE_CROSS
+	case perptypes.PerpetualMarketType_PERPETUAL_MARKET_TYPE_ISOLATED:
+		return v1types.PerpetualMarketType_PERPETUAL_MARKET_TYPE_ISOLATED
+	default:
+		panic(
+			fmt.Sprintf(
+				"ConvertToPerpetualMarketType: invalid perpetual market type: %+v",
+				marketType,
+			),
+		)
+	}
+}
+
+func VaultStatusToIndexerVaultStatus(vaultStatus vaulttypes.VaultStatus) v1types.VaultStatus {
+	return v1types.VaultStatus(vaultStatus)
 }

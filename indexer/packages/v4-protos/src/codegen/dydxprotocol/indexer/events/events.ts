@@ -1,6 +1,8 @@
 import { IndexerSubaccountId, IndexerSubaccountIdSDKType, IndexerPerpetualPosition, IndexerPerpetualPositionSDKType, IndexerAssetPosition, IndexerAssetPositionSDKType } from "../protocol/v1/subaccount";
 import { IndexerOrder, IndexerOrderSDKType, IndexerOrderId, IndexerOrderIdSDKType, ClobPairStatus, ClobPairStatusSDKType } from "../protocol/v1/clob";
 import { OrderRemovalReason, OrderRemovalReasonSDKType } from "../shared/removal_reason";
+import { PerpetualMarketType, PerpetualMarketTypeSDKType } from "../protocol/v1/perpetual";
+import { VaultStatus, VaultStatusSDKType } from "../protocol/v1/vault";
 import * as _m0 from "protobufjs/minimal";
 import { DeepPartial, Long } from "../../../helpers";
 /** Type is the type for funding values. */
@@ -414,6 +416,9 @@ export interface OrderFillEventV1 {
   /** Total filled of the taker order in base quantums. */
 
   totalFilledTaker: Long;
+  /** rev share for affiliates in USDC quantums. */
+
+  affiliateRevShare: Long;
 }
 /**
  * OrderFillEvent message contains all the information from an order match in
@@ -443,6 +448,9 @@ export interface OrderFillEventV1SDKType {
   /** Total filled of the taker order in base quantums. */
 
   total_filled_taker: Long;
+  /** rev share for affiliates in USDC quantums. */
+
+  affiliate_rev_share: Long;
 }
 /**
  * DeleveragingEvent message contains all the information for a deleveraging
@@ -618,11 +626,13 @@ export interface SubaccountUpdateEventV1SDKType {
  */
 
 export interface StatefulOrderEventV1 {
+  /** @deprecated */
   orderPlace?: StatefulOrderEventV1_StatefulOrderPlacementV1;
   orderRemoval?: StatefulOrderEventV1_StatefulOrderRemovalV1;
   conditionalOrderPlacement?: StatefulOrderEventV1_ConditionalOrderPlacementV1;
   conditionalOrderTriggered?: StatefulOrderEventV1_ConditionalOrderTriggeredV1;
   longTermOrderPlacement?: StatefulOrderEventV1_LongTermOrderPlacementV1;
+  orderReplacement?: StatefulOrderEventV1_LongTermOrderReplacementV1;
 }
 /**
  * StatefulOrderEvent message contains information about a change to a stateful
@@ -632,18 +642,26 @@ export interface StatefulOrderEventV1 {
  */
 
 export interface StatefulOrderEventV1SDKType {
+  /** @deprecated */
   order_place?: StatefulOrderEventV1_StatefulOrderPlacementV1SDKType;
   order_removal?: StatefulOrderEventV1_StatefulOrderRemovalV1SDKType;
   conditional_order_placement?: StatefulOrderEventV1_ConditionalOrderPlacementV1SDKType;
   conditional_order_triggered?: StatefulOrderEventV1_ConditionalOrderTriggeredV1SDKType;
   long_term_order_placement?: StatefulOrderEventV1_LongTermOrderPlacementV1SDKType;
+  order_replacement?: StatefulOrderEventV1_LongTermOrderReplacementV1SDKType;
 }
-/** A stateful order placement contains an order. */
+/**
+ * A stateful order placement contains an order.
+ * Deprecated in favor of LongTermOrderPlacementV1.
+ */
 
 export interface StatefulOrderEventV1_StatefulOrderPlacementV1 {
   order?: IndexerOrder;
 }
-/** A stateful order placement contains an order. */
+/**
+ * A stateful order placement contains an order.
+ * Deprecated in favor of LongTermOrderPlacementV1.
+ */
 
 export interface StatefulOrderEventV1_StatefulOrderPlacementV1SDKType {
   order?: IndexerOrderSDKType;
@@ -706,6 +724,20 @@ export interface StatefulOrderEventV1_LongTermOrderPlacementV1 {
 /** A long term order placement contains an order. */
 
 export interface StatefulOrderEventV1_LongTermOrderPlacementV1SDKType {
+  order?: IndexerOrderSDKType;
+}
+/** A long term order replacement contains an old order ID and the new order. */
+
+export interface StatefulOrderEventV1_LongTermOrderReplacementV1 {
+  /** vault replaces orders with a different order ID */
+  oldOrderId?: IndexerOrderId;
+  order?: IndexerOrder;
+}
+/** A long term order replacement contains an old order ID and the new order. */
+
+export interface StatefulOrderEventV1_LongTermOrderReplacementV1SDKType {
+  /** vault replaces orders with a different order ID */
+  old_order_id?: IndexerOrderIdSDKType;
   order?: IndexerOrderSDKType;
 }
 /**
@@ -779,7 +811,11 @@ export interface AssetCreateEventV1SDKType {
 /**
  * PerpetualMarketCreateEventV1 message contains all the information about a
  * new Perpetual Market on the dYdX chain.
+ * Deprecated. See PerpetualMarketCreateEventV2 for the most up to date message
+ * for the event to create a new Perpetual Market.
  */
+
+/** @deprecated */
 
 export interface PerpetualMarketCreateEventV1 {
   /**
@@ -849,7 +885,11 @@ export interface PerpetualMarketCreateEventV1 {
 /**
  * PerpetualMarketCreateEventV1 message contains all the information about a
  * new Perpetual Market on the dYdX chain.
+ * Deprecated. See PerpetualMarketCreateEventV2 for the most up to date message
+ * for the event to create a new Perpetual Market.
  */
+
+/** @deprecated */
 
 export interface PerpetualMarketCreateEventV1SDKType {
   /**
@@ -915,6 +955,152 @@ export interface PerpetualMarketCreateEventV1SDKType {
    */
 
   liquidity_tier: number;
+}
+/**
+ * PerpetualMarketCreateEventV2 message contains all the information about a
+ * new Perpetual Market on the dYdX chain.
+ */
+
+export interface PerpetualMarketCreateEventV2 {
+  /**
+   * Unique Perpetual id.
+   * Defined in perpetuals.perpetual
+   */
+  id: number;
+  /**
+   * Unique clob pair Id associated with this perpetual market
+   * Defined in clob.clob_pair
+   */
+
+  clobPairId: number;
+  /**
+   * The name of the `Perpetual` (e.g. `BTC-USD`).
+   * Defined in perpetuals.perpetual
+   */
+
+  ticker: string;
+  /**
+   * Unique id of market param associated with this perpetual market.
+   * Defined in perpetuals.perpetual
+   */
+
+  marketId: number;
+  /** Status of the CLOB */
+
+  status: ClobPairStatus;
+  /**
+   * `10^Exponent` gives the number of QuoteQuantums traded per BaseQuantum
+   * per Subtick.
+   * Defined in clob.clob_pair
+   */
+
+  quantumConversionExponent: number;
+  /**
+   * The exponent for converting an atomic amount (`size = 1`)
+   * to a full coin. For example, if `AtomicResolution = -8`
+   * then a `PerpetualPosition` with `size = 1e8` is equivalent to
+   * a position size of one full coin.
+   * Defined in perpetuals.perpetual
+   */
+
+  atomicResolution: number;
+  /**
+   * Defines the tick size of the orderbook by defining how many subticks
+   * are in one tick. That is, the subticks of any valid order must be a
+   * multiple of this value. Generally this value should start `>= 100`to
+   * allow room for decreasing it.
+   * Defined in clob.clob_pair
+   */
+
+  subticksPerTick: number;
+  /**
+   * Minimum increment in the size of orders on the CLOB, in base quantums.
+   * Defined in clob.clob_pair
+   */
+
+  stepBaseQuantums: Long;
+  /**
+   * The liquidity_tier that this perpetual is associated with.
+   * Defined in perpetuals.perpetual
+   */
+
+  liquidityTier: number;
+  /** Market type of the perpetual. */
+
+  marketType: PerpetualMarketType;
+}
+/**
+ * PerpetualMarketCreateEventV2 message contains all the information about a
+ * new Perpetual Market on the dYdX chain.
+ */
+
+export interface PerpetualMarketCreateEventV2SDKType {
+  /**
+   * Unique Perpetual id.
+   * Defined in perpetuals.perpetual
+   */
+  id: number;
+  /**
+   * Unique clob pair Id associated with this perpetual market
+   * Defined in clob.clob_pair
+   */
+
+  clob_pair_id: number;
+  /**
+   * The name of the `Perpetual` (e.g. `BTC-USD`).
+   * Defined in perpetuals.perpetual
+   */
+
+  ticker: string;
+  /**
+   * Unique id of market param associated with this perpetual market.
+   * Defined in perpetuals.perpetual
+   */
+
+  market_id: number;
+  /** Status of the CLOB */
+
+  status: ClobPairStatusSDKType;
+  /**
+   * `10^Exponent` gives the number of QuoteQuantums traded per BaseQuantum
+   * per Subtick.
+   * Defined in clob.clob_pair
+   */
+
+  quantum_conversion_exponent: number;
+  /**
+   * The exponent for converting an atomic amount (`size = 1`)
+   * to a full coin. For example, if `AtomicResolution = -8`
+   * then a `PerpetualPosition` with `size = 1e8` is equivalent to
+   * a position size of one full coin.
+   * Defined in perpetuals.perpetual
+   */
+
+  atomic_resolution: number;
+  /**
+   * Defines the tick size of the orderbook by defining how many subticks
+   * are in one tick. That is, the subticks of any valid order must be a
+   * multiple of this value. Generally this value should start `>= 100`to
+   * allow room for decreasing it.
+   * Defined in clob.clob_pair
+   */
+
+  subticks_per_tick: number;
+  /**
+   * Minimum increment in the size of orders on the CLOB, in base quantums.
+   * Defined in clob.clob_pair
+   */
+
+  step_base_quantums: Long;
+  /**
+   * The liquidity_tier that this perpetual is associated with.
+   * Defined in perpetuals.perpetual
+   */
+
+  liquidity_tier: number;
+  /** Market type of the perpetual. */
+
+  market_type: PerpetualMarketTypeSDKType;
 }
 /**
  * LiquidityTierUpsertEventV1 message contains all the information to
@@ -1063,7 +1249,11 @@ export interface UpdateClobPairEventV1SDKType {
 /**
  * UpdatePerpetualEventV1 message contains all the information about an update
  * to a perpetual on the dYdX chain.
+ * Deprecated. See UpdatePerpetualEventV2 for the most up to date message
+ * for the event to update a perpetual.
  */
+
+/** @deprecated */
 
 export interface UpdatePerpetualEventV1 {
   /**
@@ -1102,7 +1292,11 @@ export interface UpdatePerpetualEventV1 {
 /**
  * UpdatePerpetualEventV1 message contains all the information about an update
  * to a perpetual on the dYdX chain.
+ * Deprecated. See UpdatePerpetualEventV2 for the most up to date message
+ * for the event to update a perpetual.
  */
+
+/** @deprecated */
 
 export interface UpdatePerpetualEventV1SDKType {
   /**
@@ -1137,6 +1331,90 @@ export interface UpdatePerpetualEventV1SDKType {
    */
 
   liquidity_tier: number;
+}
+/**
+ * UpdatePerpetualEventV2 message contains all the information about an update
+ * to a perpetual on the dYdX chain.
+ */
+
+export interface UpdatePerpetualEventV2 {
+  /**
+   * Unique Perpetual id.
+   * Defined in perpetuals.perpetual
+   */
+  id: number;
+  /**
+   * The name of the `Perpetual` (e.g. `BTC-USD`).
+   * Defined in perpetuals.perpetual
+   */
+
+  ticker: string;
+  /**
+   * Unique id of market param associated with this perpetual market.
+   * Defined in perpetuals.perpetual
+   */
+
+  marketId: number;
+  /**
+   * The exponent for converting an atomic amount (`size = 1`)
+   * to a full coin. For example, if `AtomicResolution = -8`
+   * then a `PerpetualPosition` with `size = 1e8` is equivalent to
+   * a position size of one full coin.
+   * Defined in perpetuals.perpetual
+   */
+
+  atomicResolution: number;
+  /**
+   * The liquidity_tier that this perpetual is associated with.
+   * Defined in perpetuals.perpetual
+   */
+
+  liquidityTier: number;
+  /** Market type of the perpetual. */
+
+  marketType: PerpetualMarketType;
+}
+/**
+ * UpdatePerpetualEventV2 message contains all the information about an update
+ * to a perpetual on the dYdX chain.
+ */
+
+export interface UpdatePerpetualEventV2SDKType {
+  /**
+   * Unique Perpetual id.
+   * Defined in perpetuals.perpetual
+   */
+  id: number;
+  /**
+   * The name of the `Perpetual` (e.g. `BTC-USD`).
+   * Defined in perpetuals.perpetual
+   */
+
+  ticker: string;
+  /**
+   * Unique id of market param associated with this perpetual market.
+   * Defined in perpetuals.perpetual
+   */
+
+  market_id: number;
+  /**
+   * The exponent for converting an atomic amount (`size = 1`)
+   * to a full coin. For example, if `AtomicResolution = -8`
+   * then a `PerpetualPosition` with `size = 1e8` is equivalent to
+   * a position size of one full coin.
+   * Defined in perpetuals.perpetual
+   */
+
+  atomic_resolution: number;
+  /**
+   * The liquidity_tier that this perpetual is associated with.
+   * Defined in perpetuals.perpetual
+   */
+
+  liquidity_tier: number;
+  /** Market type of the perpetual. */
+
+  market_type: PerpetualMarketTypeSDKType;
 }
 /**
  * TradingRewardsEventV1 is communicates all trading rewards for all accounts
@@ -1185,6 +1463,178 @@ export interface AddressTradingRewardSDKType {
    */
 
   denom_amount: Uint8Array;
+}
+/**
+ * OpenInterestUpdateEventV1 is used for open interest update events
+ * Deprecated.
+ */
+
+/** @deprecated */
+
+export interface OpenInterestUpdateEventV1 {
+  openInterestUpdates: OpenInterestUpdate[];
+}
+/**
+ * OpenInterestUpdateEventV1 is used for open interest update events
+ * Deprecated.
+ */
+
+/** @deprecated */
+
+export interface OpenInterestUpdateEventV1SDKType {
+  open_interest_updates: OpenInterestUpdateSDKType[];
+}
+/**
+ * OpenInterestUpdate contains a single open interest update for a perpetual
+ * Deprecated.
+ */
+
+/** @deprecated */
+
+export interface OpenInterestUpdate {
+  perpetualId: number;
+  /** The new open interest value for the perpetual market. */
+
+  openInterest: Uint8Array;
+}
+/**
+ * OpenInterestUpdate contains a single open interest update for a perpetual
+ * Deprecated.
+ */
+
+/** @deprecated */
+
+export interface OpenInterestUpdateSDKType {
+  perpetual_id: number;
+  /** The new open interest value for the perpetual market. */
+
+  open_interest: Uint8Array;
+}
+/**
+ * LiquidationEventV2 message contains all the information needed to update
+ * the liquidity tiers. It contains all the fields from V1 along with the
+ * open interest caps.
+ */
+
+export interface LiquidityTierUpsertEventV2 {
+  /** Unique id. */
+  id: number;
+  /** The name of the tier purely for mnemonic purposes, e.g. "Gold". */
+
+  name: string;
+  /**
+   * The margin fraction needed to open a position.
+   * In parts-per-million.
+   */
+
+  initialMarginPpm: number;
+  /**
+   * The fraction of the initial-margin that the maintenance-margin is,
+   * e.g. 50%. In parts-per-million.
+   */
+
+  maintenanceFractionPpm: number;
+  /**
+   * The maximum position size at which the margin requirements are
+   * not increased over the default values. Above this position size,
+   * the margin requirements increase at a rate of sqrt(size).
+   * 
+   * Deprecated since v3.x.
+   */
+
+  /** @deprecated */
+
+  basePositionNotional: Long;
+  /** Lower cap of open interest in quote quantums. optional */
+
+  openInterestLowerCap: Long;
+  /** Upper cap of open interest in quote quantums. */
+
+  openInterestUpperCap: Long;
+}
+/**
+ * LiquidationEventV2 message contains all the information needed to update
+ * the liquidity tiers. It contains all the fields from V1 along with the
+ * open interest caps.
+ */
+
+export interface LiquidityTierUpsertEventV2SDKType {
+  /** Unique id. */
+  id: number;
+  /** The name of the tier purely for mnemonic purposes, e.g. "Gold". */
+
+  name: string;
+  /**
+   * The margin fraction needed to open a position.
+   * In parts-per-million.
+   */
+
+  initial_margin_ppm: number;
+  /**
+   * The fraction of the initial-margin that the maintenance-margin is,
+   * e.g. 50%. In parts-per-million.
+   */
+
+  maintenance_fraction_ppm: number;
+  /**
+   * The maximum position size at which the margin requirements are
+   * not increased over the default values. Above this position size,
+   * the margin requirements increase at a rate of sqrt(size).
+   * 
+   * Deprecated since v3.x.
+   */
+
+  /** @deprecated */
+
+  base_position_notional: Long;
+  /** Lower cap of open interest in quote quantums. optional */
+
+  open_interest_lower_cap: Long;
+  /** Upper cap of open interest in quote quantums. */
+
+  open_interest_upper_cap: Long;
+}
+/** Event emitted when a referee is registered with an affiliate. */
+
+export interface RegisterAffiliateEventV1 {
+  /** Address of the referee being registered. */
+  referee: string;
+  /** Address of the affiliate associated with the referee. */
+
+  affiliate: string;
+}
+/** Event emitted when a referee is registered with an affiliate. */
+
+export interface RegisterAffiliateEventV1SDKType {
+  /** Address of the referee being registered. */
+  referee: string;
+  /** Address of the affiliate associated with the referee. */
+
+  affiliate: string;
+}
+/** Event emitted when a vault is created / updated. */
+
+export interface UpsertVaultEventV1 {
+  /** Address of the vault. */
+  address: string;
+  /** Clob pair Id associated with the vault. */
+
+  clobPairId: number;
+  /** Status of the vault. */
+
+  status: VaultStatus;
+}
+/** Event emitted when a vault is created / updated. */
+
+export interface UpsertVaultEventV1SDKType {
+  /** Address of the vault. */
+  address: string;
+  /** Clob pair Id associated with the vault. */
+
+  clob_pair_id: number;
+  /** Status of the vault. */
+
+  status: VaultStatusSDKType;
 }
 
 function createBaseFundingUpdateV1(): FundingUpdateV1 {
@@ -1741,7 +2191,8 @@ function createBaseOrderFillEventV1(): OrderFillEventV1 {
     makerFee: Long.ZERO,
     takerFee: Long.ZERO,
     totalFilledMaker: Long.UZERO,
-    totalFilledTaker: Long.UZERO
+    totalFilledTaker: Long.UZERO,
+    affiliateRevShare: Long.UZERO
   };
 }
 
@@ -1777,6 +2228,10 @@ export const OrderFillEventV1 = {
 
     if (!message.totalFilledTaker.isZero()) {
       writer.uint32(64).uint64(message.totalFilledTaker);
+    }
+
+    if (!message.affiliateRevShare.isZero()) {
+      writer.uint32(72).uint64(message.affiliateRevShare);
     }
 
     return writer;
@@ -1823,6 +2278,10 @@ export const OrderFillEventV1 = {
           message.totalFilledTaker = (reader.uint64() as Long);
           break;
 
+        case 9:
+          message.affiliateRevShare = (reader.uint64() as Long);
+          break;
+
         default:
           reader.skipType(tag & 7);
           break;
@@ -1842,6 +2301,7 @@ export const OrderFillEventV1 = {
     message.takerFee = object.takerFee !== undefined && object.takerFee !== null ? Long.fromValue(object.takerFee) : Long.ZERO;
     message.totalFilledMaker = object.totalFilledMaker !== undefined && object.totalFilledMaker !== null ? Long.fromValue(object.totalFilledMaker) : Long.UZERO;
     message.totalFilledTaker = object.totalFilledTaker !== undefined && object.totalFilledTaker !== null ? Long.fromValue(object.totalFilledTaker) : Long.UZERO;
+    message.affiliateRevShare = object.affiliateRevShare !== undefined && object.affiliateRevShare !== null ? Long.fromValue(object.affiliateRevShare) : Long.UZERO;
     return message;
   }
 
@@ -2118,7 +2578,8 @@ function createBaseStatefulOrderEventV1(): StatefulOrderEventV1 {
     orderRemoval: undefined,
     conditionalOrderPlacement: undefined,
     conditionalOrderTriggered: undefined,
-    longTermOrderPlacement: undefined
+    longTermOrderPlacement: undefined,
+    orderReplacement: undefined
   };
 }
 
@@ -2142,6 +2603,10 @@ export const StatefulOrderEventV1 = {
 
     if (message.longTermOrderPlacement !== undefined) {
       StatefulOrderEventV1_LongTermOrderPlacementV1.encode(message.longTermOrderPlacement, writer.uint32(58).fork()).ldelim();
+    }
+
+    if (message.orderReplacement !== undefined) {
+      StatefulOrderEventV1_LongTermOrderReplacementV1.encode(message.orderReplacement, writer.uint32(66).fork()).ldelim();
     }
 
     return writer;
@@ -2176,6 +2641,10 @@ export const StatefulOrderEventV1 = {
           message.longTermOrderPlacement = StatefulOrderEventV1_LongTermOrderPlacementV1.decode(reader, reader.uint32());
           break;
 
+        case 8:
+          message.orderReplacement = StatefulOrderEventV1_LongTermOrderReplacementV1.decode(reader, reader.uint32());
+          break;
+
         default:
           reader.skipType(tag & 7);
           break;
@@ -2192,6 +2661,7 @@ export const StatefulOrderEventV1 = {
     message.conditionalOrderPlacement = object.conditionalOrderPlacement !== undefined && object.conditionalOrderPlacement !== null ? StatefulOrderEventV1_ConditionalOrderPlacementV1.fromPartial(object.conditionalOrderPlacement) : undefined;
     message.conditionalOrderTriggered = object.conditionalOrderTriggered !== undefined && object.conditionalOrderTriggered !== null ? StatefulOrderEventV1_ConditionalOrderTriggeredV1.fromPartial(object.conditionalOrderTriggered) : undefined;
     message.longTermOrderPlacement = object.longTermOrderPlacement !== undefined && object.longTermOrderPlacement !== null ? StatefulOrderEventV1_LongTermOrderPlacementV1.fromPartial(object.longTermOrderPlacement) : undefined;
+    message.orderReplacement = object.orderReplacement !== undefined && object.orderReplacement !== null ? StatefulOrderEventV1_LongTermOrderReplacementV1.fromPartial(object.orderReplacement) : undefined;
     return message;
   }
 
@@ -2432,6 +2902,61 @@ export const StatefulOrderEventV1_LongTermOrderPlacementV1 = {
 
 };
 
+function createBaseStatefulOrderEventV1_LongTermOrderReplacementV1(): StatefulOrderEventV1_LongTermOrderReplacementV1 {
+  return {
+    oldOrderId: undefined,
+    order: undefined
+  };
+}
+
+export const StatefulOrderEventV1_LongTermOrderReplacementV1 = {
+  encode(message: StatefulOrderEventV1_LongTermOrderReplacementV1, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.oldOrderId !== undefined) {
+      IndexerOrderId.encode(message.oldOrderId, writer.uint32(10).fork()).ldelim();
+    }
+
+    if (message.order !== undefined) {
+      IndexerOrder.encode(message.order, writer.uint32(18).fork()).ldelim();
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StatefulOrderEventV1_LongTermOrderReplacementV1 {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStatefulOrderEventV1_LongTermOrderReplacementV1();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.oldOrderId = IndexerOrderId.decode(reader, reader.uint32());
+          break;
+
+        case 2:
+          message.order = IndexerOrder.decode(reader, reader.uint32());
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<StatefulOrderEventV1_LongTermOrderReplacementV1>): StatefulOrderEventV1_LongTermOrderReplacementV1 {
+    const message = createBaseStatefulOrderEventV1_LongTermOrderReplacementV1();
+    message.oldOrderId = object.oldOrderId !== undefined && object.oldOrderId !== null ? IndexerOrderId.fromPartial(object.oldOrderId) : undefined;
+    message.order = object.order !== undefined && object.order !== null ? IndexerOrder.fromPartial(object.order) : undefined;
+    return message;
+  }
+
+};
+
 function createBaseAssetCreateEventV1(): AssetCreateEventV1 {
   return {
     id: 0,
@@ -2647,6 +3172,151 @@ export const PerpetualMarketCreateEventV1 = {
     message.subticksPerTick = object.subticksPerTick ?? 0;
     message.stepBaseQuantums = object.stepBaseQuantums !== undefined && object.stepBaseQuantums !== null ? Long.fromValue(object.stepBaseQuantums) : Long.UZERO;
     message.liquidityTier = object.liquidityTier ?? 0;
+    return message;
+  }
+
+};
+
+function createBasePerpetualMarketCreateEventV2(): PerpetualMarketCreateEventV2 {
+  return {
+    id: 0,
+    clobPairId: 0,
+    ticker: "",
+    marketId: 0,
+    status: 0,
+    quantumConversionExponent: 0,
+    atomicResolution: 0,
+    subticksPerTick: 0,
+    stepBaseQuantums: Long.UZERO,
+    liquidityTier: 0,
+    marketType: 0
+  };
+}
+
+export const PerpetualMarketCreateEventV2 = {
+  encode(message: PerpetualMarketCreateEventV2, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.id !== 0) {
+      writer.uint32(8).uint32(message.id);
+    }
+
+    if (message.clobPairId !== 0) {
+      writer.uint32(16).uint32(message.clobPairId);
+    }
+
+    if (message.ticker !== "") {
+      writer.uint32(26).string(message.ticker);
+    }
+
+    if (message.marketId !== 0) {
+      writer.uint32(32).uint32(message.marketId);
+    }
+
+    if (message.status !== 0) {
+      writer.uint32(40).int32(message.status);
+    }
+
+    if (message.quantumConversionExponent !== 0) {
+      writer.uint32(48).sint32(message.quantumConversionExponent);
+    }
+
+    if (message.atomicResolution !== 0) {
+      writer.uint32(56).sint32(message.atomicResolution);
+    }
+
+    if (message.subticksPerTick !== 0) {
+      writer.uint32(64).uint32(message.subticksPerTick);
+    }
+
+    if (!message.stepBaseQuantums.isZero()) {
+      writer.uint32(72).uint64(message.stepBaseQuantums);
+    }
+
+    if (message.liquidityTier !== 0) {
+      writer.uint32(80).uint32(message.liquidityTier);
+    }
+
+    if (message.marketType !== 0) {
+      writer.uint32(88).int32(message.marketType);
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): PerpetualMarketCreateEventV2 {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePerpetualMarketCreateEventV2();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.id = reader.uint32();
+          break;
+
+        case 2:
+          message.clobPairId = reader.uint32();
+          break;
+
+        case 3:
+          message.ticker = reader.string();
+          break;
+
+        case 4:
+          message.marketId = reader.uint32();
+          break;
+
+        case 5:
+          message.status = (reader.int32() as any);
+          break;
+
+        case 6:
+          message.quantumConversionExponent = reader.sint32();
+          break;
+
+        case 7:
+          message.atomicResolution = reader.sint32();
+          break;
+
+        case 8:
+          message.subticksPerTick = reader.uint32();
+          break;
+
+        case 9:
+          message.stepBaseQuantums = (reader.uint64() as Long);
+          break;
+
+        case 10:
+          message.liquidityTier = reader.uint32();
+          break;
+
+        case 11:
+          message.marketType = (reader.int32() as any);
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<PerpetualMarketCreateEventV2>): PerpetualMarketCreateEventV2 {
+    const message = createBasePerpetualMarketCreateEventV2();
+    message.id = object.id ?? 0;
+    message.clobPairId = object.clobPairId ?? 0;
+    message.ticker = object.ticker ?? "";
+    message.marketId = object.marketId ?? 0;
+    message.status = object.status ?? 0;
+    message.quantumConversionExponent = object.quantumConversionExponent ?? 0;
+    message.atomicResolution = object.atomicResolution ?? 0;
+    message.subticksPerTick = object.subticksPerTick ?? 0;
+    message.stepBaseQuantums = object.stepBaseQuantums !== undefined && object.stepBaseQuantums !== null ? Long.fromValue(object.stepBaseQuantums) : Long.UZERO;
+    message.liquidityTier = object.liquidityTier ?? 0;
+    message.marketType = object.marketType ?? 0;
     return message;
   }
 
@@ -2907,6 +3577,101 @@ export const UpdatePerpetualEventV1 = {
 
 };
 
+function createBaseUpdatePerpetualEventV2(): UpdatePerpetualEventV2 {
+  return {
+    id: 0,
+    ticker: "",
+    marketId: 0,
+    atomicResolution: 0,
+    liquidityTier: 0,
+    marketType: 0
+  };
+}
+
+export const UpdatePerpetualEventV2 = {
+  encode(message: UpdatePerpetualEventV2, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.id !== 0) {
+      writer.uint32(8).uint32(message.id);
+    }
+
+    if (message.ticker !== "") {
+      writer.uint32(18).string(message.ticker);
+    }
+
+    if (message.marketId !== 0) {
+      writer.uint32(24).uint32(message.marketId);
+    }
+
+    if (message.atomicResolution !== 0) {
+      writer.uint32(32).sint32(message.atomicResolution);
+    }
+
+    if (message.liquidityTier !== 0) {
+      writer.uint32(40).uint32(message.liquidityTier);
+    }
+
+    if (message.marketType !== 0) {
+      writer.uint32(48).int32(message.marketType);
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): UpdatePerpetualEventV2 {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdatePerpetualEventV2();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.id = reader.uint32();
+          break;
+
+        case 2:
+          message.ticker = reader.string();
+          break;
+
+        case 3:
+          message.marketId = reader.uint32();
+          break;
+
+        case 4:
+          message.atomicResolution = reader.sint32();
+          break;
+
+        case 5:
+          message.liquidityTier = reader.uint32();
+          break;
+
+        case 6:
+          message.marketType = (reader.int32() as any);
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<UpdatePerpetualEventV2>): UpdatePerpetualEventV2 {
+    const message = createBaseUpdatePerpetualEventV2();
+    message.id = object.id ?? 0;
+    message.ticker = object.ticker ?? "";
+    message.marketId = object.marketId ?? 0;
+    message.atomicResolution = object.atomicResolution ?? 0;
+    message.liquidityTier = object.liquidityTier ?? 0;
+    message.marketType = object.marketType ?? 0;
+    return message;
+  }
+
+};
+
 function createBaseTradingRewardsEventV1(): TradingRewardsEventV1 {
   return {
     tradingRewards: []
@@ -3002,6 +3767,331 @@ export const AddressTradingReward = {
     const message = createBaseAddressTradingReward();
     message.owner = object.owner ?? "";
     message.denomAmount = object.denomAmount ?? new Uint8Array();
+    return message;
+  }
+
+};
+
+function createBaseOpenInterestUpdateEventV1(): OpenInterestUpdateEventV1 {
+  return {
+    openInterestUpdates: []
+  };
+}
+
+export const OpenInterestUpdateEventV1 = {
+  encode(message: OpenInterestUpdateEventV1, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.openInterestUpdates) {
+      OpenInterestUpdate.encode(v!, writer.uint32(10).fork()).ldelim();
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): OpenInterestUpdateEventV1 {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseOpenInterestUpdateEventV1();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.openInterestUpdates.push(OpenInterestUpdate.decode(reader, reader.uint32()));
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<OpenInterestUpdateEventV1>): OpenInterestUpdateEventV1 {
+    const message = createBaseOpenInterestUpdateEventV1();
+    message.openInterestUpdates = object.openInterestUpdates?.map(e => OpenInterestUpdate.fromPartial(e)) || [];
+    return message;
+  }
+
+};
+
+function createBaseOpenInterestUpdate(): OpenInterestUpdate {
+  return {
+    perpetualId: 0,
+    openInterest: new Uint8Array()
+  };
+}
+
+export const OpenInterestUpdate = {
+  encode(message: OpenInterestUpdate, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.perpetualId !== 0) {
+      writer.uint32(8).uint32(message.perpetualId);
+    }
+
+    if (message.openInterest.length !== 0) {
+      writer.uint32(18).bytes(message.openInterest);
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): OpenInterestUpdate {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseOpenInterestUpdate();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.perpetualId = reader.uint32();
+          break;
+
+        case 2:
+          message.openInterest = reader.bytes();
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<OpenInterestUpdate>): OpenInterestUpdate {
+    const message = createBaseOpenInterestUpdate();
+    message.perpetualId = object.perpetualId ?? 0;
+    message.openInterest = object.openInterest ?? new Uint8Array();
+    return message;
+  }
+
+};
+
+function createBaseLiquidityTierUpsertEventV2(): LiquidityTierUpsertEventV2 {
+  return {
+    id: 0,
+    name: "",
+    initialMarginPpm: 0,
+    maintenanceFractionPpm: 0,
+    basePositionNotional: Long.UZERO,
+    openInterestLowerCap: Long.UZERO,
+    openInterestUpperCap: Long.UZERO
+  };
+}
+
+export const LiquidityTierUpsertEventV2 = {
+  encode(message: LiquidityTierUpsertEventV2, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.id !== 0) {
+      writer.uint32(8).uint32(message.id);
+    }
+
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+
+    if (message.initialMarginPpm !== 0) {
+      writer.uint32(24).uint32(message.initialMarginPpm);
+    }
+
+    if (message.maintenanceFractionPpm !== 0) {
+      writer.uint32(32).uint32(message.maintenanceFractionPpm);
+    }
+
+    if (!message.basePositionNotional.isZero()) {
+      writer.uint32(40).uint64(message.basePositionNotional);
+    }
+
+    if (!message.openInterestLowerCap.isZero()) {
+      writer.uint32(48).uint64(message.openInterestLowerCap);
+    }
+
+    if (!message.openInterestUpperCap.isZero()) {
+      writer.uint32(56).uint64(message.openInterestUpperCap);
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): LiquidityTierUpsertEventV2 {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLiquidityTierUpsertEventV2();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.id = reader.uint32();
+          break;
+
+        case 2:
+          message.name = reader.string();
+          break;
+
+        case 3:
+          message.initialMarginPpm = reader.uint32();
+          break;
+
+        case 4:
+          message.maintenanceFractionPpm = reader.uint32();
+          break;
+
+        case 5:
+          message.basePositionNotional = (reader.uint64() as Long);
+          break;
+
+        case 6:
+          message.openInterestLowerCap = (reader.uint64() as Long);
+          break;
+
+        case 7:
+          message.openInterestUpperCap = (reader.uint64() as Long);
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<LiquidityTierUpsertEventV2>): LiquidityTierUpsertEventV2 {
+    const message = createBaseLiquidityTierUpsertEventV2();
+    message.id = object.id ?? 0;
+    message.name = object.name ?? "";
+    message.initialMarginPpm = object.initialMarginPpm ?? 0;
+    message.maintenanceFractionPpm = object.maintenanceFractionPpm ?? 0;
+    message.basePositionNotional = object.basePositionNotional !== undefined && object.basePositionNotional !== null ? Long.fromValue(object.basePositionNotional) : Long.UZERO;
+    message.openInterestLowerCap = object.openInterestLowerCap !== undefined && object.openInterestLowerCap !== null ? Long.fromValue(object.openInterestLowerCap) : Long.UZERO;
+    message.openInterestUpperCap = object.openInterestUpperCap !== undefined && object.openInterestUpperCap !== null ? Long.fromValue(object.openInterestUpperCap) : Long.UZERO;
+    return message;
+  }
+
+};
+
+function createBaseRegisterAffiliateEventV1(): RegisterAffiliateEventV1 {
+  return {
+    referee: "",
+    affiliate: ""
+  };
+}
+
+export const RegisterAffiliateEventV1 = {
+  encode(message: RegisterAffiliateEventV1, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.referee !== "") {
+      writer.uint32(10).string(message.referee);
+    }
+
+    if (message.affiliate !== "") {
+      writer.uint32(18).string(message.affiliate);
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RegisterAffiliateEventV1 {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRegisterAffiliateEventV1();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.referee = reader.string();
+          break;
+
+        case 2:
+          message.affiliate = reader.string();
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<RegisterAffiliateEventV1>): RegisterAffiliateEventV1 {
+    const message = createBaseRegisterAffiliateEventV1();
+    message.referee = object.referee ?? "";
+    message.affiliate = object.affiliate ?? "";
+    return message;
+  }
+
+};
+
+function createBaseUpsertVaultEventV1(): UpsertVaultEventV1 {
+  return {
+    address: "",
+    clobPairId: 0,
+    status: 0
+  };
+}
+
+export const UpsertVaultEventV1 = {
+  encode(message: UpsertVaultEventV1, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.address !== "") {
+      writer.uint32(10).string(message.address);
+    }
+
+    if (message.clobPairId !== 0) {
+      writer.uint32(16).uint32(message.clobPairId);
+    }
+
+    if (message.status !== 0) {
+      writer.uint32(24).int32(message.status);
+    }
+
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): UpsertVaultEventV1 {
+    const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpsertVaultEventV1();
+
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+
+      switch (tag >>> 3) {
+        case 1:
+          message.address = reader.string();
+          break;
+
+        case 2:
+          message.clobPairId = reader.uint32();
+          break;
+
+        case 3:
+          message.status = (reader.int32() as any);
+          break;
+
+        default:
+          reader.skipType(tag & 7);
+          break;
+      }
+    }
+
+    return message;
+  },
+
+  fromPartial(object: DeepPartial<UpsertVaultEventV1>): UpsertVaultEventV1 {
+    const message = createBaseUpsertVaultEventV1();
+    message.address = object.address ?? "";
+    message.clobPairId = object.clobPairId ?? 0;
+    message.status = object.status ?? 0;
     return message;
   }
 

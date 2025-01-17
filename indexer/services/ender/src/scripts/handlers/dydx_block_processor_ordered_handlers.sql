@@ -23,11 +23,16 @@ DECLARE
     event_index int;
     transaction_index int;
     event_data jsonb;
+    -- Latency tracking variables
+    event_start_time timestamp;
+    event_end_time timestamp;
+    event_latency interval;
 BEGIN
     rval = array_fill(NULL::jsonb, ARRAY[coalesce(jsonb_array_length(block->'events'), 0)]::integer[]);
 
     /** Note that arrays are 1-indexed in PostgreSQL and empty arrays return NULL for array_length. */
     FOR i in 1..coalesce(array_length(rval, 1), 0) LOOP
+        event_start_time := clock_timestamp();
         event_ = jsonb_array_element(block->'events', i-1);
         transaction_index = dydx_tendermint_event_to_transaction_index(event_);
         event_index = (event_->'eventIndex')::int;
@@ -46,18 +51,46 @@ BEGIN
             WHEN '"asset"'::jsonb THEN
                 rval[i] = dydx_asset_create_handler(event_data);
             WHEN '"perpetual_market"'::jsonb THEN
-                rval[i] = dydx_perpetual_market_handler(event_data);
+                CASE (event_->'version')::int
+                    WHEN 1 THEN
+                        rval[i] = dydx_perpetual_market_v1_handler(event_data);
+                    WHEN 2 THEN
+                        rval[i] = dydx_perpetual_market_v2_handler(event_data);
+                    ELSE
+                        NULL;
+                END CASE;
             WHEN '"liquidity_tier"'::jsonb THEN
                 rval[i] = dydx_liquidity_tier_handler(event_data);
             WHEN '"update_perpetual"'::jsonb THEN
-                rval[i] = dydx_update_perpetual_handler(event_data);
+                CASE (event_->'version')::int
+                    WHEN 1 THEN
+                        rval[i] = dydx_update_perpetual_v1_handler(event_data);
+                    WHEN 2 THEN
+                        rval[i] = dydx_update_perpetual_v2_handler(event_data);
+                    ELSE
+                        NULL;
+                END CASE;
             WHEN '"update_clob_pair"'::jsonb THEN
                 rval[i] = dydx_update_clob_pair_handler(event_data);
             WHEN '"funding_values"'::jsonb THEN
                 rval[i] = dydx_funding_handler(block_height, block_time, event_data, event_index, transaction_index);
+            WHEN '"upsert_vault"'::jsonb THEN
+                rval[i] = dydx_vault_upsert_handler(block_time, event_data);
+            WHEN '"skipped_event"'::jsonb THEN
+                rval[i] = jsonb_build_object();
             ELSE
                 NULL;
             END CASE;
+
+            event_end_time := clock_timestamp();
+            event_latency := event_end_time - event_start_time;
+
+            -- Add the event latency in ms to the rval output for this event
+            rval[i] := jsonb_set(
+                rval[i],
+                '{latency}',
+                to_jsonb(EXTRACT(EPOCH FROM event_latency) * 1000)
+            );
     END LOOP;
 
     RETURN rval;

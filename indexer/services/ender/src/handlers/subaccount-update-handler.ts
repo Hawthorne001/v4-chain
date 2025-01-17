@@ -1,12 +1,12 @@
+import { stats } from '@dydxprotocol-indexer/base';
 import {
   AssetPositionFromDatabase,
   AssetPositionModel,
   assetRefresher,
   AssetsMap,
-  MarketColumns,
   MarketFromDatabase,
+  MarketModel,
   MarketsMap,
-  MarketTable,
   perpetualMarketRefresher,
   PerpetualMarketsMap,
   PerpetualPositionModel,
@@ -17,6 +17,7 @@ import {
 import _ from 'lodash';
 import * as pg from 'pg';
 
+import config from '../config';
 import { SUBACCOUNT_ORDER_FILL_EVENT_TYPE } from '../constants';
 import { addPositionsToContents, annotateWithPnl } from '../helpers/kafka-helper';
 import { SubaccountUpdate } from '../lib/translated-types';
@@ -36,6 +37,7 @@ export class SubaccountUpdateHandler extends Handler<SubaccountUpdate> {
     ];
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   public async internalHandle(resultRow: pg.QueryResultRow): Promise<ConsolidatedKafkaEvent[]> {
     const updateObjects: UpdatedPerpetualPositionSubaccountKafkaObject[] = _.map(
       resultRow.perpetual_positions,
@@ -46,22 +48,27 @@ export class SubaccountUpdateHandler extends Handler<SubaccountUpdate> {
       resultRow.asset_positions,
       (value) => AssetPositionModel.fromJson(value) as AssetPositionFromDatabase,
     );
-    const markets: MarketFromDatabase[] = await MarketTable.findAll(
-      {},
-      [],
-      { txId: this.txId },
+    const marketIdToMarket: MarketsMap = _.mapValues(
+      resultRow.markets,
+      (value) => MarketModel.fromJson(value) as MarketFromDatabase,
     );
-    const marketIdToMarket: MarketsMap = _.keyBy(
-      markets,
-      MarketColumns.id,
-    );
+
     for (let i = 0; i < updateObjects.length; i++) {
+      const marketId: number = perpetualMarketRefresher.getPerpetualMarketsMap()[
+        updateObjects[i].perpetualId
+      ].marketId;
       updateObjects[i] = annotateWithPnl(
         updateObjects[i],
         perpetualMarketRefresher.getPerpetualMarketsMap(),
-        marketIdToMarket,
+        marketIdToMarket[marketId],
       );
     }
+    // Handle latency from resultRow
+    stats.timing(
+      `${config.SERVICE_NAME}.handle_subaccount_update_event.sql_latency`,
+      Number(resultRow.latency),
+      this.generateTimingStatsOptions(),
+    );
 
     return [
       this.generateConsolidatedKafkaEvent(
@@ -91,6 +98,7 @@ export class SubaccountUpdateHandler extends Handler<SubaccountUpdate> {
       perpetualMarketsMapping,
       updatedAssetPositions,
       assetsMap,
+      this.block.height.toString(),
     );
 
     return this.generateConsolidatedSubaccountKafkaEvent(

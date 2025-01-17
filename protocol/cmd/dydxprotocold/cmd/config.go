@@ -54,6 +54,12 @@ func initAppConfig() (string, *DydxAppConfig) {
 
 	appConfig := DydxAppConfig{
 		Config: *srvCfg,
+		Oracle: oracleconfig.AppConfig{
+			Enabled:        true,
+			OracleAddress:  "localhost:8080",
+			ClientTimeout:  time.Second * 2,
+			MetricsEnabled: false,
+		},
 	}
 
 	// Enable telemetry.
@@ -86,8 +92,8 @@ func initTendermintConfig() *tmcfg.Config {
 	// goroutine profiling showed that we were using exactly 900 threads (the default) which was throttling
 	// the maximum amount of load that the process could take. As of the last load test, at max QPS we were
 	// seeing ~1700 threads being used.
-	cfg.RPC.MaxOpenConnections = 4000
-	cfg.RPC.GRPCMaxOpenConnections = 4000
+	cfg.RPC.MaxOpenConnections = 8000
+	cfg.RPC.GRPCMaxOpenConnections = 8000
 
 	// Mempool config.
 	// We specifically are using a number greater than max QPS (currently set at 5000) * ShortBlockWindow to prevent

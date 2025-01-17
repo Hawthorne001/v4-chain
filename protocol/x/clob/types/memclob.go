@@ -19,13 +19,11 @@ type MemClob interface {
 		msgCancelOrder *MsgCancelOrder,
 	) (offchainUpdates *OffchainUpdates, err error)
 	CreateOrderbook(
-		ctx sdk.Context,
 		clobPair ClobPair,
 	)
-	CountSubaccountShortTermOrders(
-		ctx sdk.Context,
-		subaccountId satypes.SubaccountId,
-	) uint32
+	MaybeCreateOrderbook(
+		clobPair ClobPair,
+	) bool
 	GetOperationsToReplay(
 		ctx sdk.Context,
 	) (
@@ -39,11 +37,9 @@ type MemClob interface {
 		operationsQueue []OperationRaw,
 	)
 	GetOrder(
-		ctx sdk.Context,
 		orderId OrderId,
 	) (Order, bool)
 	GetCancelOrder(
-		ctx sdk.Context,
 		orderId OrderId,
 	) (uint32, bool)
 	GetOrderFilledAmount(
@@ -58,7 +54,6 @@ type MemClob interface {
 		hasRemainingAmount bool,
 	)
 	GetSubaccountOrders(
-		ctx sdk.Context,
 		clobPairId ClobPairId,
 		subaccountId satypes.SubaccountId,
 		side Order_Side,
@@ -115,6 +110,7 @@ type MemClob interface {
 		localOperations []InternalOperation,
 		shortTermOrderTxBytes map[OrderHash][]byte,
 		existingOffchainUpdates *OffchainUpdates,
+		postOnlyFilter bool,
 	) (offchainUpdates *OffchainUpdates)
 	SetMemclobGauges(
 		ctx sdk.Context,
@@ -129,7 +125,6 @@ type MemClob interface {
 		exists bool,
 	)
 	InsertZeroFillDeleveragingIntoOperationsQueue(
-		ctx sdk.Context,
 		subaccountId satypes.SubaccountId,
 		perpetualId uint32,
 	)
@@ -137,4 +132,22 @@ type MemClob interface {
 		ctx sdk.Context,
 		clobPairId ClobPairId,
 	) (offchainUpdates *OffchainUpdates)
+	GetOrderbookUpdatesForOrderPlacement(
+		ctx sdk.Context,
+		order Order,
+	) (offchainUpdates *OffchainUpdates)
+	GetOrderbookUpdatesForOrderRemoval(
+		ctx sdk.Context,
+		orderId OrderId,
+	) (offchainUpdates *OffchainUpdates)
+	GetOrderbookUpdatesForOrderUpdate(
+		ctx sdk.Context,
+		orderId OrderId,
+	) (offchainUpdates *OffchainUpdates)
+	GenerateStreamOrderbookFill(
+		ctx sdk.Context,
+		clobMatch ClobMatch,
+		takerOrder MatchableOrder,
+		makerOrders []Order,
+	) StreamOrderbookFill
 }

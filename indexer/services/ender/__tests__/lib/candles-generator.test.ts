@@ -25,14 +25,26 @@ import _ from 'lodash';
 import {
   clearCandlesMap, getCandlesMap, startCandleCache,
 } from '../../src/caches/candle-cache';
+import * as OrderbookMidPriceMemoryCache from '../../src/caches/orderbook-mid-price-memory-cache';
 import config from '../../src/config';
-import { CandlesGenerator } from '../../src/lib/candles-generator';
+import { CandlesGenerator, getOrderbookMidPriceMap } from '../../src/lib/candles-generator';
 import { KafkaPublisher } from '../../src/lib/kafka-publisher';
 import { ConsolidatedKafkaEvent } from '../../src/lib/types';
 import { defaultTradeContent, defaultTradeKafkaEvent } from '../helpers/constants';
 import { contentToSingleTradeMessage, createConsolidatedKafkaEventFromTrade } from '../helpers/kafka-publisher-helpers';
+import { redisClient } from '../../src/helpers/redis/redis-controller';
+import {
+  redis,
+} from '@dydxprotocol-indexer/redis';
+import { ORDERBOOK_MID_PRICES_CACHE_KEY_PREFIX } from '@dydxprotocol-indexer/redis/build/src/caches/orderbook-mid-prices-cache';
+import { DateTime, Settings } from 'luxon';
 
 describe('candleHelper', () => {
+  const startedAt: DateTime = helpers.calculateNormalizedCandleStartTime(
+    testConstants.createdDateTime,
+    CandleResolution.ONE_MINUTE,
+  );
+
   beforeAll(async () => {
     await dbHelpers.migrate();
     await dbHelpers.clearData();
@@ -42,18 +54,27 @@ describe('candleHelper', () => {
   beforeEach(async () => {
     await testMocks.seedData();
     await perpetualMarketRefresher.updatePerpetualMarkets();
+    Settings.now = () => startedAt.plus({ minutes: 30 }).valueOf();
   });
 
   afterEach(async () => {
     await dbHelpers.clearData();
     clearCandlesMap();
     jest.clearAllMocks();
+    await redis.deleteAllAsync(redisClient);
+    Settings.now = () => new Date().valueOf();
   });
 
   afterAll(async () => {
     await dbHelpers.teardown();
     jest.resetAllMocks();
   });
+
+  // Helper function to set a price for a given market ticker
+  const setCachePrice = (marketTicker: string, price: string) => {
+    const now = Date.now();
+    redisClient.zadd(`${ORDERBOOK_MID_PRICES_CACHE_KEY_PREFIX}${marketTicker}`, now, price);
+  };
 
   const defaultPrice: string = defaultTradeContent.price;
   const defaultPrice2: string = '15000';
@@ -71,11 +92,9 @@ describe('candleHelper', () => {
     ).toString(),
     trades: 2,
     startingOpenInterest: '0',
+    orderbookMidPriceClose: undefined,
+    orderbookMidPriceOpen: undefined,
   };
-  const startedAt: IsoString = helpers.calculateNormalizedCandleStartTime(
-    testConstants.createdDateTime,
-    CandleResolution.ONE_MINUTE,
-  ).toISO();
   const previousStartedAt: IsoString = helpers.calculateNormalizedCandleStartTime(
     testConstants.createdDateTime.minus({ minutes: 1 }),
     CandleResolution.ONE_MINUTE,
@@ -106,6 +125,12 @@ describe('candleHelper', () => {
       defaultTradeKafkaEvent2,
     ]);
 
+    const ticker = 'BTC-USD';
+    setCachePrice(ticker, '100000');
+    setCachePrice(ticker, '105000');
+    setCachePrice(ticker, '110000');
+    await OrderbookMidPriceMemoryCache.updateOrderbookMidPrices();
+
     await runUpdateCandles(publisher);
 
     // Verify postgres is updated
@@ -122,6 +147,8 @@ describe('candleHelper', () => {
           id: CandleTable.uuid(currentStartedAt, defaultCandle.ticker, resolution),
           startedAt: currentStartedAt,
           resolution,
+          orderbookMidPriceClose: '105000',
+          orderbookMidPriceOpen: '105000',
         };
       },
     );
@@ -141,6 +168,12 @@ describe('candleHelper', () => {
       defaultTradeKafkaEvent,
       defaultTradeKafkaEvent2,
     ]);
+
+    const ticker = 'BTC-USD';
+    setCachePrice(ticker, '80000');
+    setCachePrice(ticker, '81000');
+    setCachePrice(ticker, '80500');
+    await OrderbookMidPriceMemoryCache.updateOrderbookMidPrices();
 
     // Create Perpetual Position to set open position
     const openInterest: string = '100';
@@ -163,6 +196,8 @@ describe('candleHelper', () => {
           startedAt: currentStartedAt,
           resolution,
           startingOpenInterest: openInterest,
+          orderbookMidPriceClose: '80500',
+          orderbookMidPriceOpen: '80500',
         };
       },
     );
@@ -180,6 +215,8 @@ describe('candleHelper', () => {
     const startingOpenInterest: string = '200';
     const baseTokenVolume: string = '10';
     const usdVolume: string = Big(existingPrice).times(baseTokenVolume).toString();
+    const orderbookMidPriceClose = '7500';
+    const orderbookMidPriceOpen = '8000';
     await Promise.all(
       _.map(Object.values(CandleResolution), (resolution: CandleResolution) => {
         const currentStartedAt: IsoString = helpers.calculateNormalizedCandleStartTime(
@@ -199,6 +236,8 @@ describe('candleHelper', () => {
           usdVolume,
           trades: existingTrades,
           startingOpenInterest,
+          orderbookMidPriceClose,
+          orderbookMidPriceOpen,
         });
       }),
     );
@@ -234,6 +273,8 @@ describe('candleHelper', () => {
           usdVolume: Big(defaultCandle.usdVolume).plus(usdVolume).toString(),
           trades: existingTrades + 2,
           startingOpenInterest,
+          orderbookMidPriceClose,
+          orderbookMidPriceOpen,
         };
       },
     );
@@ -248,7 +289,7 @@ describe('candleHelper', () => {
 
   it.each([
     [
-      'creates empty candles', // description
+      'creates empty candle', // description
       { // initial candle
         startedAt: previousStartedAt,
         ticker: testConstants.defaultPerpetualMarket.ticker,
@@ -261,12 +302,14 @@ describe('candleHelper', () => {
         usdVolume: '10000',
         trades: existingTrades,
         startingOpenInterest: existingStartingOpenInterest,
+        orderbookMidPriceClose: undefined,
+        orderbookMidPriceOpen: undefined,
       },
       '100', // open interest
       false, // block contains trades
       { // expected candle
-        id: CandleTable.uuid(startedAt, defaultCandle.ticker, CandleResolution.ONE_MINUTE),
-        startedAt,
+        id: CandleTable.uuid(startedAt.toISO(), defaultCandle.ticker, CandleResolution.ONE_MINUTE),
+        startedAt: startedAt.toISO(),
         ticker: testConstants.defaultPerpetualMarket.ticker,
         resolution: CandleResolution.ONE_MINUTE,
         low: closePrice,
@@ -277,7 +320,11 @@ describe('candleHelper', () => {
         usdVolume: '0',
         trades: 0,
         startingOpenInterest: '100',
+        orderbookMidPriceClose: '1000',
+        orderbookMidPriceOpen: '1000',
       },
+      true,
+      1000,
     ],
     [
       'creates new candle if existing candle is from a past normalized candle start time', // description
@@ -293,21 +340,27 @@ describe('candleHelper', () => {
         usdVolume: '10000',
         trades: existingTrades,
         startingOpenInterest: existingStartingOpenInterest,
+        orderbookMidPriceClose: '3000',
+        orderbookMidPriceOpen: '3500',
       },
       '100', // open interest
       true, // block contains trades
       { // expected candle
         ...defaultCandle,
-        id: CandleTable.uuid(startedAt, defaultCandle.ticker, CandleResolution.ONE_MINUTE),
-        startedAt,
+        id: CandleTable.uuid(startedAt.toISO(), defaultCandle.ticker, CandleResolution.ONE_MINUTE),
+        startedAt: startedAt.toISO(),
         resolution: CandleResolution.ONE_MINUTE,
         startingOpenInterest: '100',
+        orderbookMidPriceClose: '1000',
+        orderbookMidPriceOpen: '1000',
       },
+      true, // contains kafka messages
+      1000, // orderbook mid price
     ],
     [
       'updates empty candle', // description
       { // initial candle
-        startedAt,
+        startedAt: startedAt.toISO(),
         ticker: testConstants.defaultPerpetualMarket.ticker,
         resolution: CandleResolution.ONE_MINUTE,
         low: closePrice,
@@ -318,28 +371,36 @@ describe('candleHelper', () => {
         usdVolume: '0',
         trades: 0,
         startingOpenInterest: existingStartingOpenInterest,
+        orderbookMidPriceClose: undefined,
+        orderbookMidPriceOpen: undefined,
       },
       '100', // open interest
       true, // block contains trades
       { // expected candle
         ...defaultCandle,
-        id: CandleTable.uuid(startedAt, defaultCandle.ticker, CandleResolution.ONE_MINUTE),
-        startedAt,
+        id: CandleTable.uuid(startedAt.toISO(), defaultCandle.ticker, CandleResolution.ONE_MINUTE),
+        startedAt: startedAt.toISO(),
         resolution: CandleResolution.ONE_MINUTE,
         startingOpenInterest: existingStartingOpenInterest,
+        orderbookMidPriceClose: null,
+        orderbookMidPriceOpen: null,
       },
+      true, // contains kafka messages
+      1000, // orderbook mid price
     ],
     [
       'does nothing when there are no trades and no existing candle', // description
-      undefined,
+      undefined, // initial candle
       '100', // open interest
       false, // block contains trades
-      undefined,
+      undefined, // expected candle
+      true, // contains kafka messages
+      1000, // orderbook mid price
     ],
     [
       'does not update candle when there are no trades and an existing candle', // description
       { // initial candle
-        startedAt,
+        startedAt: startedAt.toISO(),
         ticker: testConstants.defaultPerpetualMarket.ticker,
         resolution: CandleResolution.ONE_MINUTE,
         low: lowPrice,
@@ -350,12 +411,14 @@ describe('candleHelper', () => {
         usdVolume: '10000',
         trades: existingTrades,
         startingOpenInterest: existingStartingOpenInterest,
+        orderbookMidPriceClose: '5000',
+        orderbookMidPriceOpen: '6000',
       },
       '100', // open interest
       false, // block contains trades
       { // expected candle
-        id: CandleTable.uuid(startedAt, defaultCandle.ticker, CandleResolution.ONE_MINUTE),
-        startedAt,
+        id: CandleTable.uuid(startedAt.toISO(), defaultCandle.ticker, CandleResolution.ONE_MINUTE),
+        startedAt: startedAt.toISO(),
         ticker: testConstants.defaultPerpetualMarket.ticker,
         resolution: CandleResolution.ONE_MINUTE,
         low: lowPrice,
@@ -366,8 +429,11 @@ describe('candleHelper', () => {
         usdVolume: '10000',
         trades: existingTrades,
         startingOpenInterest: existingStartingOpenInterest,
+        orderbookMidPriceClose: '5000',
+        orderbookMidPriceOpen: '6000',
       },
       false, // contains kafka messages
+      1000,
     ],
   ])('Successfully %s', async (
     _description: string,
@@ -376,7 +442,11 @@ describe('candleHelper', () => {
     blockContainsTrades: boolean,
     expectedCandle: CandleFromDatabase | undefined,
     containsKafkaMessages: boolean = true,
+    orderbookMidPrice: number,
   ) => {
+    setCachePrice('BTC-USD', orderbookMidPrice.toFixed());
+    await OrderbookMidPriceMemoryCache.updateOrderbookMidPrices();
+
     if (initialCandle !== undefined) {
       await CandleTable.create(initialCandle);
     }
@@ -397,7 +467,7 @@ describe('candleHelper', () => {
 
     if (expectedCandle === undefined) {
       // Verify no candles in postgres and no kafka messages
-      await verifyNoCandleInPostgres(CandleResolution.ONE_MINUTE, startedAt);
+      await verifyNoCandleInPostgres(CandleResolution.ONE_MINUTE, startedAt.toISO());
       verifyNoCandlesKafkaMessages(publisher, CandleResolution.ONE_MINUTE);
     } else {
       const expectedCandles: CandleFromDatabase[] = [expectedCandle];
@@ -409,6 +479,224 @@ describe('candleHelper', () => {
 
     await validateCandlesCache();
     expectTimingStats();
+  });
+
+  it('Updates previous candle orderBookMidPriceClose if startTime is past candle resolution', async () => {
+    // Create existing candles
+    const existingPrice: string = '7000';
+    const startingOpenInterest: string = '200';
+    const baseTokenVolume: string = '10';
+    const usdVolume: string = Big(existingPrice).times(baseTokenVolume).toString();
+    const orderbookMidPriceClose = '7500';
+    const orderbookMidPriceOpen = '8000';
+    // Set candle start time to be far in the past to ensure all candles are new
+    const startTime: IsoString = helpers.calculateNormalizedCandleStartTime(
+      testConstants.createdDateTime.minus({ minutes: 100 }),
+      CandleResolution.ONE_MINUTE,
+    ).toUTC().toISO();
+
+    await Promise.all(
+      _.map(Object.values(CandleResolution), (resolution: CandleResolution) => {
+        return CandleTable.create({
+          startedAt: startTime,
+          ticker: testConstants.defaultPerpetualMarket.ticker,
+          resolution,
+          low: existingPrice,
+          high: existingPrice,
+          open: existingPrice,
+          close: existingPrice,
+          baseTokenVolume,
+          usdVolume,
+          trades: existingTrades,
+          startingOpenInterest,
+          orderbookMidPriceClose,
+          orderbookMidPriceOpen,
+        });
+      }),
+    );
+    await startCandleCache();
+
+    setCachePrice('BTC-USD', '10005');
+    await OrderbookMidPriceMemoryCache.updateOrderbookMidPrices();
+    // Add two trades for BTC-USD market
+    const publisher: KafkaPublisher = new KafkaPublisher();
+    publisher.addEvents([
+      defaultTradeKafkaEvent,
+      defaultTradeKafkaEvent2,
+    ]);
+
+    // Create new candles, with trades
+    await runUpdateCandles(publisher);
+
+    // Verify previous candles have orderbookMidPriceClose updated
+    const previousExpectedCandles: CandleFromDatabase[] = _.map(
+      Object.values(CandleResolution),
+      (resolution: CandleResolution) => {
+        return {
+          id: CandleTable.uuid(startTime, defaultCandle.ticker, resolution),
+          startedAt: startTime,
+          ticker: defaultCandle.ticker,
+          resolution,
+          low: existingPrice,
+          high: existingPrice,
+          open: existingPrice,
+          close: existingPrice,
+          baseTokenVolume,
+          usdVolume,
+          trades: existingTrades,
+          startingOpenInterest,
+          orderbookMidPriceClose: '10005',
+          orderbookMidPriceOpen,
+        };
+      },
+    );
+    await verifyCandlesInPostgres(previousExpectedCandles);
+
+    // Verify new candles were created
+    const expectedCandles: CandleFromDatabase[] = _.map(
+      Object.values(CandleResolution),
+      (resolution: CandleResolution) => {
+        const currentStartedAt: IsoString = helpers.calculateNormalizedCandleStartTime(
+          testConstants.createdDateTime,
+          resolution,
+        ).toISO();
+
+        return {
+          id: CandleTable.uuid(currentStartedAt, defaultCandle.ticker, resolution),
+          startedAt: currentStartedAt,
+          ticker: defaultCandle.ticker,
+          resolution,
+          low: '10000',
+          high: defaultPrice2,
+          open: '10000',
+          close: defaultPrice2,
+          baseTokenVolume: '20',
+          usdVolume: '250000',
+          trades: 2,
+          startingOpenInterest: '0',
+          orderbookMidPriceClose: '10005',
+          orderbookMidPriceOpen: '10005',
+        };
+      },
+    );
+    await verifyCandlesInPostgres(expectedCandles);
+    await validateCandlesCache();
+    expectTimingStats();
+  });
+
+  it('creates an empty candle and updates the previous candle orderBookMidPriceClose if startTime is past candle resolution', async () => {
+    // Create existing candles
+    const existingPrice: string = '7000';
+    const startingOpenInterest: string = '200';
+    const baseTokenVolume: string = '10';
+    const usdVolume: string = Big(existingPrice).times(baseTokenVolume).toString();
+    const orderbookMidPriceClose = '7500';
+    const orderbookMidPriceOpen = '8000';
+    // Set candle start time to be far in the past to ensure all candles are new
+    const startTime: IsoString = helpers.calculateNormalizedCandleStartTime(
+      testConstants.createdDateTime.minus({ minutes: 100 }),
+      CandleResolution.ONE_MINUTE,
+    ).toISO();
+
+    await Promise.all(
+      _.map(Object.values(CandleResolution), (resolution: CandleResolution) => {
+        return CandleTable.create({
+          startedAt: startTime,
+          ticker: testConstants.defaultPerpetualMarket.ticker,
+          resolution,
+          low: existingPrice,
+          high: existingPrice,
+          open: existingPrice,
+          close: existingPrice,
+          baseTokenVolume,
+          usdVolume,
+          trades: existingTrades,
+          startingOpenInterest,
+          orderbookMidPriceClose,
+          orderbookMidPriceOpen,
+        });
+      }),
+    );
+    await startCandleCache();
+
+    setCachePrice('BTC-USD', '10005');
+    await OrderbookMidPriceMemoryCache.updateOrderbookMidPrices();
+
+    const publisher: KafkaPublisher = new KafkaPublisher();
+    publisher.addEvents([]);
+
+    // Create new candles, without trades
+    await runUpdateCandles(publisher);
+
+    // Verify previous candles have orderbookMidPriceClose updated
+    const previousExpectedCandles: CandleFromDatabase[] = _.map(
+      Object.values(CandleResolution),
+      (resolution: CandleResolution) => {
+        return {
+          id: CandleTable.uuid(startTime, defaultCandle.ticker, resolution),
+          startedAt: startTime,
+          ticker: defaultCandle.ticker,
+          resolution,
+          low: existingPrice,
+          high: existingPrice,
+          open: existingPrice,
+          close: existingPrice,
+          baseTokenVolume,
+          usdVolume,
+          trades: existingTrades,
+          startingOpenInterest,
+          orderbookMidPriceClose: '10005',
+          orderbookMidPriceOpen,
+        };
+      },
+    );
+    await verifyCandlesInPostgres(previousExpectedCandles);
+
+    // Verify new empty candle was created
+    const expectedCandles: CandleFromDatabase[] = _.map(
+      Object.values(CandleResolution),
+      (resolution: CandleResolution) => {
+        const currentStartedAt: IsoString = helpers.calculateNormalizedCandleStartTime(
+          testConstants.createdDateTime,
+          resolution,
+        ).toISO();
+
+        return {
+          id: CandleTable.uuid(currentStartedAt, defaultCandle.ticker, resolution),
+          startedAt: currentStartedAt,
+          ticker: defaultCandle.ticker,
+          resolution,
+          low: existingPrice,
+          high: existingPrice,
+          open: existingPrice,
+          close: existingPrice,
+          baseTokenVolume: '0',
+          usdVolume: '0',
+          trades: 0,
+          startingOpenInterest: '0',
+          orderbookMidPriceClose: '10005',
+          orderbookMidPriceOpen: '10005',
+        };
+      },
+    );
+    await verifyCandlesInPostgres(expectedCandles);
+
+  });
+
+  it('successfully creates an orderbook price map for each market', async () => {
+    setCachePrice('BTC-USD', '105000');
+    setCachePrice('ISO-USD', '115000');
+    setCachePrice('ETH-USD', '150000');
+    await OrderbookMidPriceMemoryCache.updateOrderbookMidPrices();
+
+    const map = await getOrderbookMidPriceMap();
+    expect(map).toEqual({
+      'BTC-USD': '105000',
+      'ETH-USD': '150000',
+      'ISO-USD': '115000',
+      'ISO2-USD': undefined,
+      'SHIB-USD': undefined,
+    });
   });
 });
 

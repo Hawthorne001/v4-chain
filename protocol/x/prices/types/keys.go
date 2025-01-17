@@ -16,4 +16,10 @@ const (
 
 	// MarketPriceKeyPrefix is the prefix to retrieve all MarketPrices
 	MarketPriceKeyPrefix = "Price:"
+
+	// CurrencyPairIDPrefix is the prefix to retrieve the market ID for a currency pair
+	CurrencyPairIDPrefix = "CurrencyPairID:"
+
+	// NextIDKey is the key for the next market ID
+	NextMarketIDKey = "NextMarketID"
 )

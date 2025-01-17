@@ -5,6 +5,7 @@ import (
 	gov "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	govbeta "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
+	vaulttypes "github.com/dydxprotocol/v4-chain/protocol/x/vault/types"
 )
 
 var (
@@ -28,5 +29,13 @@ var (
 		"/ibc.applications.interchain_accounts.controller.v1.MsgUpdateParams": &icacontrollertypes.
 			MsgUpdateParams{},
 		"/ibc.applications.interchain_accounts.controller.v1.MsgUpdateParamsResponse": nil,
+
+		// vault
+		// MsgSetVaultQuotingParams is deprecated since v6.x and replaced by MsgSetVaultParams.
+		// nolint:staticcheck
+		"/dydxprotocol.vault.MsgSetVaultQuotingParams": &vaulttypes.MsgSetVaultQuotingParams{},
+		// MsgUpdateParams is deprecated since v6.x and replaced by MsgUpdateDefaultQuotingParams.
+		// nolint:staticcheck
+		"/dydxprotocol.vault.MsgUpdateParams": &vaulttypes.MsgUpdateParams{},
 	}
 )

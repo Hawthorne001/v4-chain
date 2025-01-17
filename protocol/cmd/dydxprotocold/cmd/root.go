@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/core/appmodule"
@@ -32,7 +33,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	authcodec "github.com/cosmos/cosmos-sdk/x/auth/codec"
-	"github.com/cosmos/cosmos-sdk/x/auth/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
@@ -55,6 +56,9 @@ const (
 	EnvPrefix = "DYDX"
 
 	flagIAVLCacheSize = "iavl-cache-size"
+
+	// TimeoutProposeOverride is the software override for the `timeout_propose` consensus parameter.
+	TimeoutProposeOverride = 1 * time.Second
 )
 
 // NewRootCmd creates a new root command for `dydxprotocold`. It is called once in the main function.
@@ -67,7 +71,9 @@ func NewRootCmd(
 		option,
 		homeDir,
 		func(serverCtxPtr *server.Context) {
-
+			// Provide an override for `timeout_propose`. This value should be consistent across the network
+			// for synchrony, and should never be tweaked by individual validators in practice.
+			serverCtxPtr.Config.Consensus.TimeoutPropose = TimeoutProposeOverride
 		},
 		func(s string, appConfig *DydxAppConfig) (string, *DydxAppConfig) {
 			return s, appConfig
@@ -106,7 +112,7 @@ func NewRootCmdWithInterceptors(
 		WithTxConfig(tempApp.TxConfig()).
 		WithLegacyAmino(tempApp.LegacyAmino()).
 		WithInput(os.Stdin).
-		WithAccountRetriever(types.AccountRetriever{}).
+		WithAccountRetriever(authtypes.AccountRetriever{}).
 		WithBroadcastMode(flags.BroadcastSync).
 		WithHomeDir(homeDir).
 		WithViper(EnvPrefix)
@@ -267,6 +273,23 @@ func addModuleInitFlags(startCmd *cobra.Command) {
 	crisis.AddModuleInitFlags(startCmd)
 }
 
+func CmdModuleNameToAddress() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "module-name-to-address [module-name]",
+		Short: "module name to address",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx := client.GetClientContextFromCmd(cmd)
+			address := authtypes.NewModuleAddress(args[0])
+			return clientCtx.PrintString(address.String())
+		},
+	}
+
+	flags.AddPaginationFlagsToCmd(cmd, cmd.Use)
+	flags.AddQueryFlagsToCmd(cmd)
+
+	return cmd
+}
+
 // queryCommand adds transaction and account querying commands.
 func queryCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -283,6 +306,7 @@ func queryCommand() *cobra.Command {
 		server.QueryBlockCmd(),
 		authcmd.QueryTxsByEventsCmd(),
 		authcmd.QueryTxCmd(),
+		CmdModuleNameToAddress(),
 	)
 
 	// Module specific query sub-commands are added by AutoCLI

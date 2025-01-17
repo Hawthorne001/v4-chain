@@ -1,4 +1,4 @@
-import { stats } from '@dydxprotocol-indexer/base';
+import { logger, stats } from '@dydxprotocol-indexer/base';
 import {
   FundingEventV1,
   FundingEventV1_Type,
@@ -61,6 +61,9 @@ describe('fundingHandler', () => {
     await perpetualMarketRefresher.updatePerpetualMarkets();
     await assetRefresher.updateAssets();
     updateBlockCache(defaultPreviousHeight);
+
+    jest.spyOn(logger, 'error');
+    jest.resetAllMocks();
   });
 
   afterEach(async () => {
@@ -168,6 +171,28 @@ describe('fundingHandler', () => {
     );
   });
 
+  it('successfully ignores funding rate and index for market with no oracle price', async () => {
+    const kafkaMessage: KafkaMessage = createKafkaMessageFromFundingEvents({
+      fundingEvents: [{
+        ...defaultFundingRateEvent,
+        updates: [
+          {
+            perpetualId: 2,
+            fundingValuePpm: 10,
+            fundingIndex: bigIntToBytes(BigInt(0)),
+          },
+        ],
+      }],
+      height: defaultHeight,
+      time: defaultTime,
+    });
+    await onMessage(kafkaMessage);
+    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({
+      at: 'FundingHandler#handleFundingSample',
+      message: 'oracle_price not found for marketId.',
+    }));
+  });
+
   it('successfully processes and clears cache for a new funding rate with both existing/non-existent market',
     async () => {
       const kafkaMessage: KafkaMessage = createKafkaMessageFromFundingEvents({
@@ -208,6 +233,14 @@ describe('fundingHandler', () => {
       }));
       expect(stats.gauge).toHaveBeenCalledWith('ender.funding_index_update_event', 0.1, { ticker: 'BTC-USD' });
       expect(stats.gauge).toHaveBeenCalledWith('ender.funding_index_update', 0.1, { ticker: 'BTC-USD' });
+      expect(stats.timing).toHaveBeenCalledWith(
+        'ender.handle_funding_event.sql_latency',
+        expect.any(Number),
+        {
+          className: 'FundingHandler',
+          eventType: 'FundingEvent',
+        },
+      );
     });
 
   it('successfully processes and clears cache for a new funding rate', async () => {

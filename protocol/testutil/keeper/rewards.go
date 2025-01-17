@@ -1,8 +1,9 @@
 package keeper
 
 import (
-	"github.com/cosmos/gogoproto/proto"
 	"testing"
+
+	"github.com/cosmos/gogoproto/proto"
 
 	storetypes "cosmossdk.io/store/types"
 	dbm "github.com/cosmos/cosmos-db"
@@ -42,9 +43,47 @@ func RewardsKeepers(
 		transientStoreKey storetypes.StoreKey,
 	) []GenesisInitializer {
 		// Define necessary keepers here for unit tests
-		pricesKeeper, _, _, _, _ = createPricesKeeper(stateStore, db, cdc, transientStoreKey)
-		// Mock time provider response for market creation.
 		epochsKeeper, _ := createEpochsKeeper(stateStore, db, cdc)
+
+		accountsKeeper, _ := createAccountKeeper(
+			stateStore,
+			db,
+			cdc,
+			registry)
+		bankKeeper, _ := createBankKeeper(stateStore, db, cdc, accountsKeeper)
+		stakingKeeper, _ := createStakingKeeper(
+			stateStore,
+			db,
+			cdc,
+			accountsKeeper,
+			bankKeeper,
+		)
+		statsKeeper, _ := createStatsKeeper(
+			stateStore,
+			epochsKeeper,
+			db,
+			cdc,
+			stakingKeeper,
+		)
+		affiliatesKeeper, _ := createAffiliatesKeeper(stateStore, db, cdc, statsKeeper, transientStoreKey, true)
+		vaultKeeper, _ := createVaultKeeper(
+			stateStore,
+			db,
+			cdc,
+			transientStoreKey,
+		)
+		feetiersKeeper, _ = createFeeTiersKeeper(
+			stateStore,
+			statsKeeper,
+			vaultKeeper,
+			affiliatesKeeper,
+			db,
+			cdc,
+		)
+		revShareKeeper, _, _ := createRevShareKeeper(stateStore, db, cdc, affiliatesKeeper, feetiersKeeper)
+		marketMapKeeper, _ := createMarketMapKeeper(stateStore, db, cdc)
+		pricesKeeper, _, _, _ = createPricesKeeper(stateStore, db, cdc, transientStoreKey, revShareKeeper, marketMapKeeper)
+		// Mock time provider response for market creation.
 		assetsKeeper, _ = createAssetsKeeper(
 			stateStore,
 			db,
@@ -52,18 +91,6 @@ func RewardsKeepers(
 			pricesKeeper,
 			transientStoreKey,
 			true,
-		)
-		statsKeeper, _ := createStatsKeeper(
-			stateStore,
-			epochsKeeper,
-			db,
-			cdc,
-		)
-		feetiersKeeper, _ = createFeeTiersKeeper(
-			stateStore,
-			statsKeeper,
-			db,
-			cdc,
 		)
 		rewardsKeeper, storeKey = createRewardsKeeper(
 			stateStore,

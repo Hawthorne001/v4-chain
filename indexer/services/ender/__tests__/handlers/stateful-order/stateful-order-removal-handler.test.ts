@@ -21,7 +21,10 @@ import { DydxIndexerSubtypes } from '../../../src/lib/types';
 import {
   defaultDateTime,
   defaultHeight,
-  defaultOrderId, defaultPreviousHeight, defaultTime, defaultTxHash,
+  defaultOrderId,
+  defaultPreviousHeight,
+  defaultTime,
+  defaultTxHash,
 } from '../../helpers/constants';
 import { createKafkaMessageFromStatefulOrderEvent } from '../../helpers/kafka-helpers';
 import { updateBlockCache } from '../../../src/caches/block-cache';
@@ -34,8 +37,11 @@ import { StatefulOrderRemovalHandler } from '../../../src/handlers/stateful-orde
 import { STATEFUL_ORDER_ORDER_FILL_EVENT_TYPE } from '../../../src/constants';
 import { producer } from '@dydxprotocol-indexer/kafka';
 import { createPostgresFunctions } from '../../../src/helpers/postgres/postgres-functions';
+import config from '../../../src/config';
 
 describe('statefulOrderRemovalHandler', () => {
+  const prevSkippedOrderUUIDs: string = config.SKIP_STATEFUL_ORDER_UUIDS;
+
   beforeAll(async () => {
     await dbHelpers.migrate();
     await createPostgresFunctions();
@@ -49,6 +55,7 @@ describe('statefulOrderRemovalHandler', () => {
   });
 
   afterEach(async () => {
+    config.SKIP_STATEFUL_ORDER_UUIDS = prevSkippedOrderUUIDs;
     await dbHelpers.clearData();
     jest.clearAllMocks();
   });
@@ -101,13 +108,20 @@ describe('statefulOrderRemovalHandler', () => {
     });
   });
 
-  it('successfully cancels and removes order', async () => {
+  it.each([
+    ['transaction event', 0],
+    ['block event', -1],
+  ])('successfully cancels and removes order (as %s)', async (
+    _name: string,
+    transactionIndex: number,
+  ) => {
     await OrderTable.create({
       ...testConstants.defaultOrder,
       clientId: '0',
     });
     const kafkaMessage: KafkaMessage = createKafkaMessageFromStatefulOrderEvent(
       defaultStatefulOrderEvent,
+      transactionIndex,
     );
 
     await onMessage(kafkaMessage);
@@ -130,6 +144,7 @@ describe('statefulOrderRemovalHandler', () => {
       producerSendMock,
       orderId: defaultOrderId,
       offchainUpdate: expectedOffchainUpdate,
+      headers: { message_received_timestamp: kafkaMessage.timestamp, event_type: 'StatefulOrderRemoval' },
     });
   });
 
@@ -141,5 +156,36 @@ describe('statefulOrderRemovalHandler', () => {
     await expect(onMessage(kafkaMessage)).rejects.toThrowError(
       `Unable to update order status with orderId: ${orderId}`,
     );
+  });
+
+  it.each([
+    ['transaction event', 0],
+    ['block event', -1],
+  ])('successfully skips order removal event (as %s)', async (
+    _name: string,
+    transactionIndex: number,
+  ) => {
+    config.SKIP_STATEFUL_ORDER_UUIDS = OrderTable.uuid(
+      testConstants.defaultOrder.subaccountId,
+      '0',
+      testConstants.defaultOrder.clobPairId,
+      testConstants.defaultOrder.orderFlags,
+    );
+    await OrderTable.create({
+      ...testConstants.defaultOrder,
+      clientId: '0',
+    });
+    const kafkaMessage: KafkaMessage = createKafkaMessageFromStatefulOrderEvent(
+      defaultStatefulOrderEvent,
+      transactionIndex,
+    );
+
+    await onMessage(kafkaMessage);
+    const order: OrderFromDatabase | undefined = await OrderTable.findById(orderId);
+    expect(order).toBeDefined();
+    expect(order).toEqual(expect.objectContaining({
+      ...testConstants.defaultOrder,
+      clientId: '0',
+    }));
   });
 });

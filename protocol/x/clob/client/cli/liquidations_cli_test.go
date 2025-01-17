@@ -6,18 +6,19 @@ import (
 	"fmt"
 	"math"
 
-	appflags "github.com/dydxprotocol/v4-chain/protocol/app/flags"
 	"math/big"
 	"testing"
+
+	appflags "github.com/dydxprotocol/v4-chain/protocol/app/flags"
 
 	networktestutil "github.com/cosmos/cosmos-sdk/testutil/network"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
-	"github.com/dydxprotocol/v4-chain/protocol/dtypes"
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
+	testutil "github.com/dydxprotocol/v4-chain/protocol/testutil/util"
 	assettypes "github.com/dydxprotocol/v4-chain/protocol/x/assets/types"
-	"github.com/dydxprotocol/v4-chain/protocol/x/clob/client/testutil"
+	clob_testutil "github.com/dydxprotocol/v4-chain/protocol/x/clob/client/testutil"
 	"github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 	epochstypes "github.com/dydxprotocol/v4-chain/protocol/x/epochs/types"
 	feetierstypes "github.com/dydxprotocol/v4-chain/protocol/x/feetiers/types"
@@ -74,6 +75,7 @@ func TestLiquidationOrderIntegrationTestSuite(t *testing.T) {
 			// Disable the Bridge and Price daemons in the integration tests.
 			appOptions.Set(daemonflags.FlagPriceDaemonEnabled, false)
 			appOptions.Set(daemonflags.FlagBridgeDaemonEnabled, false)
+			appOptions.Set(daemonflags.FlagOracleEnabled, false)
 
 			// Effectively disable the health monitor panic timeout for these tests. This is necessary
 			// because all clob cli tests are running in the same process and the total time to run is >> 5 minutes
@@ -127,7 +129,7 @@ func (s *LiquidationsIntegrationTestSuite) SetupSuite() {
 	s.cfg.GenesisState[types.ModuleName] = buf
 
 	// Set the balances in the genesis state.
-	s.cfg.GenesisState[banktypes.ModuleName] = testutil.CreateBankGenesisState(
+	s.cfg.GenesisState[banktypes.ModuleName] = clob_testutil.CreateBankGenesisState(
 		s.T(),
 		s.cfg,
 		liqTestInitialSubaccountModuleAccBalance,
@@ -146,16 +148,18 @@ func (s *LiquidationsIntegrationTestSuite) SetupSuite() {
 		satypes.Subaccount{
 			Id: &satypes.SubaccountId{Owner: s.validatorAddress.String(), Number: liqTestSubaccountNumberOne},
 			AssetPositions: []*satypes.AssetPosition{
-				{
-					AssetId:  assettypes.AssetUsdc.Id,
-					Quantums: dtypes.NewInt(-45_001_000_000), // -$45,001
-				},
+				testutil.CreateSingleAssetPosition(
+					assettypes.AssetUsdc.Id,
+					big.NewInt(-45_001_000_000), // -$45,001
+				),
 			},
 			PerpetualPositions: []*satypes.PerpetualPosition{
-				{
-					PerpetualId: 0,
-					Quantums:    dtypes.NewInt(100_000_000), // 1 BTC
-				},
+				testutil.CreateSinglePerpetualPosition(
+					0,
+					big.NewInt(100_000_000), // 1 BTC
+					big.NewInt(0),
+					big.NewInt(0),
+				),
 			},
 		},
 	)
@@ -210,7 +214,7 @@ func (s *LiquidationsIntegrationTestSuite) TestCLILiquidations() {
 	subticks := types.Subticks(50_000_000_000)
 
 	// Place the maker order that should be filled by the liquidation order.
-	_, err = testutil.MsgPlaceOrderExec(
+	_, err = clob_testutil.MsgPlaceOrderExec(
 		ctx,
 		s.validatorAddress,
 		liqTestSubaccountNumberZero,

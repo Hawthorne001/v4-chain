@@ -6,6 +6,7 @@ import {
   SubaccountMessageContents,
 } from '@dydxprotocol-indexer/postgres';
 import {
+  PerpetualMarketCreateEventV2,
   StatefulOrderEventV1,
   IndexerTendermintEvent,
   CandleMessage,
@@ -28,11 +29,17 @@ import {
   AssetCreateEventV1,
   PerpetualMarketCreateEventV1,
   LiquidityTierUpsertEventV1,
+  LiquidityTierUpsertEventV2,
   UpdatePerpetualEventV1,
+  UpdatePerpetualEventV2,
   UpdateClobPairEventV1,
   DeleveragingEventV1,
   TradingRewardsEventV1,
+  BlockHeightMessage,
+  RegisterAffiliateEventV1,
+  UpsertVaultEventV1,
 } from '@dydxprotocol-indexer/v4-protos';
+import { IHeaders } from 'kafkajs';
 import Long from 'long';
 
 // Type sourced from protocol:
@@ -51,7 +58,11 @@ export enum DydxIndexerSubtypes {
   UPDATE_CLOB_PAIR = 'update_clob_pair',
   DELEVERAGING = 'deleveraging',
   TRADING_REWARD = 'trading_reward',
+  REGISTER_AFFILIATE = 'register_affiliate',
+  UPSERT_VAULT = 'upsert_vault',
 }
+
+export const SKIPPED_EVENT_SUBTYPE = 'skipped_event';
 
 // Generic interface used for creating the Handler objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,14 +123,32 @@ export type EventProtoWithTypeAndVersion = {
   version: number,
   blockEventIndex: number,
 } | {
+  type: DydxIndexerSubtypes.PERPETUAL_MARKET,
+  eventProto: PerpetualMarketCreateEventV2,
+  indexerTendermintEvent: IndexerTendermintEvent,
+  version: number,
+  blockEventIndex: number,
+} | {
   type: DydxIndexerSubtypes.LIQUIDITY_TIER,
   eventProto: LiquidityTierUpsertEventV1,
   indexerTendermintEvent: IndexerTendermintEvent,
   version: number,
   blockEventIndex: number,
 } | {
+  type: DydxIndexerSubtypes.LIQUIDITY_TIER,
+  eventProto: LiquidityTierUpsertEventV2,
+  indexerTendermintEvent: IndexerTendermintEvent,
+  version: number,
+  blockEventIndex: number,
+} | {
   type: DydxIndexerSubtypes.UPDATE_PERPETUAL,
   eventProto: UpdatePerpetualEventV1,
+  indexerTendermintEvent: IndexerTendermintEvent,
+  version: number,
+  blockEventIndex: number,
+} | {
+  type: DydxIndexerSubtypes.UPDATE_PERPETUAL,
+  eventProto: UpdatePerpetualEventV2,
   indexerTendermintEvent: IndexerTendermintEvent,
   version: number,
   blockEventIndex: number,
@@ -138,6 +167,18 @@ export type EventProtoWithTypeAndVersion = {
 } | {
   type: DydxIndexerSubtypes.TRADING_REWARD,
   eventProto: TradingRewardsEventV1,
+  indexerTendermintEvent: IndexerTendermintEvent,
+  version: number,
+  blockEventIndex: number,
+} | {
+  type: DydxIndexerSubtypes.REGISTER_AFFILIATE,
+  eventProto: RegisterAffiliateEventV1,
+  indexerTendermintEvent: IndexerTendermintEvent,
+  version: number,
+  blockEventIndex: number,
+} | {
+  type: DydxIndexerSubtypes.UPSERT_VAULT,
+  eventProto: UpsertVaultEventV1,
   indexerTendermintEvent: IndexerTendermintEvent,
   version: number,
   blockEventIndex: number,
@@ -172,6 +213,7 @@ export type OrderFillEventWithOrder = {
   totalFilledTaker: Long,
   makerFee: Long,
   takerFee: Long,
+  affiliateRevShare: Long,
 };
 
 export type OrderFillEventWithLiquidation = {
@@ -182,6 +224,7 @@ export type OrderFillEventWithLiquidation = {
   totalFilledTaker: Long,
   makerFee: Long,
   takerFee: Long,
+  affiliateRevShare: Long,
 };
 
 export type FundingEventMessage = {
@@ -217,6 +260,7 @@ export interface AnnotatedSubaccountMessage extends SubaccountMessage {
 export interface VulcanMessage {
   key: Buffer,
   value: OffChainUpdateV1,
+  headers?: IHeaders,
 }
 
 export type ConsolidatedKafkaEvent = {
@@ -234,6 +278,9 @@ export type ConsolidatedKafkaEvent = {
 } | {
   topic: KafkaTopics.TO_VULCAN,
   message: VulcanMessage,
+} | {
+  topic: KafkaTopics.TO_WEBSOCKETS_BLOCK_HEIGHT,
+  message: BlockHeightMessage,
 };
 
 export enum TransferEventType {

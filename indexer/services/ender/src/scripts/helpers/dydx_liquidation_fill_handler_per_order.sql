@@ -7,6 +7,7 @@ DECLARE
     clob_pair_id bigint;
     subaccount_uuid uuid;
     perpetual_market_record perpetual_markets%ROWTYPE;
+    market_record markets%ROWTYPE;
     order_record orders%ROWTYPE;
     fill_record fills%ROWTYPE;
     perpetual_position_record perpetual_positions%ROWTYPE;
@@ -17,6 +18,7 @@ DECLARE
     order_price numeric;
     order_client_metadata bigint;
     fee numeric;
+    affiliate_rev_share numeric;
     fill_amount numeric;
     total_filled numeric;
     maker_price numeric;
@@ -55,6 +57,7 @@ BEGIN
     END IF;
 
     perpetual_market_record = dydx_get_perpetual_market_for_clob_pair(clob_pair_id);
+    market_record = dydx_get_market_for_id(perpetual_market_record."marketId");
 
     BEGIN
         SELECT * INTO STRICT asset_record FROM assets WHERE "id" = usdc_asset_id;
@@ -78,6 +81,8 @@ BEGIN
                                    power(10, perpetual_market_record."atomicResolution")::numeric);
     fee = dydx_trim_scale(dydx_get_fee(fill_liquidity, event_data) *
                           power(10, asset_record."atomicResolution")::numeric);
+    affiliate_rev_share = dydx_trim_scale(dydx_from_jsonlib_long(event_data->'affiliateRevShare') *
+                                    power(10, asset_record."atomicResolution")::numeric);
     order_price = dydx_trim_scale(dydx_from_jsonlib_long(order_->'subticks') *
                                   power(10, perpetual_market_record."quantumConversionExponent" +
                                             asset_record."atomicResolution" -
@@ -158,7 +163,7 @@ BEGIN
             block_height, transaction_index, event_index);
     INSERT INTO fills
     ("id", "subaccountId", "side", "liquidity", "type", "clobPairId", "orderId", "size", "price", "quoteAmount",
-     "eventId", "transactionHash", "createdAt", "createdAtHeight", "clientMetadata", "fee")
+     "eventId", "transactionHash", "createdAt", "createdAtHeight", "clientMetadata", "fee", "affiliateRevShare")
     VALUES (dydx_uuid_from_fill_event_parts(event_id, fill_liquidity),
             subaccount_uuid,
             order_side,
@@ -174,7 +179,8 @@ BEGIN
             block_time,
             block_height,
             order_client_metadata,
-            fee)
+            fee,
+            affiliate_rev_share)
     RETURNING * INTO fill_record;
 
     /* Upsert the perpetual_position record for this order_fill event. */
@@ -223,6 +229,8 @@ BEGIN
                 dydx_to_jsonb(fill_record),
                 'perpetual_market',
                 dydx_to_jsonb(perpetual_market_record),
+                'market',
+                dydx_to_jsonb(market_record),
                 'perpetual_position',
                 dydx_to_jsonb(perpetual_position_record)
             );
@@ -232,6 +240,8 @@ BEGIN
                 dydx_to_jsonb(fill_record),
                 'perpetual_market',
                 dydx_to_jsonb(perpetual_market_record),
+                'market',
+                dydx_to_jsonb(market_record),
                 'perpetual_position',
                 dydx_to_jsonb(perpetual_position_record)
             );

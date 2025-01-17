@@ -1,8 +1,9 @@
 package clob_test
 
 import (
-	errorsmod "cosmossdk.io/errors"
 	"testing"
+
+	errorsmod "cosmossdk.io/errors"
 
 	indexerevents "github.com/dydxprotocol/v4-chain/protocol/indexer/events"
 	"github.com/dydxprotocol/v4-chain/protocol/indexer/indexer_manager"
@@ -34,13 +35,7 @@ func TestGenesis(t *testing.T) {
 		"Genesis state is valid": {
 			genesis: types.GenesisState{
 				BlockRateLimitConfig: types.BlockRateLimitConfiguration{
-					MaxShortTermOrdersPerNBlocks: []types.MaxPerNBlocksRateLimit{
-						{
-							Limit:     200,
-							NumBlocks: 1,
-						},
-					},
-					MaxShortTermOrderCancellationsPerNBlocks: []types.MaxPerNBlocksRateLimit{
+					MaxShortTermOrdersAndCancelsPerNBlocks: []types.MaxPerNBlocksRateLimit{
 						{
 							Limit:     200,
 							NumBlocks: 1,
@@ -377,7 +372,7 @@ func TestGenesis(t *testing.T) {
 		"Genesis state is invalid when BlockRateLimitConfiguration is invalid": {
 			genesis: types.GenesisState{
 				BlockRateLimitConfig: types.BlockRateLimitConfiguration{
-					MaxShortTermOrdersPerNBlocks: []types.MaxPerNBlocksRateLimit{
+					MaxShortTermOrdersAndCancelsPerNBlocks: []types.MaxPerNBlocksRateLimit{
 						{
 							Limit:     1,
 							NumBlocks: 0,
@@ -394,7 +389,7 @@ func TestGenesis(t *testing.T) {
 					SubaccountBlockLimits: constants.SubaccountBlockLimits_Default,
 				},
 			},
-			expectedErr: "0 is not a valid NumBlocks for MaxShortTermOrdersPerNBlocks rate limit " +
+			expectedErr: "0 is not a valid NumBlocks for MaxShortTermOrdersAndCancelsPerNBlocks rate limit " +
 				"{NumBlocks:0 Limit:1}",
 			expectedErrType: types.ErrInvalidBlockRateLimitConfig,
 		},
@@ -431,6 +426,7 @@ func TestGenesis(t *testing.T) {
 			ks := keepertest.NewClobKeepersTestContext(t, memClob, &mocks.BankKeeper{}, mockIndexerEventManager)
 			ctx := ks.Ctx.WithBlockTime(constants.TimeT)
 
+			ks.MarketMapKeeper.InitGenesis(ks.Ctx, constants.MarketMap_DefaultGenesisState)
 			prices.InitGenesis(ctx, *ks.PricesKeeper, constants.Prices_DefaultGenesisState)
 			perpetuals.InitGenesis(ctx, *ks.PerpetualsKeeper, constants.Perpetuals_DefaultGenesisState)
 
@@ -456,6 +452,7 @@ func TestGenesis(t *testing.T) {
 								clobPair.SubticksPerTick,
 								clobPair.StepBaseQuantums,
 								perpetual.Params.LiquidityTier,
+								perpetual.Params.MarketType,
 							),
 						),
 					).Once().Return()

@@ -1,10 +1,18 @@
 package perpetuals
 
 import (
+	"fmt"
 	"math/big"
+	"testing"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dydxprotocol/v4-chain/protocol/dtypes"
+	"github.com/dydxprotocol/v4-chain/protocol/lib"
+	"github.com/dydxprotocol/v4-chain/protocol/testutil/constants"
 	perptypes "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/types"
+	pricetypes "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
 )
 
 type PerpetualModifierOption func(cp *perptypes.Perpetual)
@@ -36,6 +44,12 @@ func WithTicker(ticker string) PerpetualModifierOption {
 func WithLiquidityTier(liquidityTier uint32) PerpetualModifierOption {
 	return func(cp *perptypes.Perpetual) {
 		cp.Params.LiquidityTier = liquidityTier
+	}
+}
+
+func WithAtomicResolution(atomicResolution int32) PerpetualModifierOption {
+	return func(cp *perptypes.Perpetual) {
+		cp.Params.AtomicResolution = atomicResolution
 	}
 }
 
@@ -77,40 +91,78 @@ func GeneratePerpetual(optionalModifications ...PerpetualModifierOption) *perpty
 	return perpetual
 }
 
+// MustHumanSizeToBaseQuantums converts a human-readable size to quantums.
+// It uses the inverse of the exponent to convert the human size to quantums,
+// since the exponent applies to the quantums to derive the human-readable size.
 func MustHumanSizeToBaseQuantums(
 	humanSize string,
 	atomicResolution int32,
 ) (baseQuantums uint64) {
-	// Parse the humanSize string to a big rational
-	ratValue, ok := new(big.Rat).SetString(humanSize)
+	ratio, ok := new(big.Rat).SetString(humanSize)
 	if !ok {
-		panic("Failed to parse humanSize to big.Rat")
+		panic(fmt.Sprintf("MustHumanSizeToBaseQuantums: Failed to parse humanSize: %s", humanSize))
 	}
-
-	// Convert atomicResolution to int64 for calculations
-	resolution := int64(atomicResolution)
-
-	// Create a multiplier which is 10 raised to the power of the absolute atomicResolution
-	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(abs(resolution)), nil)
-
-	// Depending on the sign of atomicResolution, multiply or divide
-	if atomicResolution > 0 {
-		ratValue.Mul(ratValue, new(big.Rat).SetInt(multiplier))
-	} else if atomicResolution < 0 {
-		divisor := new(big.Rat).SetInt(multiplier)
-		ratValue.Mul(ratValue, divisor)
+	result := lib.BigIntMulPow10(ratio.Num(), -atomicResolution, false)
+	result.Quo(result, ratio.Denom())
+	if !result.IsUint64() {
+		panic("MustHumanSizeToBaseQuantums: result is not a uint64")
 	}
-
-	// Convert the result to an unsigned 64-bit integer
-	resultInt := ratValue.Num() // Get the numerator which now represents the whole value
-
-	return resultInt.Uint64()
+	return result.Uint64()
 }
 
-// Helper function to get the absolute value of an int64
-func abs(n int64) int64 {
-	if n < 0 {
-		return -n
+// Helper function to set up default open interest for input perpetuals.
+func SetUpDefaultPerpOIsForTest(
+	t testing.TB,
+	ctx sdk.Context,
+	k perptypes.PerpetualsKeeper,
+	perps []perptypes.Perpetual,
+) {
+	for _, perpOI := range constants.DefaultTestPerpOIs {
+		for _, perp := range perps {
+			if perp.Params.Id != perpOI.PerpetualId {
+				continue
+			}
+			// If the perpetual exists in input, set up the open interest.
+			require.NoError(t,
+				k.ModifyOpenInterest(
+					ctx,
+					perp.Params.Id,
+					perpOI.BaseQuantums,
+				),
+			)
+		}
 	}
-	return n
+}
+
+func CreatePerpInfo(
+	id uint32,
+	atomicResolution int32,
+	price uint64,
+	priceExponent int32,
+) perptypes.PerpInfo {
+	return perptypes.PerpInfo{
+		Perpetual: perptypes.Perpetual{
+			Params: perptypes.PerpetualParams{
+				Id:               id,
+				Ticker:           "test ticker",
+				MarketId:         id,
+				AtomicResolution: atomicResolution,
+				LiquidityTier:    id,
+			},
+			FundingIndex: dtypes.NewInt(0),
+			OpenInterest: dtypes.NewInt(0),
+		},
+		Price: pricetypes.MarketPrice{
+			Id:       id,
+			Exponent: priceExponent,
+			Price:    price,
+		},
+		LiquidityTier: perptypes.LiquidityTier{
+			Id:                     id,
+			InitialMarginPpm:       100_000,
+			MaintenanceFractionPpm: 500_000,
+			OpenInterestLowerCap:   0,
+			OpenInterestUpperCap:   0,
+		},
+	}
 }

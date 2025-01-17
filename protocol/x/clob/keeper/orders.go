@@ -18,6 +18,7 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
 	"github.com/dydxprotocol/v4-chain/protocol/lib/log"
 	"github.com/dydxprotocol/v4-chain/protocol/lib/metrics"
+	assettypes "github.com/dydxprotocol/v4-chain/protocol/x/assets/types"
 	"github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 	satypes "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
 )
@@ -105,7 +106,7 @@ func (k Keeper) BatchCancelShortTermOrder(
 				failure = append(failure, clientId)
 				log.InfoLog(
 					ctx,
-					"Failed to cancel short term order.",
+					"Batch Cancel: Failed to cancel a short term order.",
 					log.Error, err,
 				)
 			} else {
@@ -167,7 +168,6 @@ func (k Keeper) CancelShortTermOrder(
 //
 // An error will be returned if any of the following conditions are true:
 //   - Standard stateful validation fails.
-//   - The subaccount's equity tier limit is exceeded.
 //   - Placing the short term order on the memclob returns an error.
 //
 // This method will panic if the provided order is not a Short-Term order.
@@ -204,12 +204,6 @@ func (k Keeper) PlaceShortTermOrder(
 
 	// Perform stateful validation.
 	err = k.PerformStatefulOrderValidation(ctx, &order, nextBlockHeight, true)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	// Validate that adding the order wouldn't exceed subaccount equity tier limits.
-	err = k.ValidateSubaccountEquityTierLimitForShortTermOrder(ctx, order)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -311,6 +305,7 @@ func (k Keeper) CancelStatefulOrder(
 
 // PlaceStatefulOrder performs order validation, equity tier limit check, a collateralization check and writes the
 // order to state and the memstore. The order will not be placed on the orderbook.
+// Metrics, equity tier limit, and collateralization check are skipped for orders internal to the protocol.
 //
 // An error will be returned if any of the following conditions are true:
 //   - Standard stateful validation fails.
@@ -325,26 +320,29 @@ func (k Keeper) CancelStatefulOrder(
 func (k Keeper) PlaceStatefulOrder(
 	ctx sdk.Context,
 	msg *types.MsgPlaceOrder,
+	isInternalOrder bool,
 ) (err error) {
-	defer func() {
-		if err != nil {
-			telemetry.IncrCounterWithLabels(
-				[]string{types.ModuleName, metrics.PlaceStatefulOrder, metrics.Error, metrics.Count},
-				1,
-				[]gometrics.Label{
-					metrics.GetLabelForStringValue(metrics.Callback, metrics.GetCallbackMetricFromCtx(ctx)),
-				},
-			)
-		} else {
-			telemetry.IncrCounterWithLabels(
-				[]string{types.ModuleName, metrics.PlaceStatefulOrder, metrics.Success, metrics.Count},
-				1,
-				[]gometrics.Label{
-					metrics.GetLabelForStringValue(metrics.Callback, metrics.GetCallbackMetricFromCtx(ctx)),
-				},
-			)
-		}
-	}()
+	if !isInternalOrder {
+		defer func() {
+			if err != nil {
+				telemetry.IncrCounterWithLabels(
+					[]string{types.ModuleName, metrics.PlaceStatefulOrder, metrics.Error, metrics.Count},
+					1,
+					[]gometrics.Label{
+						metrics.GetLabelForStringValue(metrics.Callback, metrics.GetCallbackMetricFromCtx(ctx)),
+					},
+				)
+			} else {
+				telemetry.IncrCounterWithLabels(
+					[]string{types.ModuleName, metrics.PlaceStatefulOrder, metrics.Success, metrics.Count},
+					1,
+					[]gometrics.Label{
+						metrics.GetLabelForStringValue(metrics.Callback, metrics.GetCallbackMetricFromCtx(ctx)),
+					},
+				)
+			}
+		}()
+	}
 
 	// 1. Ensure the order is not a Short-Term order.
 	order := msg.Order
@@ -361,35 +359,38 @@ func (k Keeper) PlaceStatefulOrder(
 		return err
 	}
 
-	// 3. Check that adding the order would not exceed the equity tier for the account.
-	if err := k.ValidateSubaccountEquityTierLimitForStatefulOrder(ctx, order); err != nil {
-		return err
-	}
+	if !isInternalOrder {
+		// 3. Check that adding the order would not exceed the equity tier for the account.
+		if err := k.ValidateSubaccountEquityTierLimitForStatefulOrder(ctx, order); err != nil {
+			return err
+		}
 
-	// 4. Perform a collateralization check for the full size of the order to mitigate spam.
-	// TODO(CLOB-725): Consider using a pessimistic collateralization check.
-	_, successPerSubaccountUpdate := k.AddOrderToOrderbookCollatCheck(
-		ctx,
-		order.GetClobPairId(),
-		map[satypes.SubaccountId][]types.PendingOpenOrder{
-			order.OrderId.SubaccountId: {
-				{
+		// 4. Perform a check on the subaccount updates for the full size of the order to mitigate spam.
+		if !order.IsConditionalOrder() {
+			updateResult := k.AddOrderToOrderbookSubaccountUpdatesCheck(
+				ctx,
+				order.OrderId.SubaccountId,
+				types.PendingOpenOrder{
 					RemainingQuantums: order.GetBaseQuantums(),
 					IsBuy:             order.IsBuy(),
 					Subticks:          order.GetOrderSubticks(),
 					ClobPairId:        order.GetClobPairId(),
 				},
-			},
-		},
-	)
+			)
 
-	if !successPerSubaccountUpdate[order.OrderId.SubaccountId].IsSuccess() {
-		return errorsmod.Wrapf(
-			types.ErrStatefulOrderCollateralizationCheckFailed,
-			"PlaceStatefulOrder: order (%+v), result (%s)",
-			order,
-			successPerSubaccountUpdate[order.OrderId.SubaccountId].String(),
-		)
+			if !updateResult.IsSuccess() {
+				err := types.ErrStatefulOrderCollateralizationCheckFailed
+				if updateResult.IsIsolatedSubaccountError() {
+					err = types.ErrWouldViolateIsolatedSubaccountConstraints
+				}
+				return errorsmod.Wrapf(
+					err,
+					"PlaceStatefulOrder: order (%+v), result (%s)",
+					order,
+					updateResult.String(),
+				)
+			}
+		}
 	}
 
 	// 5. If we are in `deliverTx` then we write the order to committed state otherwise add the order to uncommitted
@@ -397,7 +398,7 @@ func (k Keeper) PlaceStatefulOrder(
 	if lib.IsDeliverTxMode(ctx) {
 		// Write the stateful order to state and the memstore.
 		k.SetLongTermOrderPlacement(ctx, order, lib.MustConvertIntegerToUint32(ctx.BlockHeight()))
-		k.MustAddOrderToStatefulOrdersTimeSlice(
+		k.AddStatefulOrderIdExpiration(
 			ctx,
 			order.MustGetUnixGoodTilBlockTime(),
 			order.GetOrderId(),
@@ -486,6 +487,9 @@ func (k Keeper) AddPreexistingStatefulOrder(
 // PlaceStatefulOrdersFromLastBlock validates and places stateful orders from the last block onto the memclob.
 // Note that stateful orders could fail to be placed due to various reasons such as collateralization
 // check failures, self-trade errors, etc. In these cases the `checkState` will not be written to.
+// Note that this function also takes in a postOnlyFilter variable and only places post-only orders if
+// postOnlyFilter is true and non-post-only orders if postOnlyFilter is false.
+//
 // This function is used in:
 // 1. `PrepareCheckState` to place newly placed long term orders from the last
 // block from ProcessProposerMatchesEvents.PlacedStatefulOrderIds. This is step 3 in PrepareCheckState.
@@ -495,6 +499,7 @@ func (k Keeper) PlaceStatefulOrdersFromLastBlock(
 	ctx sdk.Context,
 	placedStatefulOrderIds []types.OrderId,
 	existingOffchainUpdates *types.OffchainUpdates,
+	postOnlyFilter bool,
 ) (
 	offchainUpdates *types.OffchainUpdates,
 ) {
@@ -520,6 +525,12 @@ func (k Keeper) PlaceStatefulOrdersFromLastBlock(
 		}
 
 		order := orderPlacement.GetOrder()
+
+		// Skip post-only orders if postOnlyFilter is false or non-post-only orders if postOnlyFilter is true.
+		if postOnlyFilter != order.IsPostOnlyOrder() {
+			continue
+		}
+
 		// Validate and place order.
 		_, orderStatus, placeOrderOffchainUpdates, err := k.AddPreexistingStatefulOrder(
 			ctx,
@@ -574,10 +585,14 @@ func (k Keeper) PlaceStatefulOrdersFromLastBlock(
 // PlaceConditionalOrdersTriggeredInLastBlock takes in a list of conditional order ids that were triggered
 // in the last block, verifies they are conditional orders, verifies they are in triggered state, and places
 // the orders on the memclob.
+//
+// Note that this function also takes in a postOnlyFilter variable and only places post-only orders if
+// postOnlyFilter is true and non-post-only orders if postOnlyFilter is false.
 func (k Keeper) PlaceConditionalOrdersTriggeredInLastBlock(
 	ctx sdk.Context,
 	conditionalOrderIdsTriggeredInLastBlock []types.OrderId,
 	existingOffchainUpdates *types.OffchainUpdates,
+	postOnlyFilter bool,
 ) (
 	offchainUpdates *types.OffchainUpdates,
 ) {
@@ -607,7 +622,12 @@ func (k Keeper) PlaceConditionalOrdersTriggeredInLastBlock(
 		}
 	}
 
-	return k.PlaceStatefulOrdersFromLastBlock(ctx, conditionalOrderIdsTriggeredInLastBlock, existingOffchainUpdates)
+	return k.PlaceStatefulOrdersFromLastBlock(
+		ctx,
+		conditionalOrderIdsTriggeredInLastBlock,
+		existingOffchainUpdates,
+		postOnlyFilter,
+	)
 }
 
 // PerformOrderCancellationStatefulValidation performs stateful validation on an order cancellation.
@@ -997,121 +1017,58 @@ func (k Keeper) MustValidateReduceOnlyOrder(
 	return nil
 }
 
-// AddOrderToOrderbookCollatCheck performs collateralization checks for orders to determine whether or not they may
-// be added to the orderbook.
-func (k Keeper) AddOrderToOrderbookCollatCheck(
+// AddOrderToOrderbookSubaccountUpdatesCheck performs checks on the subaccount updates that will occur
+// for orders to determine whether or not they may be added to the orderbook.
+func (k Keeper) AddOrderToOrderbookSubaccountUpdatesCheck(
 	ctx sdk.Context,
-	clobPairId types.ClobPairId,
-	// TODO(DEC-1713): Convert this to 2 parameters: SubaccountId and a slice of PendingOpenOrders.
-	subaccountOpenOrders map[satypes.SubaccountId][]types.PendingOpenOrder,
-) (
-	success bool,
-	successPerUpdate map[satypes.SubaccountId]satypes.UpdateResult,
-) {
-	defer telemetry.ModuleMeasureSince(
-		types.ModuleName,
-		time.Now(),
-		metrics.CollateralizationCheck,
-		metrics.Latency,
-	)
-
-	telemetry.SetGauge(
-		float32(len(subaccountOpenOrders)),
-		types.ModuleName,
-		metrics.CollateralizationCheckSubaccounts,
-		metrics.Count,
-	)
-
+	subaccountId satypes.SubaccountId,
+	order types.PendingOpenOrder,
+) satypes.UpdateResult {
+	clobPairId := order.ClobPairId
 	clobPair, found := k.GetClobPair(ctx, clobPairId)
 	if !found {
 		panic(types.ErrInvalidClob)
 	}
-
-	pendingUpdates := types.NewPendingUpdates()
-
-	// Retrieve the associated `PerpetualId` for the `ClobPair`.
 	perpetualId := clobPair.MustGetPerpetualId()
+	makerFeePpm := k.feeTiersKeeper.GetPerpetualFeePpm(ctx, subaccountId.Owner, false)
+	bigFillQuoteQuantums := types.FillAmountToQuoteQuantums(
+		order.Subticks,
+		order.RemainingQuantums,
+		clobPair.QuantumConversionExponent,
+	)
 
-	iterateOverOpenOrdersStart := time.Now()
-	for subaccountId, openOrders := range subaccountOpenOrders {
-		telemetry.SetGauge(
-			float32(len(openOrders)),
-			types.ModuleName,
-			metrics.SubaccountPendingMatches,
-			metrics.Count,
-		)
-
-		makerFeePpm := k.feeTiersKeeper.GetPerpetualFeePpm(ctx, subaccountId.Owner, false)
-		// For each subaccount ID, create the update from all of its existing open orders for the clob and side.
-		for _, openOrder := range openOrders {
-			if openOrder.ClobPairId != clobPairId {
-				panic(fmt.Sprintf("Order `ClobPairId` must equal `clobPairId` for order %+v", openOrder))
-			}
-
-			collatCheckPriceSubticks := openOrder.Subticks
-
-			bigFillQuoteQuantums, err := getFillQuoteQuantums(
-				clobPair,
-				collatCheckPriceSubticks,
-				openOrder.RemainingQuantums,
-			)
-
-			// If an error is returned, this implies stateful order validation was not performed properly, therefore panic.
-			if err != nil {
-				panic(err)
-			}
-
-			bigFillAmount := openOrder.RemainingQuantums.ToBigInt()
-			addPerpetualFillAmountStart := time.Now()
-			pendingUpdates.AddPerpetualFill(
-				subaccountId,
-				perpetualId,
-				openOrder.IsBuy,
-				makerFeePpm,
-				bigFillAmount,
-				bigFillQuoteQuantums,
-			)
-			telemetry.ModuleMeasureSince(
-				types.ModuleName,
-				addPerpetualFillAmountStart,
-				metrics.AddPerpetualFillAmount,
-				metrics.Latency,
-			)
-		}
+	quoteDelta := new(big.Int).Set(bigFillQuoteQuantums)
+	baseDelta := new(big.Int).Neg(order.RemainingQuantums.ToBigInt())
+	if order.IsBuy {
+		quoteDelta.Neg(quoteDelta)
+		baseDelta.Neg(baseDelta)
 	}
-	telemetry.ModuleMeasureSince(
-		types.ModuleName,
-		iterateOverOpenOrdersStart,
-		metrics.IterateOverPendingMatches,
-		metrics.Latency,
-	)
-
-	covertToUpdatesStart := time.Now()
-	updates := pendingUpdates.ConvertToUpdates()
-	telemetry.ModuleMeasureSince(
-		types.ModuleName,
-		covertToUpdatesStart,
-		metrics.ConvertToUpdates,
-		metrics.Latency,
-	)
-
-	success, successPerSubaccountUpdate, err := k.subaccountsKeeper.CanUpdateSubaccounts(
+	fee := lib.BigMulPpm(bigFillQuoteQuantums, lib.BigI(makerFeePpm), true)
+	quoteDelta.Sub(quoteDelta, fee)
+	_, updateResults, err := k.subaccountsKeeper.CanUpdateSubaccounts(
 		ctx,
-		updates,
-		satypes.Match,
+		[]satypes.Update{
+			{
+				SubaccountId: subaccountId,
+				AssetUpdates: []satypes.AssetUpdate{{
+					AssetId:          assettypes.AssetUsdc.Id,
+					BigQuantumsDelta: quoteDelta,
+				}},
+				PerpetualUpdates: []satypes.PerpetualUpdate{{
+					PerpetualId:      perpetualId,
+					BigQuantumsDelta: baseDelta,
+				}},
+			},
+		},
+		satypes.CollatCheck,
 	)
-	// TODO(DEC-191): Remove the error case from `CanUpdateSubaccounts`, which can only occur on overflow and specifying
-	// duplicate accounts.
 	if err != nil {
 		panic(err)
 	}
-
-	result := make(map[satypes.SubaccountId]satypes.UpdateResult, len(updates))
-	for i, update := range updates {
-		result[update.SubaccountId] = successPerSubaccountUpdate[i]
+	if len(updateResults) != 1 {
+		panic("Expected exactly one update result")
 	}
-
-	return success, result
+	return updateResults[0]
 }
 
 // GetOraclePriceSubticksRat returns the oracle price in subticks for the given `ClobPair`.
@@ -1239,38 +1196,6 @@ func (k Keeper) InitStatefulOrders(
 	}
 }
 
-// HydrateUntriggeredConditionalOrders inserts all untriggered conditional orders in state into the
-// `UntriggeredConditionalOrders` data structure. Note that all untriggered conditional orders will
-// be ordered by time priority. This function should only be called on application startup.
-func (k Keeper) HydrateUntriggeredConditionalOrders(
-	ctx sdk.Context,
-) {
-	defer telemetry.ModuleMeasureSince(
-		types.ModuleName,
-		time.Now(),
-		metrics.ConditionalOrderUntriggered,
-		metrics.Hydrate,
-		metrics.Latency,
-	)
-
-	// Get all untriggered conditional orders in state, ordered by time priority ascending order,
-	// and add them to the `UntriggeredConditionalOrders` data structure.
-	untriggeredConditionalOrders := k.GetAllUntriggeredConditionalOrders(ctx)
-	k.AddUntriggeredConditionalOrders(
-		ctx,
-		lib.MapSlice(
-			untriggeredConditionalOrders,
-			func(o types.Order) types.OrderId {
-				return o.OrderId
-			},
-		),
-		// Note both of these arguments are empty slices since the untriggered conditional orders
-		// shouldn't be expired or canceled.
-		map[types.OrderId]struct{}{},
-		map[types.OrderId]struct{}{},
-	)
-}
-
 // sendOffchainMessagesWithTxHash sends all the `Message` in the offchainUpdates passed in along with
 // an additional header for the transaction hash passed in.
 func (k Keeper) sendOffchainMessagesWithTxHash(
@@ -1310,39 +1235,4 @@ func (k Keeper) SendOffchainMessages(
 		}
 		k.GetIndexerEventManager().SendOffchainData(update)
 	}
-
-	k.GetGrpcStreamingManager().SendOrderbookUpdates(offchainUpdates, false)
-}
-
-// getFillQuoteQuantums returns the total fillAmount price in quote quantums based on the maker subticks.
-// This value is always positive.
-//
-// Returns an error if:
-// - The Order is not for a `PerpetualClob`.
-// - The underlying `Price` does not exist.
-func getFillQuoteQuantums(
-	clobPair types.ClobPair,
-	makerSubticks types.Subticks,
-	fillAmount satypes.BaseQuantums,
-) (*big.Int, error) {
-	defer telemetry.ModuleMeasureSince(
-		types.ModuleName,
-		time.Now(),
-		metrics.GetFillQuoteQuantums,
-		metrics.Latency,
-	)
-
-	if perpetualClobMetadata := clobPair.GetPerpetualClobMetadata(); perpetualClobMetadata == nil {
-		return nil, types.ErrAssetOrdersNotImplemented
-	}
-
-	quantumConversionExponent := clobPair.QuantumConversionExponent
-
-	quoteQuantums := types.FillAmountToQuoteQuantums(
-		makerSubticks,
-		fillAmount,
-		quantumConversionExponent,
-	)
-
-	return quoteQuantums, nil
 }

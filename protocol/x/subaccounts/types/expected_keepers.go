@@ -6,30 +6,13 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	assettypes "github.com/dydxprotocol/v4-chain/protocol/x/assets/types"
 	blocktimetypes "github.com/dydxprotocol/v4-chain/protocol/x/blocktime/types"
 	perptypes "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/types"
+	pricestypes "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
 )
 
-// ProductKeeper represents a generic interface for a keeper
-// of a product.
-type ProductKeeper interface {
-	GetNetCollateral(
-		ctx sdk.Context,
-		id uint32,
-		bigQuantums *big.Int,
-	) (
-		bigNetCollateralQuoteQuantums *big.Int,
-		err error,
-	)
-	GetMarginRequirements(
-		ctx sdk.Context,
-		id uint32,
-		bigQuantums *big.Int,
-	) (
-		bigInitialMarginQuoteQuantums *big.Int,
-		bigMaintenanceMarginQuoteQuantums *big.Int,
-		err error,
-	)
+type AssetsKeeper interface {
 	IsPositionUpdatable(
 		ctx sdk.Context,
 		id uint32,
@@ -37,10 +20,6 @@ type ProductKeeper interface {
 		updatable bool,
 		err error,
 	)
-}
-
-type AssetsKeeper interface {
-	ProductKeeper
 	ConvertAssetToCoin(
 		ctx sdk.Context,
 		assetId uint32,
@@ -50,18 +29,21 @@ type AssetsKeeper interface {
 		coin sdk.Coin,
 		err error,
 	)
+	GetAsset(
+		ctx sdk.Context,
+		id uint32,
+	) (
+		val assettypes.Asset,
+		exists bool,
+	)
 }
 
 type PerpetualsKeeper interface {
-	ProductKeeper
-	GetSettlementPpm(
+	IsPositionUpdatable(
 		ctx sdk.Context,
-		perpetualId uint32,
-		quantums *big.Int,
-		index *big.Int,
+		id uint32,
 	) (
-		bigNetSettlement *big.Int,
-		newFundingIndex *big.Int,
+		updatable bool,
 		err error,
 	)
 	GetPerpetual(
@@ -71,9 +53,35 @@ type PerpetualsKeeper interface {
 		perpetual perptypes.Perpetual,
 		err error,
 	)
+	GetPerpetualAndMarketPrice(
+		ctx sdk.Context,
+		perpetualId uint32,
+	) (
+		perptypes.Perpetual,
+		pricestypes.MarketPrice,
+		error,
+	)
+	GetPerpetualAndMarketPriceAndLiquidityTier(
+		ctx sdk.Context,
+		perpetualId uint32,
+	) (
+		perptypes.Perpetual,
+		pricestypes.MarketPrice,
+		perptypes.LiquidityTier,
+		error,
+	)
+	GetLiquidityTier(
+		ctx sdk.Context,
+		id uint32,
+	) (
+		perptypes.LiquidityTier,
+		error,
+	)
 	GetAllPerpetuals(ctx sdk.Context) []perptypes.Perpetual
 	GetInsuranceFundName(ctx sdk.Context, perpetualId uint32) (string, error)
 	GetInsuranceFundModuleAddress(ctx sdk.Context, perpetualId uint32) (sdk.AccAddress, error)
+	IsIsolatedPerpetual(ctx sdk.Context, perpetualId uint32) (bool, error)
+	ModifyOpenInterest(ctx sdk.Context, perpetualId uint32, bigQuantums *big.Int) error
 }
 
 // BankKeeper defines the expected interface needed to retrieve account balances.
@@ -91,6 +99,7 @@ type BankKeeper interface {
 	) error
 	SendCoinsFromModuleToModule(ctx context.Context, senderModule, recipientModule string, amt sdk.Coins) error
 	SendCoins(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) error
+	GetBalance(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin
 }
 
 type BlocktimeKeeper interface {

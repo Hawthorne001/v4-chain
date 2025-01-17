@@ -12,6 +12,10 @@ import (
 	satypes "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
 )
 
+var (
+	timeoutHeightLogKey = "TimeoutHeight"
+)
+
 // ClobDecorator is an AnteDecorator which is responsible for:
 //   - adding short term order placements and cancelations to the in-memory orderbook (`CheckTx` only).
 //   - adding stateful order placements and cancelations to state (`CheckTx` and `RecheckTx` only).
@@ -60,23 +64,19 @@ func (cd ClobDecorator) AnteHandle(
 		return next(ctx, tx, simulate)
 	}
 
+	// Disable order placement and cancelation processing if the clob keeper is not initialized.
+	if !cd.clobKeeper.IsInMemStructuresInitialized() {
+		return ctx, errorsmod.Wrap(
+			types.ErrClobNotInitialized,
+			"clob keeper is not initialized. Please wait for the next block.",
+		)
+	}
+
 	msgs := tx.GetMsgs()
 	var msg = msgs[0]
 
-	// Set request-level logging tags
-	ctx = log.AddPersistentTagsToLogger(ctx,
-		log.Module, log.Clob,
-		log.Callback, lib.TxMode(ctx),
-		log.BlockHeight, ctx.BlockHeight()+1,
-		log.Msg, msg,
-	)
-
 	switch msg := msg.(type) {
 	case *types.MsgCancelOrder:
-		ctx = log.AddPersistentTagsToLogger(ctx,
-			log.Handler, log.CancelOrder,
-		)
-
 		if msg.OrderId.IsStatefulOrder() {
 			err = cd.clobKeeper.CancelStatefulOrder(ctx, msg)
 		} else {
@@ -96,11 +96,8 @@ func (cd ClobDecorator) AnteHandle(
 		)
 
 	case *types.MsgPlaceOrder:
-		ctx = log.AddPersistentTagsToLogger(ctx,
-			log.Handler, log.PlaceOrder,
-		)
 		if msg.Order.OrderId.IsStatefulOrder() {
-			err = cd.clobKeeper.PlaceStatefulOrder(ctx, msg)
+			err = cd.clobKeeper.PlaceStatefulOrder(ctx, msg, false)
 
 			log.DebugLog(ctx, "Received new stateful order",
 				log.Tx, cometbftlog.NewLazySprintf("%X", tmhash.Sum(ctx.TxBytes())),
@@ -111,6 +108,21 @@ func (cd ClobDecorator) AnteHandle(
 			// No need to process short term orders on `ReCheckTx`.
 			if ctx.IsReCheckTx() {
 				return next(ctx, tx, simulate)
+			}
+
+			// HOTFIX: Reject any short-term place orders in a transaction with a non-zero timeout height < good til block
+			if timeoutHeight := GetTimeoutHeight(tx); timeoutHeight > 0 &&
+				timeoutHeight < uint64(msg.Order.GetGoodTilBlock()) && ctx.IsCheckTx() {
+				log.InfoLog(
+					ctx,
+					"Rejected short-term place order with non-zero timeout height < goodTilBlock",
+					timeoutHeightLogKey,
+					timeoutHeight,
+				)
+				return ctx, errorsmod.Wrap(
+					sdkerrors.ErrInvalidRequest,
+					"timeout height (if non-zero) may not be less than `goodTilBlock` for a short-term place order",
+				)
 			}
 
 			var orderSizeOptimisticallyFilledFromMatchingQuantums satypes.BaseQuantums
@@ -136,11 +148,6 @@ func (cd ClobDecorator) AnteHandle(
 		if ctx.IsReCheckTx() {
 			return next(ctx, tx, simulate)
 		}
-
-		ctx = log.AddPersistentTagsToLogger(
-			ctx,
-			log.Handler, log.MsgBatchCancel,
-		)
 
 		success, failures, err := cd.clobKeeper.BatchCancelShortTermOrder(
 			ctx,
@@ -250,4 +257,16 @@ func IsShortTermClobMsgTx(ctx sdk.Context, tx sdk.Tx) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// GetTimeoutHeight returns the timeout height of a transaction. If the transaction does not have
+// a timeout height, return 0.
+func GetTimeoutHeight(tx sdk.Tx) uint64 {
+	timeoutTx, ok := tx.(sdk.TxWithTimeoutHeight)
+	if !ok {
+		return 0
+	}
+
+	timeoutHeight := timeoutTx.GetTimeoutHeight()
+	return timeoutHeight
 }

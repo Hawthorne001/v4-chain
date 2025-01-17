@@ -1,5 +1,6 @@
 import * as AssetTable from '../../src/stores/asset-table';
 import * as BlockTable from '../../src/stores/block-table';
+import * as FirebaseNotificationTokenTable from '../../src/stores/firebase-notification-token-table';
 import * as LiquidityTiersTable from '../../src/stores/liquidity-tiers-table';
 import * as MarketTable from '../../src/stores/market-table';
 import * as PerpetualMarketTable from '../../src/stores/perpetual-market-table';
@@ -26,18 +27,38 @@ import {
   defaultTendermintEvent2,
   defaultTendermintEvent3,
   defaultTendermintEvent4,
+  defaultFirebaseNotificationToken,
   defaultWallet,
+  isolatedMarket,
+  isolatedMarket2,
+  isolatedPerpetualMarket,
+  isolatedPerpetualMarket2,
+  isolatedSubaccount,
+  isolatedSubaccount2,
+  defaultSubaccount2Num0,
+  defaultSubaccount3Num0,
 } from './constants';
+
+export async function seedAdditionalSubaccounts() {
+  await Promise.all([
+    SubaccountTable.create(defaultSubaccount2Num0),
+    SubaccountTable.create(defaultSubaccount3Num0),
+  ]);
+}
 
 export async function seedData() {
   await Promise.all([
     SubaccountTable.create(defaultSubaccount),
     SubaccountTable.create(defaultSubaccount2),
+    SubaccountTable.create(isolatedSubaccount),
+    SubaccountTable.create(isolatedSubaccount2),
   ]);
   await Promise.all([
     MarketTable.create(defaultMarket),
     MarketTable.create(defaultMarket2),
     MarketTable.create(defaultMarket3),
+    MarketTable.create(isolatedMarket),
+    MarketTable.create(isolatedMarket2),
   ]);
   await Promise.all([
     LiquidityTiersTable.create(defaultLiquidityTier),
@@ -47,6 +68,8 @@ export async function seedData() {
     PerpetualMarketTable.create(defaultPerpetualMarket),
     PerpetualMarketTable.create(defaultPerpetualMarket2),
     PerpetualMarketTable.create(defaultPerpetualMarket3),
+    PerpetualMarketTable.create(isolatedPerpetualMarket),
+    PerpetualMarketTable.create(isolatedPerpetualMarket2),
   ]);
   await Promise.all([
     BlockTable.create(defaultBlock),
@@ -65,5 +88,8 @@ export async function seedData() {
   ]);
   await Promise.all([
     WalletTable.create(defaultWallet),
+  ]);
+  await Promise.all([
+    FirebaseNotificationTokenTable.create(defaultFirebaseNotificationToken),
   ]);
 }

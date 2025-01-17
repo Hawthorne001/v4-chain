@@ -2,8 +2,10 @@ package clob_test
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/cometbft/cometbft/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/dydxprotocol/v4-chain/protocol/dtypes"
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
 	testapp "github.com/dydxprotocol/v4-chain/protocol/testutil/app"
@@ -11,8 +13,6 @@ import (
 	clobtypes "github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 	satypes "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestPlaceOrder_EquityTierLimit(t *testing.T) {
@@ -25,224 +25,6 @@ func TestPlaceOrder_EquityTierLimit(t *testing.T) {
 		expectError                                   bool
 		crashingAppCheckTxNonDeterminsmChecksDisabled bool
 	}{
-		"Short-term order would exceed max open short-term orders in same block": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			expectError: true,
-		},
-		"Short-term order would exceed max open short-term orders in same block with multiple orders": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20,
-					testapp.DefaultGenesis(),
-				),
-				testapp.MustScaleOrder(
-					constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob0_Buy6_Price10_GTB20,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          2,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			expectError: true,
-		},
-		"Long-term order would exceed max open stateful orders in same block": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				StatefulOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			expectError: true,
-		},
-		"Long-term order would exceed max open stateful orders in same block with multiple orders": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20,
-					testapp.DefaultGenesis(),
-				),
-				testapp.MustScaleOrder(
-					constants.ConditionalOrder_Alice_Num0_Id0_Clob1_Buy5_Price10_GTBT15_StopLoss20,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				StatefulOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          2,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			expectError: true,
-		},
-		"Conditional order would exceed max open stateful orders in same block": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				StatefulOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			expectError: true,
-		},
-		"Conditional order would exceed max open stateful orders in same block with multiple orders": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15,
-					testapp.DefaultGenesis(),
-				),
-				testapp.MustScaleOrder(
-					constants.LongTermOrder_Alice_Num0_Id1_Clob1_Sell65_Price15_GTBT25,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_StopLoss20,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				StatefulOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          2,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			expectError: true,
-		},
-		"Short-term order would exceed max open short-term orders across blocks": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			advanceBlock: true,
-			expectError:  true,
-			// The short-term order will be forgotten when restarting the app.
-			crashingAppCheckTxNonDeterminsmChecksDisabled: true,
-		},
 		"Long-term order would exceed max open stateful orders across blocks": {
 			allowedOrders: []clobtypes.Order{
 				testapp.MustScaleOrder(
@@ -333,36 +115,6 @@ func TestPlaceOrder_EquityTierLimit(t *testing.T) {
 			advanceBlock: true,
 			expectError:  true,
 		},
-		"Conditional FoK order would exceed max open stateful orders across blocks": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price50_GTBT10_StopLoss51_FOK,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				StatefulOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			advanceBlock: true,
-			expectError:  true,
-		},
 		"Conditional IoC order would exceed max open stateful orders across blocks": {
 			allowedOrders: []clobtypes.Order{
 				testapp.MustScaleOrder(
@@ -371,7 +123,7 @@ func TestPlaceOrder_EquityTierLimit(t *testing.T) {
 				),
 			},
 			limitedOrder: testapp.MustScaleOrder(
-				constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price50_GTBT10_StopLoss51_FOK,
+				constants.ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price50_GTBT10_StopLoss51_IOC,
 				testapp.DefaultGenesis(),
 			),
 			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
@@ -392,38 +144,6 @@ func TestPlaceOrder_EquityTierLimit(t *testing.T) {
 			},
 			advanceBlock: true,
 			expectError:  true,
-		},
-		"Order cancellation prevents exceeding max open short-term orders for short-term order in same block": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			cancellation: clobtypes.NewMsgCancelOrderShortTerm(
-				constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20.OrderId,
-				constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20.GetGoodTilBlock(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
 		},
 		"Order cancellation prevents exceeding max open stateful orders for long-term order in same block": {
 			allowedOrders: []clobtypes.Order{
@@ -521,41 +241,6 @@ func TestPlaceOrder_EquityTierLimit(t *testing.T) {
 					},
 				},
 			},
-		},
-		"Order cancellation prevents exceeding max open short-term orders for short-term order across blocks": {
-			allowedOrders: []clobtypes.Order{
-				testapp.MustScaleOrder(
-					constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20,
-					testapp.DefaultGenesis(),
-				),
-			},
-			limitedOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			cancellation: clobtypes.NewMsgCancelOrderShortTerm(
-				constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20.OrderId,
-				constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20.GetGoodTilBlock(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			advanceBlock: true,
-			// The short-term order & cancel will be forgotten when restarting the app.
-			crashingAppCheckTxNonDeterminsmChecksDisabled: true,
 		},
 		"Order cancellation prevents exceeding max open stateful orders for long-term order across blocks": {
 			allowedOrders: []clobtypes.Order{
@@ -715,8 +400,6 @@ func TestPlaceOrder_EquityTierLimit(t *testing.T) {
 							len(tc.allowedOrders),
 						),
 					)
-
-					checkThatFoKOrderIsNotBlockedByEquityTierLimits(t, tApp, ctx)
 				} else {
 					require.Conditionf(t, resp.IsOK, "Expected CheckTx to succeed. Response: %+v", resp)
 				}
@@ -737,65 +420,6 @@ func TestPlaceOrder_EquityTierLimit_OrderExpiry(t *testing.T) {
 		expectError                                   bool
 		crashingAppCheckTxNonDeterminsmChecksDisabled bool
 	}{
-		"Short-term order has not expired": {
-			firstOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			secondOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			advanceToBlockAndTime: 14,
-			expectError:           true,
-			// Short term order will be forgotten on app restart.
-			crashingAppCheckTxNonDeterminsmChecksDisabled: true,
-		},
-		"Short-term order has expired": {
-			firstOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			secondOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			advanceToBlockAndTime: 15,
-			// Short term order will be forgotten on app restart.
-			crashingAppCheckTxNonDeterminsmChecksDisabled: true,
-		},
 		"Stateful order has not expired": {
 			firstOrder: testapp.MustScaleOrder(
 				constants.LongTermOrder_Alice_Num0_Id0_Clob1_Buy5_Price10_GTBT5,
@@ -887,8 +511,6 @@ func TestPlaceOrder_EquityTierLimit_OrderExpiry(t *testing.T) {
 				if tc.expectError {
 					require.Conditionf(t, resp.IsErr, "Expected CheckTx to error. Response: %+v", resp)
 					require.Contains(t, resp.Log, "Opening order would exceed equity tier limit of 1. Order count: 1,")
-
-					checkThatFoKOrderIsNotBlockedByEquityTierLimits(t, tApp, ctx)
 				} else {
 					require.Conditionf(t, resp.IsOK, "Expected CheckTx to succeed. Response: %+v", resp)
 				}
@@ -911,132 +533,6 @@ func TestPlaceOrder_EquityTierLimit_OrderFill(t *testing.T) {
 		expectError                                   bool
 		crashingAppCheckTxNonDeterminsmChecksDisabled bool
 	}{
-		"Fully filled order prevents exceeding max open short-term orders for short-term order in same block": {
-			makerOrder: testapp.MustScaleOrder(
-				constants.Order_Bob_Num0_Id8_Clob0_Sell20_Price10_GTB22,
-				testapp.DefaultGenesis(),
-			),
-			takerOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20,
-				testapp.DefaultGenesis(),
-			),
-			extraOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-		},
-		"Partially filled order causes new short-term order to exceed max open short-term orders in same block": {
-			makerOrder: testapp.MustScaleOrder(
-				constants.Order_Bob_Num0_Id8_Clob0_Sell20_Price10_GTB22,
-				testapp.DefaultGenesis(),
-			),
-			takerOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob0_Buy35_Price10_GTB20,
-				testapp.DefaultGenesis(),
-			),
-			extraOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			expectError: true,
-		},
-		"Fully filled order prevents exceeding max open short-term orders for short-term order across blocks": {
-			makerOrder: testapp.MustScaleOrder(
-				constants.Order_Bob_Num0_Id8_Clob0_Sell20_Price10_GTB22,
-				testapp.DefaultGenesis(),
-			),
-			takerOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob0_Buy5_Price10_GTB20,
-				testapp.DefaultGenesis(),
-			),
-			extraOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			advanceBlock: true,
-		},
-		"Partially filled order causes new short-term order to exceed max open short-term orders across blocks": {
-			makerOrder: testapp.MustScaleOrder(
-				constants.Order_Bob_Num0_Id8_Clob0_Sell20_Price10_GTB22,
-				testapp.DefaultGenesis(),
-			),
-			takerOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob0_Buy35_Price10_GTB20,
-				testapp.DefaultGenesis(),
-			),
-			extraOrder: testapp.MustScaleOrder(
-				constants.Order_Alice_Num0_Id0_Clob1_Buy5_Price10_GTB15,
-				testapp.DefaultGenesis(),
-			),
-			equityTierLimitConfiguration: clobtypes.EquityTierLimitConfiguration{
-				ShortTermOrderEquityTiers: []clobtypes.EquityTierLimit{
-					{
-						UsdTncRequired: dtypes.NewInt(0),
-						Limit:          0,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(5_000_000_000), // $5,000
-						Limit:          1,
-					},
-					{
-						UsdTncRequired: dtypes.NewInt(70_000_000_000), // $70,000
-						Limit:          100,
-					},
-				},
-			},
-			advanceBlock: true,
-			expectError:  true,
-			// The short-term order will be forgotten when restarting the app.
-			crashingAppCheckTxNonDeterminsmChecksDisabled: true,
-		},
 		"Order fully filled prevents exceeding max open stateful orders for conditional order across blocks": {
 			makerOrder: testapp.MustScaleOrder(
 				constants.LongTermOrder_Bob_Num0_Id0_Clob0_Sell5_Price5_GTBT10,
@@ -1214,20 +710,5 @@ func TestPlaceOrder_EquityTierLimit_OrderFill(t *testing.T) {
 			// Ensure that any successful transactions can be delivered.
 			tApp.AdvanceToBlock(5, testapp.AdvanceToBlockOptions{})
 		})
-	}
-}
-
-func checkThatFoKOrderIsNotBlockedByEquityTierLimits(t *testing.T, tApp *testapp.TestApp, ctx sdk.Context) {
-	for _, fokTx := range testapp.MustMakeCheckTxsWithClobMsg(
-		ctx,
-		tApp.App,
-		*clobtypes.NewMsgPlaceOrder(testapp.MustScaleOrder(
-			constants.Order_Alice_Num0_Id0_Clob1_Buy10_Price15_GTB20_FOK,
-			testapp.DefaultGenesis(),
-		)),
-	) {
-		fokResponse := tApp.CheckTx(fokTx)
-		require.Conditionf(t, fokResponse.IsErr, "Expected CheckTx to error. Response: %+v", fokResponse)
-		require.Contains(t, fokResponse.Log, "FillOrKill order could not be fully filled")
 	}
 }

@@ -1,6 +1,7 @@
 package gov_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cometbft/cometbft/types"
@@ -14,6 +15,8 @@ import (
 	clobtypes "github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 	perptypes "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/types"
 	pricestypes "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
+	slinkytypes "github.com/skip-mev/slinky/pkg/types"
+	marketmaptypes "github.com/skip-mev/slinky/x/marketmap/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -170,6 +173,7 @@ func TestUpdatePerpetualsParams(t *testing.T) {
 					AtomicResolution:  TEST_PERPETUAL_PARAMS.AtomicResolution,
 					DefaultFundingPpm: 500,
 					LiquidityTier:     123,
+					MarketType:        perptypes.PerpetualMarketType_PERPETUAL_MARKET_TYPE_CROSS,
 				},
 			},
 			genesisLiquidityTierIds: []uint32{123},
@@ -186,6 +190,7 @@ func TestUpdatePerpetualsParams(t *testing.T) {
 					AtomicResolution:  TEST_PERPETUAL_PARAMS.AtomicResolution,
 					DefaultFundingPpm: 500,
 					LiquidityTier:     123,
+					MarketType:        perptypes.PerpetualMarketType_PERPETUAL_MARKET_TYPE_CROSS,
 				},
 			},
 			genesisLiquidityTierIds: []uint32{123},
@@ -202,6 +207,7 @@ func TestUpdatePerpetualsParams(t *testing.T) {
 					AtomicResolution:  TEST_PERPETUAL_PARAMS.AtomicResolution,
 					DefaultFundingPpm: 1_000_001,
 					LiquidityTier:     123,
+					MarketType:        perptypes.PerpetualMarketType_PERPETUAL_MARKET_TYPE_CROSS,
 				},
 			},
 			genesisLiquidityTierIds: []uint32{123},
@@ -218,6 +224,7 @@ func TestUpdatePerpetualsParams(t *testing.T) {
 					AtomicResolution:  TEST_PERPETUAL_PARAMS.AtomicResolution,
 					DefaultFundingPpm: 500,
 					LiquidityTier:     123,
+					MarketType:        perptypes.PerpetualMarketType_PERPETUAL_MARKET_TYPE_CROSS,
 				},
 			},
 			genesisLiquidityTierIds:   []uint32{123},
@@ -234,6 +241,7 @@ func TestUpdatePerpetualsParams(t *testing.T) {
 					AtomicResolution:  TEST_PERPETUAL_PARAMS.AtomicResolution,
 					DefaultFundingPpm: 500,
 					LiquidityTier:     124, // liquidity tier 124 does not exist.
+					MarketType:        perptypes.PerpetualMarketType_PERPETUAL_MARKET_TYPE_CROSS,
 				},
 			},
 			genesisLiquidityTierIds: []uint32{123},
@@ -250,6 +258,7 @@ func TestUpdatePerpetualsParams(t *testing.T) {
 					AtomicResolution:  TEST_PERPETUAL_PARAMS.AtomicResolution,
 					DefaultFundingPpm: 500,
 					LiquidityTier:     0,
+					MarketType:        perptypes.PerpetualMarketType_PERPETUAL_MARKET_TYPE_CROSS,
 				},
 			},
 			genesisMarketIds:       []uint32{4},
@@ -267,6 +276,35 @@ func TestUpdatePerpetualsParams(t *testing.T) {
 						genesisState.Params.VotingPeriod = &testapp.TestVotingPeriod
 					},
 				)
+				// Initialize marketmap module with genesis markets.
+				testapp.UpdateGenesisDocWithAppStateForModule(
+					&genesis,
+					func(genesisState *marketmaptypes.GenesisState) {
+						markets := make(map[string]marketmaptypes.Market)
+						marketIds := append(tc.genesisMarketIds, TEST_PERPETUAL_PARAMS.MarketId)
+						for i := range marketIds {
+							ticker := marketmaptypes.Ticker{
+								CurrencyPair:     slinkytypes.CurrencyPair{Base: fmt.Sprintf("%d", i), Quote: fmt.Sprintf("%d", i)},
+								Decimals:         8,
+								MinProviderCount: 3,
+								Enabled:          true,
+								Metadata_JSON:    "",
+							}
+							markets[fmt.Sprintf("%d/%d", i, i)] = marketmaptypes.Market{
+								Ticker: ticker,
+								ProviderConfigs: []marketmaptypes.ProviderConfig{
+									{Name: "binance_ws", OffChainTicker: "test"},
+									{Name: "bybit_ws", OffChainTicker: "test"},
+									{Name: "coinbase_ws", OffChainTicker: "test"},
+								},
+							}
+						}
+						marketMap := marketmaptypes.MarketMap{
+							Markets: markets,
+						}
+						genesisState.MarketMap = marketMap
+					},
+				)
 				// Initialize prices module with genesis markets.
 				testapp.UpdateGenesisDocWithAppStateForModule(
 					&genesis,
@@ -276,6 +314,7 @@ func TestUpdatePerpetualsParams(t *testing.T) {
 						for i, marketId := range append(tc.genesisMarketIds, TEST_PERPETUAL_PARAMS.MarketId) {
 							marketParamPrice := pricestest.GenerateMarketParamPrice(
 								pricestest.WithId(marketId),
+								pricestest.WithPair(fmt.Sprintf("%d-%d", i, i)),
 							)
 							marketParams[i] = marketParamPrice.Param
 							marketPrices[i] = marketParamPrice.Price

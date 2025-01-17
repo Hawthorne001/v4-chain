@@ -3,11 +3,12 @@ package prices_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/dydxprotocol/v4-chain/protocol/app/module"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/dydxprotocol/v4-chain/protocol/app/module"
 
 	"github.com/dydxprotocol/v4-chain/protocol/testutil/constants"
 
@@ -19,11 +20,12 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/dydxprotocol/v4-chain/protocol/mocks"
 	"github.com/dydxprotocol/v4-chain/protocol/testutil/daemons/pricefeed"
-	"github.com/dydxprotocol/v4-chain/protocol/testutil/keeper"
+	keepertest "github.com/dydxprotocol/v4-chain/protocol/testutil/keeper"
 	"github.com/dydxprotocol/v4-chain/protocol/x/prices"
 	prices_keeper "github.com/dydxprotocol/v4-chain/protocol/x/prices/keeper"
 	pricestypes "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	marketmapkeeper "github.com/skip-mev/slinky/x/marketmap/keeper"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -32,9 +34,9 @@ const (
 	// Exchange config json is left empty as it is not validated by the server.
 	// This genesis state is formatted to export back to itself. It explicitly defines all fields using valid defaults.
 	validGenesisState = `{` +
-		`"market_params":[{"id":0,"pair":"DENT-USD","exponent":0,"min_exchanges":1,"min_price_change_ppm":1,` +
+		`"market_params":[{"id":0,"pair":"DENT-USD","exponent":-1,"min_exchanges":1,"min_price_change_ppm":1,` +
 		`"exchange_config_json":"{}"}],` +
-		`"market_prices":[{"id":0,"exponent":0,"price":"1"}]` +
+		`"market_prices":[{"id":0,"exponent":-1,"price":"1"}]` +
 		`}`
 )
 
@@ -49,13 +51,15 @@ func createAppModule(t *testing.T) prices.AppModule {
 func createAppModuleWithKeeper(t *testing.T) (prices.AppModule, *prices_keeper.Keeper, sdk.Context) {
 	appCodec := codec.NewProtoCodec(module.InterfaceRegistry)
 
-	ctx, keeper, _, _, _, mockTimeProvider := keeper.PricesKeepers(t)
+	ctx, keeper, _, _, mockTimeProvider, _, _ := keepertest.PricesKeepers(t)
 	// Mock the time provider response for market creation.
 	mockTimeProvider.On("Now").Return(constants.TimeT)
 
 	return prices.NewAppModule(
 		appCodec,
 		*keeper,
+		nil,
+		nil,
 		nil,
 		nil,
 	), keeper, ctx
@@ -124,8 +128,8 @@ func TestAppModuleBasic_ValidateGenesisErr(t *testing.T) {
 		},
 		"Bad state: duplicate market param id": {
 			genesisJson: `{"market_params": [` +
-				`{"id":0,"pair": "DENT-USD","minExchanges":1,"minPriceChangePpm":1,"exchangeConfigJson":"{}"},` +
-				`{"id":0,"pair": "LINK-USD","minExchanges":1,"minPriceChangePpm":1,"exchangeConfigJson":"{}"}` +
+				`{"id":0,"pair": "DENT-USD","minPriceChangePpm":1},` +
+				`{"id":0,"pair": "LINK-USD","minPriceChangePpm":1}` +
 				`]}`,
 			expectedErr: "duplicated market param id",
 		},
@@ -134,17 +138,8 @@ func TestAppModuleBasic_ValidateGenesisErr(t *testing.T) {
 			expectedErr: errorsmod.Wrap(pricestypes.ErrInvalidInput, "Pair cannot be empty").Error(),
 		},
 		"Bad state: Mismatch between params and prices": {
-			genesisJson: `{"market_params": [{"pair": "DENT-USD","minExchanges":1,"minPriceChangePpm":1,` +
-				`"exchangeConfigJson":"{}"}]}`,
+			genesisJson: `{"market_params": [{"pair": "DENT-USD","minPriceChangePpm":1}]}`,
 			expectedErr: "expected the same number of market prices and market params",
-		},
-		"Bad state: Invalid price": {
-			genesisJson: `{"market_params":[{"pair": "DENT-USD","minExchanges":1,"minPriceChangePpm":1,` +
-				`"exchangeConfigJson":"{}"}],"market_prices": [{"exponent":1,"price": "0"}]}`,
-			expectedErr: errorsmod.Wrap(
-				pricestypes.ErrInvalidInput,
-				"market param 0 exponent 0 does not match market price 0 exponent 1",
-			).Error(),
 		},
 	}
 	for name, tc := range tests {
@@ -246,6 +241,16 @@ func TestAppModule_InitExportGenesis(t *testing.T) {
 	am, keeper, ctx := createAppModuleWithKeeper(t)
 	cdc := codec.NewProtoCodec(module.InterfaceRegistry)
 	gs := json.RawMessage(validGenesisState)
+
+	// Create the market in market map
+	var genState pricestypes.GenesisState
+	cdc.MustUnmarshalJSON(gs, &genState)
+	keepertest.CreateMarketsInMarketMapFromParams(
+		t,
+		ctx,
+		keeper.MarketMapKeeper.(*marketmapkeeper.Keeper),
+		genState.MarketParams,
+	)
 
 	am.InitGenesis(ctx, cdc, gs)
 

@@ -284,17 +284,6 @@ func (f *FakeMemClobKeeper) GetStatefulOrdersTimeSlice(
 	return orderIds
 }
 
-func (f *FakeMemClobKeeper) AddOrderToOrderbookCollatCheck(
-	ctx sdk.Context,
-	clobPairId types.ClobPairId,
-	subaccountOpenOrders map[satypes.SubaccountId][]types.PendingOpenOrder,
-) (
-	success bool,
-	successPerUpdate map[satypes.SubaccountId]satypes.UpdateResult,
-) {
-	return f.collatCheckFn(subaccountOpenOrders)
-}
-
 func (f *FakeMemClobKeeper) addFakePositionSize(
 	ctx sdk.Context,
 	clobPairId types.ClobPairId,
@@ -338,11 +327,12 @@ func (f *FakeMemClobKeeper) addFakeFillAmount(
 func (f *FakeMemClobKeeper) ProcessSingleMatch(
 	ctx sdk.Context,
 	matchWithOrders *types.MatchWithOrders,
+	affiliatesWhitelistMap map[string]uint32,
 ) (
 	success bool,
 	takerUpdateResult satypes.UpdateResult,
 	makerUpdateResult satypes.UpdateResult,
-	offchainUpdates *types.OffchainUpdates,
+	affiliateRevSharesQuoteQuantums *big.Int,
 	err error,
 ) {
 	makerOrder := matchWithOrders.MakerOrder
@@ -375,7 +365,7 @@ func (f *FakeMemClobKeeper) ProcessSingleMatch(
 			)
 		}
 
-		return true, satypes.Success, satypes.Success, types.NewOffchainUpdates(), nil
+		return true, satypes.Success, satypes.Success, big.NewInt(0), nil
 	}
 
 	subaccountMatchedOrders := make(map[satypes.SubaccountId][]types.PendingOpenOrder)
@@ -422,7 +412,7 @@ func (f *FakeMemClobKeeper) ProcessSingleMatch(
 		}
 	}
 
-	return success, takerUpdateResult, makerUpdateResult, types.NewOffchainUpdates(), nil
+	return success, takerUpdateResult, makerUpdateResult, big.NewInt(0), nil
 }
 
 func (f *FakeMemClobKeeper) GetStatePosition(
@@ -510,4 +500,35 @@ func (f *FakeMemClobKeeper) ValidateSubaccountEquityTierLimitForStatefulOrder(
 
 func (f *FakeMemClobKeeper) Logger(ctx sdk.Context) log.Logger {
 	return ctx.Logger()
+}
+
+func (f *FakeMemClobKeeper) SendOrderbookUpdates(
+	ctx sdk.Context,
+	offchainUpdates *types.OffchainUpdates,
+) {
+}
+
+func (f *FakeMemClobKeeper) SendOrderbookFillUpdate(
+	ctx sdk.Context,
+	orderbookFill types.StreamOrderbookFill,
+) {
+}
+
+func (f *FakeMemClobKeeper) SendTakerOrderStatus(
+	ctx sdk.Context,
+	takerOrder types.StreamTakerOrder,
+) {
+}
+
+// Placeholder to satisfy interface implementation of types.MemClobKeeper
+func (f *FakeMemClobKeeper) AddOrderToOrderbookSubaccountUpdatesCheck(
+	ctx sdk.Context,
+	subaccountId satypes.SubaccountId,
+	order types.PendingOpenOrder,
+) satypes.UpdateResult {
+	return satypes.Success
+}
+
+func (f *FakeMemClobKeeper) MaybeValidateAuthenticators(ctx sdk.Context, txBytes []byte) error {
+	return nil
 }

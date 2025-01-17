@@ -30,8 +30,8 @@ var (
 					Ticker:         "LINKUSDT",
 					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
 				},
-				MARKET_MATIC_USD: {
-					Ticker:         "MATICUSDT",
+				MARKET_POL_USD: {
+					Ticker:         "POLUSDT",
 					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
 				},
 				MARKET_CRV_USD: {
@@ -224,9 +224,6 @@ var (
 				MARKET_USDT_USD: {
 					Ticker: "USDTZUSD",
 				},
-				MARKET_MATIC_USD: {
-					Ticker: "MATICUSD",
-				},
 				MARKET_MKR_USD: {
 					Ticker: "MKRUSD",
 				},
@@ -240,10 +237,6 @@ var (
 			MarketToMarketConfig: map[types.MarketId]types.MarketConfig{
 				MARKET_DYDX_USD: {
 					Ticker:         "DYDX_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_MATIC_USD: {
-					Ticker:         "MATIC_USDT",
 					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
 				},
 				MARKET_CRV_USD: {
@@ -443,8 +436,8 @@ var (
 					Ticker:         "DOTUSDT",
 					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
 				},
-				MARKET_MATIC_USD: {
-					Ticker:         "MATICUSDT",
+				MARKET_POL_USD: {
+					Ticker:         "POLUSDT",
 					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
 				},
 				MARKET_USDT_USD: {
@@ -454,16 +447,16 @@ var (
 			},
 		},
 		exchange_common.EXCHANGE_ID_CRYPTO_COM: {
-			Id:                   exchange_common.EXCHANGE_ID_CRYPTO_COM,
-			MarketToMarketConfig: map[types.MarketId]types.MarketConfig{},
+			Id: exchange_common.EXCHANGE_ID_CRYPTO_COM,
+			MarketToMarketConfig: map[types.MarketId]types.MarketConfig{
+				MARKET_POL_USD: {
+					Ticker: "POL_USD",
+				},
+			},
 		},
 		exchange_common.EXCHANGE_ID_HUOBI: {
 			Id: exchange_common.EXCHANGE_ID_HUOBI,
 			MarketToMarketConfig: map[types.MarketId]types.MarketConfig{
-				MARKET_MATIC_USD: {
-					Ticker:         "maticusdt",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
 				MARKET_SOL_USD: {
 					Ticker:         "solusdt",
 					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
@@ -552,10 +545,6 @@ var (
 				},
 				MARKET_LINK_USD: {
 					Ticker:         "LINK-USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_MATIC_USD: {
-					Ticker:         "MATIC-USDT",
 					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
 				},
 				MARKET_CRV_USD: {
@@ -700,8 +689,8 @@ var (
 					Ticker:         "LINK-USDT",
 					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
 				},
-				MARKET_MATIC_USD: {
-					Ticker:         "MATIC-USDT",
+				MARKET_POL_USD: {
+					Ticker:         "POL-USDT",
 					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
 				},
 				MARKET_CRV_USD: {
@@ -822,138 +811,6 @@ var (
 				},
 			},
 		},
-		exchange_common.EXCHANGE_ID_MEXC: {
-			MarketToMarketConfig: map[types.MarketId]types.MarketConfig{
-				MARKET_DYDX_USD: {
-					Ticker:         "DYDX_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_BTC_USD: {
-					Ticker:         "BTC_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_SOL_USD: {
-					Ticker:         "SOL_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_LTC_USD: {
-					Ticker:         "LTC_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_APE_USD: {
-					Ticker:         "APE_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_APT_USD: {
-					Ticker:         "APT_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_ARB_USD: {
-					Ticker:         "ARB_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_BLUR_USD: {
-					Ticker:         "BLUR_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_FIL_USD: {
-					Ticker:         "FIL_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_LDO_USD: {
-					Ticker:         "LDO_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_OP_USD: {
-					Ticker:         "OP_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_PEPE_USD: {
-					Ticker:         "PEPE_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_SEI_USD: {
-					Ticker:         "SEI_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_SHIB_USD: {
-					Ticker:         "SHIB_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_SUI_USD: {
-					Ticker:         "SUI_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_WLD_USD: {
-					Ticker:         "WLD_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_XLM_USD: {
-					Ticker:         "XLM_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_XRP_USD: {
-					Ticker:         "XRP_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_ETH_USD: {
-					Ticker:         "ETH_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_ADA_USD: {
-					Ticker:         "ADA_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_LINK_USD: {
-					Ticker:         "LINK_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_TRX_USD: {
-					Ticker:         "TRX_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_DOGE_USD: {
-					Ticker:         "DOGE_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_MKR_USD: {
-					Ticker:         "MKR_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_NEAR_USD: {
-					Ticker:         "NEAR_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_ATOM_USD: {
-					Ticker:         "ATOM_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_BCH_USD: {
-					Ticker:         "BCH_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_COMP_USD: {
-					Ticker:         "COMP_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_CRV_USD: {
-					Ticker:         "CRV_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_DOT_USD: {
-					Ticker:         "DOT_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_ETC_USD: {
-					Ticker:         "ETC_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-				MARKET_MATIC_USD: {
-					Ticker:         "MATIC_USDT",
-					AdjustByMarket: newMarketIdWithValue(MARKET_USDT_USD),
-				},
-			},
-		},
 		exchange_common.EXCHANGE_ID_COINBASE_PRO: {
 			Id: exchange_common.EXCHANGE_ID_COINBASE_PRO,
 			MarketToMarketConfig: map[types.MarketId]types.MarketConfig{
@@ -966,8 +823,8 @@ var (
 				MARKET_LINK_USD: {
 					Ticker: "LINK-USD",
 				},
-				MARKET_MATIC_USD: {
-					Ticker: "MATIC-USD",
+				MARKET_POL_USD: {
+					Ticker: "POL-USD",
 				},
 				MARKET_CRV_USD: {
 					Ticker: "CRV-USD",

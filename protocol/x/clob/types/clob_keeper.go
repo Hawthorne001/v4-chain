@@ -2,7 +2,6 @@ package types
 
 import (
 	"math/big"
-	"time"
 
 	"cosmossdk.io/log"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -14,14 +13,14 @@ type ClobKeeper interface {
 	LiquidationsKeeper
 	LiquidationsConfigKeeper
 
-	AddOrderToOrderbookCollatCheck(
+	IsInMemStructuresInitialized() bool
+	Initialize(ctx sdk.Context)
+
+	AddOrderToOrderbookSubaccountUpdatesCheck(
 		ctx sdk.Context,
-		clobPairId ClobPairId,
-		subaccountOpenOrders map[satypes.SubaccountId][]PendingOpenOrder,
-	) (
-		success bool,
-		successPerUpdate map[satypes.SubaccountId]satypes.UpdateResult,
-	)
+		subaccountId satypes.SubaccountId,
+		order PendingOpenOrder,
+	) satypes.UpdateResult
 	BatchCancelShortTermOrder(
 		ctx sdk.Context,
 		msg *MsgBatchCancel,
@@ -47,6 +46,7 @@ type ClobKeeper interface {
 	HandleMsgPlaceOrder(
 		ctx sdk.Context,
 		msg *MsgPlaceOrder,
+		isInternalOrder bool,
 	) (err error)
 	GetAllClobPairs(ctx sdk.Context) (list []ClobPair)
 	GetClobPair(ctx sdk.Context, id ClobPairId) (val ClobPair, found bool)
@@ -56,7 +56,11 @@ type ClobKeeper interface {
 		orderStatus OrderStatus,
 		err error,
 	)
-	PlaceStatefulOrder(ctx sdk.Context, msg *MsgPlaceOrder) error
+	PlaceStatefulOrder(
+		ctx sdk.Context,
+		msg *MsgPlaceOrder,
+		isInternalOrder bool,
+	) error
 
 	PruneStateFillAmountsForShortTermOrders(
 		ctx sdk.Context,
@@ -77,11 +81,12 @@ type ClobKeeper interface {
 	ProcessSingleMatch(
 		ctx sdk.Context,
 		matchWithOrders *MatchWithOrders,
+		affiliatesWhitelistMap map[string]uint32,
 	) (
 		success bool,
 		takerUpdateResult satypes.UpdateResult,
 		makerUpdateResult satypes.UpdateResult,
-		offchainUpdates *OffchainUpdates,
+		affiliateRevSharesQuoteQuantums *big.Int,
 		err error,
 	)
 	SetLongTermOrderPlacement(
@@ -98,20 +103,9 @@ type ClobKeeper interface {
 		orderId OrderId,
 	)
 	RemoveOrderFillAmount(ctx sdk.Context, orderId OrderId)
-	MustAddOrderToStatefulOrdersTimeSlice(
-		ctx sdk.Context,
-		goodTilBlockTime time.Time,
-		orderId OrderId,
-	)
-	GetStatefulOrdersTimeSlice(ctx sdk.Context, goodTilBlockTime time.Time) (
-		orderIds []OrderId,
-	)
 	MustRemoveStatefulOrder(
 		ctx sdk.Context,
 		orderId OrderId,
-	)
-	RemoveExpiredStatefulOrdersTimeSlices(ctx sdk.Context, blockTime time.Time) (
-		expiredOrderIds []OrderId,
 	)
 	GetProcessProposerMatchesEvents(ctx sdk.Context) ProcessProposerMatchesEvents
 	MustSetProcessProposerMatchesEvents(
@@ -132,7 +126,11 @@ type ClobKeeper interface {
 	GetIndexerEventManager() indexer_manager.IndexerEventManager
 	RateLimitCancelOrder(ctx sdk.Context, order *MsgCancelOrder) error
 	RateLimitPlaceOrder(ctx sdk.Context, order *MsgPlaceOrder) error
+	RateLimitBatchCancel(ctx sdk.Context, order *MsgBatchCancel) error
 	InitializeBlockRateLimit(ctx sdk.Context, config BlockRateLimitConfiguration) error
+	GetBlockRateLimitConfiguration(
+		ctx sdk.Context,
+	) (config BlockRateLimitConfiguration)
 	InitializeEquityTierLimit(ctx sdk.Context, config EquityTierLimitConfiguration) error
 	Logger(ctx sdk.Context) log.Logger
 	UpdateClobPair(
@@ -140,5 +138,19 @@ type ClobKeeper interface {
 		clobPair ClobPair,
 	) error
 	UpdateLiquidationsConfig(ctx sdk.Context, config LiquidationsConfig) error
-	InitializeNewGrpcStreams(ctx sdk.Context)
+	// full node streaming
+	InitializeNewStreams(
+		ctx sdk.Context,
+		subaccountSnapshots map[satypes.SubaccountId]*satypes.StreamSubaccountUpdate,
+	)
+	SendOrderbookUpdates(
+		ctx sdk.Context,
+		offchainUpdates *OffchainUpdates,
+	)
+	MigratePruneableOrders(ctx sdk.Context)
+	GetAllStatefulOrders(ctx sdk.Context) []Order
+	ResetAllDeliveredOrderIds(ctx sdk.Context)
+	// Migrate order expiration state (for upgrading to 5.2 only)
+	UnsafeMigrateOrderExpirationState(ctx sdk.Context)
+	SetNextClobPairID(ctx sdk.Context, nextID uint32)
 }

@@ -40,10 +40,12 @@ export default class WalletModel extends BaseModel {
       required: [
         'address',
         'totalTradingRewards',
+        'totalVolume',
       ],
       properties: {
         address: { type: 'string' },
         totalTradingRewards: { type: 'string', pattern: NonNegativeNumericPattern },
+        totalVolume: { type: 'string', pattern: NonNegativeNumericPattern },
       },
     };
   }
@@ -57,6 +59,8 @@ export default class WalletModel extends BaseModel {
   static get sqlToJsonConversions() {
     return {
       address: 'string',
+      totalTradingRewards: 'string',
+      totalVolume: 'string',
     };
   }
 
@@ -65,4 +69,6 @@ export default class WalletModel extends BaseModel {
   address!: string;
 
   totalTradingRewards!: string;
+
+  totalVolume!: string;
 }

@@ -294,6 +294,18 @@ var (
 		Subticks:     30,
 		GoodTilOneof: &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 10},
 	}
+	LongTermOrder_Bob_Num0_Id0_Clob1_Buy25_Price30_GTBT10 = clobtypes.Order{
+		OrderId: clobtypes.OrderId{
+			SubaccountId: Bob_Num0,
+			ClientId:     0,
+			OrderFlags:   clobtypes.OrderIdFlags_LongTerm,
+			ClobPairId:   1,
+		},
+		Side:         clobtypes.Order_SIDE_BUY,
+		Quantums:     25,
+		Subticks:     30,
+		GoodTilOneof: &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 10},
+	}
 	LongTermOrder_Bob_Num0_Id0_Clob0_Buy35_Price30_GTBT11 = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
 			SubaccountId: Bob_Num0,
@@ -456,6 +468,20 @@ var (
 		ConditionType:                   clobtypes.Order_CONDITION_TYPE_STOP_LOSS,
 		ConditionalOrderTriggerSubticks: 20,
 	}
+	ConditionalOrder_Alice_Num1_Id0_Clob0_Buy5_Price20_GTBT15_StopLoss20 = clobtypes.Order{
+		OrderId: clobtypes.OrderId{
+			SubaccountId: Alice_Num1,
+			ClientId:     0,
+			OrderFlags:   clobtypes.OrderIdFlags_Conditional,
+			ClobPairId:   0,
+		},
+		Side:                            clobtypes.Order_SIDE_BUY,
+		Quantums:                        5,
+		Subticks:                        20,
+		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 15},
+		ConditionType:                   clobtypes.Order_CONDITION_TYPE_STOP_LOSS,
+		ConditionalOrderTriggerSubticks: 20,
+	}
 	ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT15_TakeProfit20 = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
 			SubaccountId: Alice_Num0,
@@ -554,6 +580,20 @@ var (
 		ConditionType:                   clobtypes.Order_CONDITION_TYPE_STOP_LOSS,
 		ConditionalOrderTriggerSubticks: 25,
 	}
+	ConditionalOrder_Alice_Num1_Id1_Clob0_Buy15_Price25_GTBT15_StopLoss25 = clobtypes.Order{
+		OrderId: clobtypes.OrderId{
+			SubaccountId: Alice_Num1,
+			ClientId:     1,
+			OrderFlags:   clobtypes.OrderIdFlags_Conditional,
+			ClobPairId:   0,
+		},
+		Side:                            clobtypes.Order_SIDE_BUY,
+		Quantums:                        15,
+		Subticks:                        25,
+		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 15},
+		ConditionType:                   clobtypes.Order_CONDITION_TYPE_STOP_LOSS,
+		ConditionalOrderTriggerSubticks: 25,
+	}
 	ConditionalOrder_Alice_Num0_Id1_Clob0_Buy15_Price10_GTBT15_TakeProfit20 = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
 			SubaccountId: Alice_Num0,
@@ -624,6 +664,20 @@ var (
 		ConditionType:                   clobtypes.Order_CONDITION_TYPE_TAKE_PROFIT,
 		ConditionalOrderTriggerSubticks: 20,
 	}
+	ConditionalOrder_Alice_Num1_Id2_Clob0_Sell20_Price20_GTBT15_TakeProfit20 = clobtypes.Order{
+		OrderId: clobtypes.OrderId{
+			SubaccountId: Alice_Num1,
+			ClientId:     2,
+			OrderFlags:   clobtypes.OrderIdFlags_Conditional,
+			ClobPairId:   0,
+		},
+		Side:                            clobtypes.Order_SIDE_SELL,
+		Quantums:                        20,
+		Subticks:                        20,
+		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 15},
+		ConditionType:                   clobtypes.Order_CONDITION_TYPE_TAKE_PROFIT,
+		ConditionalOrderTriggerSubticks: 20,
+	}
 	ConditionalOrder_Alice_Num0_Id2_Clob0_Buy20_Price10_GTBT15_TakeProfit10 = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
 			SubaccountId: Alice_Num0,
@@ -655,6 +709,20 @@ var (
 	ConditionalOrder_Alice_Num0_Id3_Clob0_Buy25_Price25_GTBT15_StopLoss25 = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
 			SubaccountId: Alice_Num0,
+			ClientId:     3,
+			OrderFlags:   clobtypes.OrderIdFlags_Conditional,
+			ClobPairId:   0,
+		},
+		Side:                            clobtypes.Order_SIDE_BUY,
+		Quantums:                        25,
+		Subticks:                        10,
+		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 15},
+		ConditionType:                   clobtypes.Order_CONDITION_TYPE_STOP_LOSS,
+		ConditionalOrderTriggerSubticks: 25,
+	}
+	ConditionalOrder_Alice_Num1_Id3_Clob0_Buy25_Price25_GTBT15_StopLoss25 = clobtypes.Order{
+		OrderId: clobtypes.OrderId{
+			SubaccountId: Alice_Num1,
 			ClientId:     3,
 			OrderFlags:   clobtypes.OrderIdFlags_Conditional,
 			ClobPairId:   0,
@@ -709,6 +777,20 @@ var (
 		ConditionalOrderTriggerSubticks: 20,
 	}
 	ConditionalOrder_Alice_Num0_Id0_Clob1_Buy5_Price10_GTBT15_StopLoss20 = clobtypes.Order{
+		OrderId: clobtypes.OrderId{
+			SubaccountId: Alice_Num0,
+			ClientId:     0,
+			OrderFlags:   clobtypes.OrderIdFlags_Conditional,
+			ClobPairId:   1,
+		},
+		Side:                            clobtypes.Order_SIDE_BUY,
+		Quantums:                        5,
+		Subticks:                        10,
+		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 15},
+		ConditionType:                   clobtypes.Order_CONDITION_TYPE_STOP_LOSS,
+		ConditionalOrderTriggerSubticks: 20,
+	}
+	ConditionalOrder_Alice_Num0_Id1_Clob1_Buy5_Price10_GTBT15_StopLoss20 = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
 			SubaccountId: Alice_Num0,
 			ClientId:     0,
@@ -777,21 +859,6 @@ var (
 		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 15},
 		ConditionType:                   clobtypes.Order_CONDITION_TYPE_TAKE_PROFIT,
 		ConditionalOrderTriggerSubticks: 20,
-	}
-	ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price50_GTBT10_StopLoss51_FOK = clobtypes.Order{
-		OrderId: clobtypes.OrderId{
-			SubaccountId: Alice_Num0,
-			ClientId:     0,
-			OrderFlags:   clobtypes.OrderIdFlags_Conditional,
-			ClobPairId:   0,
-		},
-		Side:                            clobtypes.Order_SIDE_BUY,
-		Quantums:                        5,
-		Subticks:                        50,
-		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 10},
-		TimeInForce:                     clobtypes.Order_TIME_IN_FORCE_FILL_OR_KILL,
-		ConditionType:                   clobtypes.Order_CONDITION_TYPE_STOP_LOSS,
-		ConditionalOrderTriggerSubticks: 51,
 	}
 	ConditionalOrder_Alice_Num0_Id0_Clob0_Buy5_Price50_GTBT10_StopLoss51_IOC = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
@@ -1177,7 +1244,7 @@ var (
 		ConditionType:                   clobtypes.Order_CONDITION_TYPE_STOP_LOSS,
 		ConditionalOrderTriggerSubticks: 50_003_000_000,
 	}
-	ConditionalOrder_Carl_Num0_Id0_Clob0_Buy05BTC_Price50000_GTBT10_SL_50003_FOK = clobtypes.Order{
+	ConditionalOrder_Carl_Num0_Id0_Clob0_Buy05BTC_Price50000_GTBT10_SL_50003 = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
 			SubaccountId: Carl_Num0,
 			ClientId:     0,
@@ -1188,23 +1255,7 @@ var (
 		Quantums:                        50_000_000, // 0.5 BTC
 		Subticks:                        50_000_000_000,
 		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 10},
-		TimeInForce:                     clobtypes.Order_TIME_IN_FORCE_FILL_OR_KILL,
 		ConditionType:                   clobtypes.Order_CONDITION_TYPE_STOP_LOSS,
-		ConditionalOrderTriggerSubticks: 50_003_000_000,
-	}
-	ConditionalOrder_Carl_Num0_Id0_Clob0_Sell05BTC_Price50000_GTBT10_TP_50003_FOK = clobtypes.Order{
-		OrderId: clobtypes.OrderId{
-			SubaccountId: Carl_Num0,
-			ClientId:     0,
-			OrderFlags:   clobtypes.OrderIdFlags_Conditional,
-			ClobPairId:   0,
-		},
-		Side:                            clobtypes.Order_SIDE_SELL,
-		Quantums:                        50_000_000, // 0.5 BTC
-		Subticks:                        50_000_000_000,
-		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 10},
-		TimeInForce:                     clobtypes.Order_TIME_IN_FORCE_FILL_OR_KILL,
-		ConditionType:                   clobtypes.Order_CONDITION_TYPE_TAKE_PROFIT,
 		ConditionalOrderTriggerSubticks: 50_003_000_000,
 	}
 	ConditionalOrder_Carl_Num0_Id0_Clob0_Buy05BTC_Price50000_GTBT10_SL_50003_IOC = clobtypes.Order{
@@ -1238,7 +1289,7 @@ var (
 		ConditionalOrderTriggerSubticks: 49_999_000_000,
 	}
 
-	// Conditional FOK/IOC RO orders.
+	// Conditional IOC RO orders.
 	ConditionalOrder_Alice_Num1_Id1_Clob0_Sell05BTC_Price500000_GTBT20_TP_50001_IOC_RO = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
 			SubaccountId: Alice_Num1,
@@ -1255,24 +1306,21 @@ var (
 		ConditionType:                   clobtypes.Order_CONDITION_TYPE_TAKE_PROFIT,
 		ConditionalOrderTriggerSubticks: 50_001_000_000,
 	}
-	ConditionalOrder_Alice_Num1_Id1_Clob0_Sell05BTC_Price500000_GTBT20_TP_50001_FOK_RO = clobtypes.Order{
-		OrderId: clobtypes.OrderId{
-			SubaccountId: Alice_Num1,
-			ClientId:     1,
-			ClobPairId:   0,
-			OrderFlags:   clobtypes.OrderIdFlags_Conditional,
-		},
-		Side:                            clobtypes.Order_SIDE_SELL,
-		Quantums:                        50_000_000, // 0.5 BTC
-		Subticks:                        500_000_000_000,
-		GoodTilOneof:                    &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 20},
-		TimeInForce:                     clobtypes.Order_TIME_IN_FORCE_FILL_OR_KILL,
-		ReduceOnly:                      true,
-		ConditionType:                   clobtypes.Order_CONDITION_TYPE_TAKE_PROFIT,
-		ConditionalOrderTriggerSubticks: 50_001_000_000,
-	}
 
 	// Long-Term post-only orders.
+	LongTermOrder_Alice_Num0_Id0_Clob0_Buy5_Price10_GTBT5_PO = clobtypes.Order{
+		OrderId: clobtypes.OrderId{
+			SubaccountId: Alice_Num0,
+			ClientId:     0,
+			OrderFlags:   clobtypes.OrderIdFlags_LongTerm,
+			ClobPairId:   0,
+		},
+		Side:         clobtypes.Order_SIDE_BUY,
+		Quantums:     5,
+		Subticks:     10,
+		GoodTilOneof: &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 5},
+		TimeInForce:  clobtypes.Order_TIME_IN_FORCE_POST_ONLY,
+	}
 	LongTermOrder_Alice_Num0_Id0_Clob0_Buy100_Price10_GTBT15_PO = clobtypes.Order{
 		OrderId: clobtypes.OrderId{
 			SubaccountId: Alice_Num0,
@@ -1325,6 +1373,19 @@ var (
 		GoodTilOneof: &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 10},
 		TimeInForce:  clobtypes.Order_TIME_IN_FORCE_POST_ONLY,
 	}
+	LongTermOrder_Dave_Num0_Id0_Clob0_Sell025BTC_Price50000_GTBT10_PO = clobtypes.Order{
+		OrderId: clobtypes.OrderId{
+			SubaccountId: Dave_Num0,
+			ClientId:     0,
+			OrderFlags:   clobtypes.OrderIdFlags_LongTerm,
+			ClobPairId:   0,
+		},
+		Side:         clobtypes.Order_SIDE_SELL,
+		Quantums:     25_000_000,
+		Subticks:     50_000_000_000,
+		GoodTilOneof: &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 10},
+		TimeInForce:  clobtypes.Order_TIME_IN_FORCE_POST_ONLY,
+	}
 
 	// Long-Term reduce-only orders.
 	LongTermOrder_Bob_Num0_Id2_Clob0_Sell10_Price35_GTB20_RO = clobtypes.Order{
@@ -1339,21 +1400,6 @@ var (
 		Subticks:     35,
 		GoodTilOneof: &clobtypes.Order_GoodTilBlock{GoodTilBlock: 20},
 		ReduceOnly:   true,
-	}
-
-	// Long-Term Fill Or Kill Orders.
-	LongTermOrder_Carl_Num0_Id0_Clob0_Sell1BTC_Price50000_GTBT10_FOK = clobtypes.Order{
-		OrderId: clobtypes.OrderId{
-			SubaccountId: Carl_Num0,
-			ClientId:     0,
-			OrderFlags:   clobtypes.OrderIdFlags_LongTerm,
-			ClobPairId:   0,
-		},
-		Side:         clobtypes.Order_SIDE_SELL,
-		Quantums:     100_000_000,
-		Subticks:     50_000_000_000,
-		GoodTilOneof: &clobtypes.Order_GoodTilBlockTime{GoodTilBlockTime: 10},
-		TimeInForce:  clobtypes.Order_TIME_IN_FORCE_FILL_OR_KILL,
 	}
 
 	// Long-Term Immediate Or Cancel Orders.

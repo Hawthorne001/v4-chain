@@ -19,7 +19,7 @@ export const configSchema = {
 
   CHAIN_ID: parseString({ default: 'dydxprotocol' }),
   API_LIMIT_V4: parseInteger({
-    default: 100,
+    default: 1000,
   }),
   API_ORDERBOOK_LEVELS_PER_SIDE_LIMIT: parseInteger({ default: 100 }),
 
@@ -55,6 +55,17 @@ export const configSchema = {
   MAX_AGE_SCREENED_ADDRESS_COMPLIANCE_DATA_SECONDS: parseInteger({ default: 86_400 }), //  1 day
   // Expose setting compliance status, only set to true in dev/staging.
   EXPOSE_SET_COMPLIANCE_ENDPOINT: parseBoolean({ default: false }),
+
+  // Affiliates config
+  VOLUME_ELIGIBILITY_THRESHOLD: parseInteger({ default: 10_000 }),
+
+  // Vaults config
+  VAULT_PNL_HISTORY_DAYS: parseInteger({ default: 90 }),
+  VAULT_PNL_HISTORY_HOURS: parseInteger({ default: 72 }),
+  VAULT_PNL_START_DATE: parseString({ default: '2024-01-01T00:00:00Z' }),
+  VAULT_LATEST_PNL_TICK_WINDOW_HOURS: parseInteger({ default: 1 }),
+  VAULT_FETCH_FUNDING_INDEX_BLOCK_WINDOWS: parseInteger({ default: 250_000 }),
+
 };
 
 ////////////////////////////////////////////////////////////////////////////////

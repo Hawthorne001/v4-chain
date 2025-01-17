@@ -2,6 +2,7 @@ package clob_test
 
 import (
 	"math"
+	"math/big"
 	"testing"
 
 	"github.com/dydxprotocol/v4-chain/protocol/daemons/liquidation/api"
@@ -12,6 +13,7 @@ import (
 	testapp "github.com/dydxprotocol/v4-chain/protocol/testutil/app"
 	clobtest "github.com/dydxprotocol/v4-chain/protocol/testutil/clob"
 	"github.com/dydxprotocol/v4-chain/protocol/testutil/constants"
+	testutil "github.com/dydxprotocol/v4-chain/protocol/testutil/util"
 	assettypes "github.com/dydxprotocol/v4-chain/protocol/x/assets/types"
 	clobtypes "github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 	feetiertypes "github.com/dydxprotocol/v4-chain/protocol/x/feetiers/types"
@@ -65,7 +67,7 @@ func TestLiquidationConfig(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -73,19 +75,19 @@ func TestLiquidationConfig(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_499_000_000 - 50_000_000_000 - 250_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_499_000_000-50_000_000_000-250_000_000),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(100_000_000_000), // $100,000
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(100_000_000_000), // $100,000
+						),
 					},
 				},
 			},
@@ -115,7 +117,7 @@ func TestLiquidationConfig(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -123,19 +125,19 @@ func TestLiquidationConfig(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(100_000_000_000 - 50_000_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(100_000_000_000-50_000_000_000),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(-49_501_000_000 + 50_000_000_000 - 250_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(-49_501_000_000+50_000_000_000-250_000_000),
+						),
 					},
 				},
 			},
@@ -163,7 +165,7 @@ func TestLiquidationConfig(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -171,33 +173,35 @@ func TestLiquidationConfig(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_499_000_000 - 5_000_000_000 - 25_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_499_000_000-5_000_000_000-25_000_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(-90_000_000), // -0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(-90_000_000), // -0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(55_000_000_000), // $55,000
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(55_000_000_000), // $55,000
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(90_000_000), // 0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(90_000_000), // 0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 			},
@@ -225,7 +229,7 @@ func TestLiquidationConfig(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -233,33 +237,35 @@ func TestLiquidationConfig(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(100_000_000_000 - 5_000_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(100_000_000_000-5_000_000_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(-90_000_000), // -0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(-90_000_000), // -0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(-49_501_000_000 + 5_000_000_000 - 25_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(-49_501_000_000+5_000_000_000-25_000_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(90_000_000), // 0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(90_000_000), // 0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 			},
@@ -287,7 +293,7 @@ func TestLiquidationConfig(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -295,33 +301,35 @@ func TestLiquidationConfig(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_499_000_000 - 4_950_000_000 - 24_750_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_499_000_000-4_950_000_000-24_750_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(-90_000_000), // -0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(-90_000_000), // -0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(54_950_000_000), // $54,950
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(54_950_000_000), // $54,950
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(90_000_000), // 0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(90_000_000), // 0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 			},
@@ -353,7 +361,7 @@ func TestLiquidationConfig(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -361,33 +369,35 @@ func TestLiquidationConfig(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(100_000_000_000 - 5_050_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(100_000_000_000-5_050_000_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(-90_000_000), // -0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(-90_000_000), // -0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(-49_501_000_000 + 5_050_000_000 - 25_250_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(-49_501_000_000+5_050_000_000-25_250_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(90_000_000), // 0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(90_000_000), // 0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 			},
@@ -425,7 +435,7 @@ func TestLiquidationConfig(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -433,34 +443,36 @@ func TestLiquidationConfig(t *testing.T) {
 				{
 					Id: &constants.Carl_Num1,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId: 0,
+						testutil.CreateSingleAssetPosition(
+							0,
 							// $0.1 from insurance fund
-							Quantums: dtypes.NewInt(50_499_000_000 - 5_050_000_000 + 100_000),
-						},
+							big.NewInt(50_499_000_000-5_050_000_000+100_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(-90_000_000), // -0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(-90_000_000), // -0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_000_000_000 + 49_500_000_000 + 5_050_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_000_000_000+49_500_000_000+5_050_000_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(-10_000_000), // -0.1 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(-10_000_000), // -0.1 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 			},
@@ -498,7 +510,7 @@ func TestLiquidationConfig(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -506,33 +518,35 @@ func TestLiquidationConfig(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(100_000_000_000 - 50_500_000_000 - 4_950_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(100_000_000_000-50_500_000_000-4_950_000_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(10_000_000), // 0.1 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(10_000_000), // 0.1 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(-49_501_000_000 + 4_950_000_000 + 100_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(-49_501_000_000+4_950_000_000+100_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(90_000_000), // 0.9 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(90_000_000), // 0.9 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 			},
@@ -670,7 +684,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -678,19 +692,19 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_499_000_000 - 50_000_000_000 - 250_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_499_000_000-50_000_000_000-250_000_000),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(100_000_000_000), // $100,000
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(100_000_000_000), // $100,000
+						),
 					},
 				},
 			},
@@ -712,7 +726,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -720,33 +734,35 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_499_000_000 - 12_500_000_000 - 62_500_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_499_000_000-12_500_000_000-62_500_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(-75_000_000), // -0.75 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(-75_000_000), // -0.75 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_000_000_000 + 12_500_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_000_000_000+12_500_000_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(75_000_000), // 0.75 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(75_000_000), // 0.75 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 			},
@@ -771,7 +787,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -782,10 +798,10 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_000_000_000 + 50_499_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_000_000_000+50_499_000_000),
+						),
 					},
 				},
 			},
@@ -812,7 +828,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -820,33 +836,35 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_499_000_000 - (50_498_000_000 / 4) - 250_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_499_000_000-(50_498_000_000/4)-250_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(-75_000_000), // -0.75 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(-75_000_000), // -0.75 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_000_000_000 + (50_498_000_000 / 4)),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_000_000_000+(50_498_000_000/4)),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(75_000_000), // 0.75 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(75_000_000), // 0.75 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 			},
@@ -869,7 +887,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -901,7 +919,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -910,17 +928,18 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(49_999_000_000 - 12_499_750_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(49_999_000_000-12_499_750_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId:  0,
-							Quantums:     dtypes.NewInt(-75_000_000), // -0.75 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+						testutil.CreateSinglePerpetualPosition(
+							0,
+							big.NewInt(-75_000_000), // -0.75 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				// Dave's bankruptcy price to close 1 BTC long is $50,000, and deleveraging can not be
@@ -957,7 +976,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -965,18 +984,19 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(49_999_000_000 - 24_999_500_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(49_999_000_000-24_999_500_000),
+						),
 					},
 					PerpetualPositions: []*satypes.PerpetualPosition{
-						{
-							PerpetualId: 0,
+						testutil.CreateSinglePerpetualPosition(
+							0,
 							// Deleveraging fails for remaining amount.
-							Quantums:     dtypes.NewInt(-50_000_000), // -0.5 BTC
-							FundingIndex: dtypes.NewInt(0),
-						},
+							big.NewInt(-50_000_000), // -0.5 BTC
+							big.NewInt(0),
+							big.NewInt(0),
+						),
 					},
 				},
 				// Dave_Num0 does not change since deleveraging against this subaccount failed.
@@ -1022,7 +1042,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 
 			liquidityTiers: constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc},
 
@@ -1033,10 +1053,10 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_000_000_000 + 50_499_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_000_000_000+50_499_000_000),
+						),
 					},
 				},
 			},
@@ -1056,7 +1076,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 			liquidationConfig:         constants.LiquidationsConfig_FillablePrice_Max_Smmr,
 			liquidityTiers:            constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc_Final_Settlement},
 
@@ -1067,10 +1087,10 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_000_000_000 + 50_499_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_000_000_000+50_499_000_000),
+						),
 					},
 				},
 			},
@@ -1085,7 +1105,7 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 			liquidationConfig:         constants.LiquidationsConfig_FillablePrice_Max_Smmr,
 			liquidityTiers:            constants.LiquidityTiers,
 			perpetuals: []perptypes.Perpetual{
-				constants.BtcUsd_20PercentInitial_10PercentMaintenance,
+				constants.BtcUsd_20PercentInitial_10PercentMaintenance_OpenInterest1,
 			},
 			clobPairs: []clobtypes.ClobPair{constants.ClobPair_Btc_Final_Settlement},
 
@@ -1093,19 +1113,19 @@ func TestPlacePerpetualLiquidation_Deleveraging(t *testing.T) {
 				{
 					Id: &constants.Carl_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(100_000_000_000 - 50_000_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(100_000_000_000-50_000_000_000),
+						),
 					},
 				},
 				{
 					Id: &constants.Dave_Num0,
 					AssetPositions: []*satypes.AssetPosition{
-						{
-							AssetId:  0,
-							Quantums: dtypes.NewInt(50_000_000_000 + 50_000_000_000),
-						},
+						testutil.CreateSingleAssetPosition(
+							0,
+							big.NewInt(50_000_000_000+50_000_000_000),
+						),
 					},
 				},
 			},

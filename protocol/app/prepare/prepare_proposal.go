@@ -2,7 +2,6 @@ package prepare
 
 import (
 	"fmt"
-	"github.com/dydxprotocol/v4-chain/protocol/app/constants"
 	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -11,9 +10,11 @@ import (
 	"github.com/cosmos/cosmos-sdk/telemetry"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
+	"github.com/dydxprotocol/v4-chain/protocol/app/constants"
 	"github.com/dydxprotocol/v4-chain/protocol/app/prepare/prices"
 	"github.com/dydxprotocol/v4-chain/protocol/lib/metrics"
 	pricetypes "github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
+	"github.com/skip-mev/slinky/abci/ve"
 )
 
 var (
@@ -75,8 +76,9 @@ func PrepareProposalHandler(
 		}
 
 		// Grab the injected VEs from the previous block.
-		// If VEs are not enabled, no tx will have been injected.
 		var extCommitBzTx []byte
+		// Sanity check to ensure that there is at least 1 tx. This should never return false unless
+		// before VE are enabled, there are no tx in the block.
 		if len(req.Txs) >= constants.OracleVEInjectedTxs {
 			extCommitBzTx = req.Txs[constants.OracleInfoIndex]
 		}
@@ -94,33 +96,33 @@ func PrepareProposalHandler(
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("GetUpdateMarketPricesTx error: %v", err))
 			recordErrorMetricsWithLabel(metrics.PricesTx)
-			return &EmptyResponse, nil
+			return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 		}
 		err = txs.SetUpdateMarketPricesTx(pricesTxResp.Tx)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("SetUpdateMarketPricesTx error: %v", err))
 			recordErrorMetricsWithLabel(metrics.PricesTx)
-			return &EmptyResponse, nil
+			return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 		}
 
 		fundingTxResp, err := GetAddPremiumVotesTx(ctx, txConfig, perpetualKeeper)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("GetAddPremiumVotesTx error: %v", err))
 			recordErrorMetricsWithLabel(metrics.FundingTx)
-			return &EmptyResponse, nil
+			return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 		}
 		err = txs.SetAddPremiumVotesTx(fundingTxResp.Tx)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("SetAddPremiumVotesTx error: %v", err))
 			recordErrorMetricsWithLabel(metrics.FundingTx)
-			return &EmptyResponse, nil
+			return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 		}
 
 		acknowledgeBridgesTxResp, err := GetAcknowledgeBridgesTx(ctx, txConfig, bridgeKeeper)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("GetAcknowledgeBridgesTx error: %v", err))
 			recordErrorMetricsWithLabel(metrics.AcknowledgeBridgesTx)
-			return &EmptyResponse, nil
+			return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 		}
 		// Set AcknowledgeBridgesTx whether there are bridge events or not to ensure
 		// consistent ordering of txs received by ProcessProposal.
@@ -128,20 +130,25 @@ func PrepareProposalHandler(
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("SetAcknowledgeBridgesTx error: %v", err))
 			recordErrorMetricsWithLabel(metrics.AcknowledgeBridgesTx)
-			return &EmptyResponse, nil
+			return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 		}
 
 		// Gather "Other" group messages.
 		otherBytesAllocated := txs.GetAvailableBytes() / 4 // ~25% of the remainder.
 		// filter out txs that have disallow messages.
-		txsWithoutDisallowMsgs := RemoveDisallowMsgs(ctx, txConfig.TxDecoder(), req.Txs)
+		var txsWithoutDisallowMsgs [][]byte
+		if ve.VoteExtensionsEnabled(ctx) {
+			txsWithoutDisallowMsgs = RemoveDisallowMsgs(ctx, txConfig.TxDecoder(), req.Txs[1:])
+		} else {
+			txsWithoutDisallowMsgs = RemoveDisallowMsgs(ctx, txConfig.TxDecoder(), req.Txs)
+		}
 		otherTxsToInclude, otherTxsRemainder := GetGroupMsgOther(txsWithoutDisallowMsgs, otherBytesAllocated)
 		if len(otherTxsToInclude) > 0 {
 			err := txs.AddOtherTxs(otherTxsToInclude)
 			if err != nil {
 				ctx.Logger().Error(fmt.Sprintf("AddOtherTxs error: %v", err))
 				recordErrorMetricsWithLabel(metrics.OtherTxs)
-				return &EmptyResponse, nil
+				return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 			}
 		}
 
@@ -151,13 +158,13 @@ func PrepareProposalHandler(
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("GetProposedOperationsTx error: %v", err))
 			recordErrorMetricsWithLabel(metrics.OperationsTx)
-			return &EmptyResponse, nil
+			return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 		}
 		err = txs.SetProposedOperationsTx(operationsTxResp.Tx)
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("SetProposedOperationsTx error: %v", err))
 			recordErrorMetricsWithLabel(metrics.OperationsTx)
-			return &EmptyResponse, nil
+			return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 		}
 
 		// Try to pack in more "Other" txs.
@@ -169,7 +176,7 @@ func PrepareProposalHandler(
 				if err != nil {
 					ctx.Logger().Error(fmt.Sprintf("AddOtherTxs (additional) error: %v", err))
 					recordErrorMetricsWithLabel(metrics.OtherTxs)
-					return &EmptyResponse, nil
+					return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 				}
 			}
 		}
@@ -178,7 +185,7 @@ func PrepareProposalHandler(
 		if err != nil {
 			ctx.Logger().Error(fmt.Sprintf("GetTxsInOrder error: %v", err))
 			recordErrorMetricsWithLabel(metrics.GetTxsInOrder)
-			return &EmptyResponse, nil
+			return &abci.ResponsePrepareProposal{Txs: [][]byte{}}, nil
 		}
 
 		// Record a success metric.

@@ -23,6 +23,10 @@ func (u UpdateResult) IsSuccess() bool {
 	return u == Success
 }
 
+func (u UpdateResult) IsIsolatedSubaccountError() bool {
+	return u == ViolatesIsolatedSubaccountConstraints
+}
+
 // GetErrorFromUpdateResults generates a helpful error when UpdateSubaccounts or
 // CanUpdateSubaccounts returns one or more failed updates.
 func GetErrorFromUpdateResults(
@@ -88,28 +92,54 @@ type AssetUpdate struct {
 	BigQuantumsDelta *big.Int
 }
 
+func (u *AssetUpdate) DeepCopy() AssetUpdate {
+	return AssetUpdate{
+		AssetId:          u.AssetId,
+		BigQuantumsDelta: new(big.Int).Set(u.BigQuantumsDelta),
+	}
+}
+
 type PerpetualUpdate struct {
 	// The `Id` of the `Perpetual` for which the `PerpetualPosition` is for.
 	PerpetualId uint32
 	// The signed change in the `Quantums` of the `PerpetualPosition`
 	// represented in base quantums.
 	BigQuantumsDelta *big.Int
+	// The signed change in the `QuoteBalance` of the `PerpetualPosition`.
+	BigQuoteBalanceDelta *big.Int
+}
+
+func (u *PerpetualUpdate) DeepCopy() PerpetualUpdate {
+	r := PerpetualUpdate{
+		PerpetualId:          u.PerpetualId,
+		BigQuantumsDelta:     new(big.Int).Set(u.BigQuantumsDelta),
+		BigQuoteBalanceDelta: new(big.Int),
+	}
+
+	if u.BigQuoteBalanceDelta != nil {
+		r.BigQuoteBalanceDelta.Set(u.BigQuoteBalanceDelta)
+	}
+	return r
 }
 
 type UpdateType uint
 
 const (
-	Withdrawal UpdateType = iota
+	UpdateTypeUnspecified UpdateType = iota
+	Withdrawal
 	Transfer
 	Deposit
 	Match
+	CollatCheck
 )
 
 var updateTypeStringMap = map[UpdateType]string{
-	Withdrawal: "Withdrawal",
-	Transfer:   "Transfer",
-	Deposit:    "Deposit",
-	Match:      "Match",
+	UpdateTypeUnspecified: "UpdateTypeUnspecified",
+	Withdrawal:            "Withdrawal",
+	Transfer:              "Transfer",
+	Deposit:               "Deposit",
+	Match:                 "Match",
+	CollatCheck:           "CollatCheck",
 }
 
 func (u UpdateType) String() string {

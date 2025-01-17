@@ -1,3 +1,4 @@
+import { OrderTable } from '@dydxprotocol-indexer/postgres';
 import { ORDER_FLAG_CONDITIONAL, ORDER_FLAG_LONG_TERM } from '@dydxprotocol-indexer/v4-proto-parser';
 import {
   IndexerTendermintEvent,
@@ -13,6 +14,7 @@ import {
 } from '@dydxprotocol-indexer/v4-protos';
 import Long from 'long';
 
+import config from '../config';
 import { Handler, HandlerInitializer } from '../handlers/handler';
 import { ConditionalOrderPlacementHandler } from '../handlers/stateful-order/conditional-order-placement-handler';
 import { ConditionalOrderTriggeredHandler } from '../handlers/stateful-order/conditional-order-triggered-handler';
@@ -211,6 +213,7 @@ export class StatefulOrderValidator extends Validator<StatefulOrderEventV1> {
   public createHandlers(
     indexerTendermintEvent: IndexerTendermintEvent,
     txId: number,
+    messageReceivedTimestamp: string,
   ): Handler<StatefulOrderEventV1>[] {
     const Initializer:
     HandlerInitializer | undefined = this.getHandlerInitializer();
@@ -227,8 +230,45 @@ export class StatefulOrderValidator extends Validator<StatefulOrderEventV1> {
       indexerTendermintEvent,
       txId,
       this.event,
+      messageReceivedTimestamp,
     );
 
     return [handler];
+  }
+
+  /**
+   * Skip order uuids in config env var.
+   */
+  public shouldExcludeEvent(): boolean {
+    const orderUUIDsToSkip: string[] = config.SKIP_STATEFUL_ORDER_UUIDS.split(',');
+    if (orderUUIDsToSkip.length === 0) {
+      return false;
+    }
+
+    const orderUUIDStoSkipSet: Set<string> = new Set(orderUUIDsToSkip);
+    if (orderUUIDStoSkipSet.has(this.getOrderUUId())) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Gets order uuid for the event being validated.
+   * Assumes events are valid.
+   */
+  private getOrderUUId(): string {
+    if (this.event.orderPlace !== undefined) {
+      return OrderTable.orderIdToUuid(this.event.orderPlace.order!.orderId!);
+    } else if (this.event.orderRemoval !== undefined) {
+      return OrderTable.orderIdToUuid(this.event.orderRemoval.removedOrderId!);
+    } else if (this.event.conditionalOrderPlacement !== undefined) {
+      return OrderTable.orderIdToUuid(this.event.conditionalOrderPlacement.order!.orderId!);
+    } else if (this.event.conditionalOrderTriggered !== undefined) {
+      return OrderTable.orderIdToUuid(this.event.conditionalOrderTriggered.triggeredOrderId!);
+    } else if (this.event.longTermOrderPlacement !== undefined) {
+      return OrderTable.orderIdToUuid(this.event.longTermOrderPlacement.order!.orderId!);
+    }
+    return '';
   }
 }

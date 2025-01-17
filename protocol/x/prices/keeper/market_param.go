@@ -5,6 +5,7 @@ import (
 
 	errorsmod "cosmossdk.io/errors"
 	"github.com/dydxprotocol/v4-chain/protocol/daemons/pricefeed/metrics"
+	"github.com/dydxprotocol/v4-chain/protocol/lib/slinky"
 
 	"cosmossdk.io/store/prefix"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -39,15 +40,62 @@ func (k Keeper) ModifyMarketParam(
 	}
 
 	// Validate update is permitted.
-	if updatedMarketParam.Exponent != existingParam.Exponent {
-		return types.MarketParam{},
-			errorsmod.Wrapf(types.ErrMarketExponentCannotBeUpdated, lib.UintToString(updatedMarketParam.Id))
+	for _, market := range k.GetAllMarketParams(ctx) {
+		if market.Pair == updatedMarketParam.Pair && market.Id != updatedMarketParam.Id {
+			return types.MarketParam{}, errorsmod.Wrap(types.ErrMarketParamPairAlreadyExists, updatedMarketParam.Pair)
+		}
+	}
+
+	// Validate that modified market param has a corresponding ticker in MarketMap
+	cp, err := slinky.MarketPairToCurrencyPair(updatedMarketParam.Pair)
+	if err != nil {
+		return types.MarketParam{}, errorsmod.Wrap(types.ErrMarketPairConversionFailed, updatedMarketParam.Pair)
+	}
+	if _, err := k.MarketMapKeeper.GetMarket(ctx, cp.String()); err != nil {
+		return types.MarketParam{}, errorsmod.Wrap(types.ErrTickerNotFoundInMarketMap, cp.String())
 	}
 
 	// Store the modified market param.
 	marketParamStore := k.getMarketParamStore(ctx)
 	b := k.cdc.MustMarshal(&updatedMarketParam)
 	marketParamStore.Set(lib.Uint32ToKey(updatedMarketParam.Id), b)
+
+	// if the market pair has been changed, we need to update the in-memory market pair cache
+	if existingParam.Pair != updatedMarketParam.Pair {
+		// remove the old cache entry and disable the old market
+		oldCurrencyPair, err := slinky.MarketPairToCurrencyPair(existingParam.Pair)
+		if err != nil {
+			return types.MarketParam{}, errorsmod.Wrap(
+				types.ErrMarketPairConversionFailed,
+				existingParam.Pair,
+			)
+		}
+
+		k.RemoveCurrencyPairFromStore(ctx, oldCurrencyPair)
+		if err = k.MarketMapKeeper.DisableMarket(ctx, oldCurrencyPair.String()); err != nil {
+			return types.MarketParam{}, errorsmod.Wrap(
+				types.ErrMarketCouldNotBeDisabled,
+				existingParam.Pair,
+			)
+		}
+
+		// add the new cache entry and enable the new market
+		newCurrencyPair, err := slinky.MarketPairToCurrencyPair(updatedMarketParam.Pair)
+		if err != nil {
+			return types.MarketParam{}, errorsmod.Wrap(
+				types.ErrMarketPairConversionFailed,
+				updatedMarketParam.Pair,
+			)
+		}
+
+		k.AddCurrencyPairIDToStore(ctx, updatedMarketParam.Id, newCurrencyPair)
+		if err = k.MarketMapKeeper.EnableMarket(ctx, newCurrencyPair.String()); err != nil {
+			return types.MarketParam{}, errorsmod.Wrap(
+				types.ErrMarketCouldNotBeEnabled,
+				existingParam.Pair,
+			)
+		}
+	}
 
 	// Generate indexer event.
 	k.GetIndexerEventManager().AddTxnEvent(

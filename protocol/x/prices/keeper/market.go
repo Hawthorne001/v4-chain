@@ -3,12 +3,15 @@ package keeper
 import (
 	"fmt"
 
+	gogotypes "github.com/cosmos/gogoproto/types"
+
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/dydxprotocol/v4-chain/protocol/daemons/pricefeed/metrics"
 	indexerevents "github.com/dydxprotocol/v4-chain/protocol/indexer/events"
 	"github.com/dydxprotocol/v4-chain/protocol/indexer/indexer_manager"
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
+	"github.com/dydxprotocol/v4-chain/protocol/lib/slinky"
 	"github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
 )
 
@@ -36,6 +39,39 @@ func (k Keeper) CreateMarket(
 	if err := marketPrice.ValidateFromParam(marketParam); err != nil {
 		return types.MarketParam{}, err
 	}
+	// Stateful Validation
+	for _, market := range k.GetAllMarketParams(ctx) {
+		if market.Pair == marketParam.Pair {
+			return types.MarketParam{}, errorsmod.Wrap(
+				types.ErrMarketParamPairAlreadyExists,
+				marketParam.Pair,
+			)
+		}
+	}
+	// check that the market exists in market map
+	currencyPair, err := slinky.MarketPairToCurrencyPair(marketParam.Pair)
+	if err != nil {
+		return types.MarketParam{}, errorsmod.Wrap(
+			types.ErrMarketPairConversionFailed,
+			marketParam.Pair,
+		)
+	}
+	currencyPairStr := currencyPair.String()
+	marketMapDetails, err := k.MarketMapKeeper.GetMarket(ctx, currencyPairStr)
+	if err != nil {
+		return types.MarketParam{}, errorsmod.Wrap(
+			types.ErrTickerNotFoundInMarketMap,
+			currencyPairStr,
+		)
+	}
+
+	// Check that the exponent of market price is the negation of the decimals value in the market map
+	if marketPrice.Exponent != int32(marketMapDetails.Ticker.Decimals)*-1 {
+		return types.MarketParam{}, errorsmod.Wrap(
+			types.ErrInvalidMarketPriceExponent,
+			currencyPairStr,
+		)
+	}
 
 	paramBytes := k.cdc.MustMarshal(&marketParam)
 	priceBytes := k.cdc.MustMarshal(&marketPrice)
@@ -45,6 +81,9 @@ func (k Keeper) CreateMarket(
 
 	marketPriceStore := k.getMarketPriceStore(ctx)
 	marketPriceStore.Set(lib.Uint32ToKey(marketPrice.Id), priceBytes)
+
+	// add the pair to the currency-pair-id cache
+	k.AddCurrencyPairIDToStore(ctx, marketParam.Id, currencyPair)
 
 	// Generate indexer event.
 	k.GetIndexerEventManager().AddTxnEvent(
@@ -56,35 +95,47 @@ func (k Keeper) CreateMarket(
 				marketParam.Id,
 				marketParam.Pair,
 				marketParam.MinPriceChangePpm,
-				marketParam.Exponent,
+				// The exponent in market price is the source of truth, the exponent of the param is deprecated as of v7.1.x
+				marketPrice.Exponent,
 			),
 		),
 	)
 
-	k.marketToCreatedAt[marketParam.Id] = k.timeProvider.Now()
 	metrics.SetMarketPairForTelemetry(marketParam.Id, marketParam.Pair)
 
+	// create a new market rev share
+	k.RevShareKeeper.CreateNewMarketRevShare(ctx, marketParam.Id)
+
+	// enable the market in the market map
+	err = k.MarketMapKeeper.EnableMarket(ctx, currencyPairStr)
+	if err != nil {
+		k.Logger(ctx).Error(
+			"failed to enable market in market map",
+			"market ticker",
+			currencyPairStr,
+			"err",
+			err,
+		)
+	}
 	return marketParam, nil
 }
 
-// IsRecentlyAvailable returns true if the market was recently made available to the pricefeed daemon. A market is
-// considered recently available either if it was recently created, or if the pricefeed daemon was recently started. If
-// an index price does not exist for a recently available market, the protocol does not consider this an error
-// condition, as it is expected that the pricefeed daemon will eventually provide a price for the market within a
-// few seconds.
-func (k Keeper) IsRecentlyAvailable(ctx sdk.Context, marketId uint32) bool {
-	createdAt, ok := k.marketToCreatedAt[marketId]
-
-	if !ok {
-		return false
+// Get the exponent for a market as the negation of the decimals value in the market map
+func (k Keeper) GetExponent(ctx sdk.Context, ticker string) (int32, error) {
+	currencyPair, err := slinky.MarketPairToCurrencyPair(ticker)
+	if err != nil {
+		k.Logger(ctx).Error("Could not convert market pair to currency pair", "error", err)
+		return 0, err
 	}
 
-	// The comparison condition considers both market age and price daemon warmup time because a market can be
-	// created before or after the daemon starts. We use block height as a proxy for daemon warmup time because
-	// the price daemon is started when the gRPC service comes up, which typically occurs just before the first
-	// block is processed.
-	return k.timeProvider.Now().Sub(createdAt) < types.MarketIsRecentDuration ||
-		ctx.BlockHeight() < types.PriceDaemonInitializationBlocks
+	marketMapDetails, err := k.MarketMapKeeper.GetMarket(ctx, currencyPair.String())
+	if err != nil {
+		return 0, errorsmod.Wrap(
+			types.ErrTickerNotFoundInMarketMap,
+			ticker,
+		)
+	}
+	return int32(marketMapDetails.Ticker.Decimals) * -1, nil
 }
 
 // GetAllMarketParamPrices returns a slice of MarketParam, MarketPrice tuples for all markets.
@@ -107,4 +158,43 @@ func (k Keeper) GetAllMarketParamPrices(ctx sdk.Context) ([]types.MarketParamPri
 		marketParamPrices[i].Price = price
 	}
 	return marketParamPrices, nil
+}
+
+// GetNextMarketID returns the next market id to be used from the module store
+func (k Keeper) GetNextMarketID(ctx sdk.Context) uint32 {
+	store := ctx.KVStore(k.storeKey)
+	b := store.Get([]byte(types.NextMarketIDKey))
+	var result gogotypes.UInt32Value
+	k.cdc.MustUnmarshal(b, &result)
+	return result.Value
+}
+
+// SetNextMarketID sets the next market id to be used
+func (k Keeper) SetNextMarketID(ctx sdk.Context, nextID uint32) {
+	store := ctx.KVStore(k.storeKey)
+	value := gogotypes.UInt32Value{Value: nextID}
+	store.Set([]byte(types.NextMarketIDKey), k.cdc.MustMarshal(&value))
+}
+
+// AcquireNextMarketID returns the next market id to be used and increments the next market id
+func (k Keeper) AcquireNextMarketID(ctx sdk.Context) uint32 {
+	nextID := k.GetNextMarketID(ctx)
+	// if market id already exists, increment until we find one that doesn't
+	maxAttempts, attempts := 1000, 0
+	for {
+		_, exists := k.GetMarketParam(ctx, nextID)
+		if !exists {
+			break
+		}
+		nextID++
+
+		// panic if we've tried too many times and are stuck in a loop
+		attempts++
+		if attempts >= maxAttempts {
+			panic("Exceeded maximum attempts to find a unique market id")
+		}
+	}
+
+	k.SetNextMarketID(ctx, nextID+1)
+	return nextID
 }

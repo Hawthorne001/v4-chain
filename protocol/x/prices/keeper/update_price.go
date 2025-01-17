@@ -56,10 +56,15 @@ func (k Keeper) GetValidMarketPriceUpdates(
 	}
 
 	// 2. Get all index prices from in-memory cache.
-	allIndexPrices := k.indexPriceCache.GetValidMedianPrices(allMarketParams, k.timeProvider.Now())
+	allIndexPrices := k.indexPriceCache.GetValidMedianPrices(
+		k.Logger(ctx),
+		allMarketParams,
+		k.timeProvider.Now(),
+	)
 
 	// 3. Collect all "valid" price updates.
 	updates := make([]*types.MsgUpdateMarketPrices_MarketPrice, 0, len(allMarketParamPrices))
+	nonExistentMarkets := []uint32{}
 	for _, marketParamPrice := range allMarketParamPrices {
 		marketId := marketParamPrice.Param.Id
 		indexPrice, indexPriceExists := allIndexPrices[marketId]
@@ -69,17 +74,7 @@ func (k Keeper) GetValidMarketPriceUpdates(
 		// Skip proposal logic in the event of invalid inputs, which is only likely to occur around network genesis.
 		if !indexPriceExists {
 			metrics.IncrCountMetricWithLabels(types.ModuleName, metrics.IndexPriceDoesNotExist, marketMetricsLabel)
-			// Conditionally log missing index prices at least 20s after genesis/restart/market creation. We expect that
-			// there will be a delay in populating index prices after network genesis or a network restart, or when a
-			// market is created, it takes the daemon some time to warm up.
-			if !k.IsRecentlyAvailable(ctx, marketId) {
-				log.ErrorLog(
-					ctx,
-					"Index price for market does not exist",
-					constants.MarketIdLogKey,
-					marketId,
-				)
-			}
+			nonExistentMarkets = append(nonExistentMarkets, marketId)
 			continue
 		}
 
@@ -96,33 +91,9 @@ func (k Keeper) GetValidMarketPriceUpdates(
 			continue
 		}
 
-		historicalSmoothedPrices := k.marketToSmoothedPrices.GetHistoricalSmoothedPrices(marketId)
-		// We generally expect to have a smoothed price history for each market, except during the first few blocks
-		// after network genesis or a network restart. In this scenario, we use the index price as the smoothed price.
-		if len(historicalSmoothedPrices) == 0 {
-			// Conditionally log missing smoothed prices at least 20s after genesis/restart/market creation. We expect
-			// that there will be a delay in populating historical smoothed prices after network genesis or a network
-			// restart, or when a market is created, because they depend on present index prices, and it takes the
-			// daemon some time to warm up.
-			if !k.IsRecentlyAvailable(ctx, marketId) {
-				log.ErrorLog(
-					ctx,
-					"Smoothed price for market does not exist",
-					constants.MarketIdLogKey,
-					marketId,
-				)
-			}
-			historicalSmoothedPrices = []uint64{indexPrice}
-		}
-		smoothedPrice := historicalSmoothedPrices[0]
-
-		proposalPrice := getProposalPrice(smoothedPrice, indexPrice, marketParamPrice.Price.Price)
-
 		shouldPropose, reasons := shouldProposePrice(
-			proposalPrice,
-			marketParamPrice,
 			indexPrice,
-			historicalSmoothedPrices,
+			marketParamPrice,
 		)
 
 		// If the index price would have updated, track how the proposal price changes the update
@@ -131,7 +102,6 @@ func (k Keeper) GetValidMarketPriceUpdates(
 			logPriceUpdateBehavior(
 				ctx,
 				marketParamPrice,
-				proposalPrice,
 				indexPrice,
 				marketMetricsLabel,
 				shouldPropose,
@@ -145,10 +115,16 @@ func (k Keeper) GetValidMarketPriceUpdates(
 				updates,
 				&types.MsgUpdateMarketPrices_MarketPrice{
 					MarketId: marketId,
-					Price:    proposalPrice,
+					Price:    indexPrice,
 				},
 			)
 		}
+	}
+
+	if len(nonExistentMarkets) > 0 {
+		ctx.Logger().Warn(
+			fmt.Sprintf("Index price for markets does not exist, marketIds: %v", nonExistentMarkets),
+		)
 	}
 
 	// 4. Sort price updates by market id in ascending order.
@@ -163,7 +139,6 @@ func logPriceUpdateBehavior(
 	ctx sdk.Context,
 	marketParamPrice types.MarketParamPrice,
 	proposalPrice uint64,
-	indexPrice uint64,
 	marketMetricsLabel gometrics.Label,
 	shouldPropose bool,
 	reasons []proposeCancellationReason,
@@ -189,11 +164,10 @@ func logPriceUpdateBehavior(
 	log.InfoLog(
 		ctx,
 		fmt.Sprintf(
-			"Proposal price (%v) %v for market (%v), index price (%v), oracle price (%v), min price change (%v)",
+			"Proposal price (%v) %v for market (%v), oracle price (%v), min price change (%v)",
 			proposalPrice,
 			loggingVerb,
 			marketParamPrice.Param.Id,
-			indexPrice,
 			marketParamPrice.Price.Price,
 			getMinPriceChangeAmountForMarket(marketParamPrice),
 		),
@@ -212,66 +186,12 @@ type proposeCancellationReason struct {
 func shouldProposePrice(
 	proposalPrice uint64,
 	marketParamPrice types.MarketParamPrice,
-	indexPrice uint64,
-	historicalSmoothedPrices []uint64,
 ) (
 	shouldPropose bool,
 	reasons []proposeCancellationReason,
 ) {
 	reasons = make([]proposeCancellationReason, 0, 4)
 	shouldPropose = true
-
-	// If any smoothed price crosses the old price compared to the index price, do not update.
-	reasons = append(
-		reasons,
-		proposeCancellationReason{
-			Reason: metrics.RecentSmoothedPriceCrossesOraclePrice,
-			Value:  false,
-		},
-	)
-	for _, smoothedPrice := range historicalSmoothedPrices {
-		if isCrossingOldPrice(PriceTuple{
-			OldPrice:   marketParamPrice.Price.Price,
-			IndexPrice: indexPrice,
-			NewPrice:   smoothedPrice,
-		}) {
-			shouldPropose = false
-			reasons[len(reasons)-1].Value = true
-			break
-		}
-	}
-
-	// If the proposal price crosses the old price compared to the index price, do not update.
-	reasons = append(
-		reasons,
-		proposeCancellationReason{
-			Reason: metrics.ProposedPriceCrossesOraclePrice,
-		},
-	)
-	if isCrossingOldPrice(PriceTuple{
-		OldPrice:   marketParamPrice.Price.Price,
-		IndexPrice: indexPrice,
-		NewPrice:   proposalPrice,
-	}) {
-		shouldPropose = false
-		reasons[len(reasons)-1].Value = true
-	}
-
-	// If any smoothed price does not meet the min price change, do not update.
-	reasons = append(
-		reasons,
-		proposeCancellationReason{
-			Reason: metrics.RecentSmoothedPriceDoesNotMeetMinPriceChange,
-			Value:  false,
-		},
-	)
-	for _, smoothedPrice := range historicalSmoothedPrices {
-		if !isAboveRequiredMinPriceChange(marketParamPrice, smoothedPrice) {
-			shouldPropose = false
-			reasons[len(reasons)-1].Value = true
-			break
-		}
-	}
 
 	// If the proposal price does not meet the min price change, do not update.
 	reasons = append(

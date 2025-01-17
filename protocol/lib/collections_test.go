@@ -5,9 +5,85 @@ import (
 	"testing"
 
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
+	"github.com/dydxprotocol/v4-chain/protocol/testutil/constants"
+	"github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestDedupeSlice(t *testing.T) {
+	tests := map[string]struct {
+		input  []types.OrderId
+		output []types.OrderId
+	}{
+		"Empty": {
+			input:  []types.OrderId{},
+			output: []types.OrderId{},
+		},
+		"No dupes": {
+			input: []types.OrderId{
+				constants.CancelConditionalOrder_Alice_Num1_Id0_Clob1_GTBT15.OrderId,
+				constants.Order_Bob_Num0_Id0_Clob0_Sell200BTC_Price101_GTB20.OrderId,
+			},
+			output: []types.OrderId{
+				constants.CancelConditionalOrder_Alice_Num1_Id0_Clob1_GTBT15.OrderId,
+				constants.Order_Bob_Num0_Id0_Clob0_Sell200BTC_Price101_GTB20.OrderId,
+			},
+		},
+		"Dedupe one": {
+			input: []types.OrderId{
+				constants.CancelConditionalOrder_Alice_Num1_Id0_Clob1_GTBT15.OrderId,
+				constants.Order_Bob_Num0_Id0_Clob0_Sell200BTC_Price101_GTB20.OrderId,
+				constants.Order_Bob_Num0_Id0_Clob0_Sell200BTC_Price101_GTB20.OrderId,
+			},
+			output: []types.OrderId{
+				constants.CancelConditionalOrder_Alice_Num1_Id0_Clob1_GTBT15.OrderId,
+				constants.Order_Bob_Num0_Id0_Clob0_Sell200BTC_Price101_GTB20.OrderId,
+			},
+		},
+		"Dedupe multiple": {
+			input: []types.OrderId{
+				constants.Order_Bob_Num0_Id0_Clob0_Sell200BTC_Price101_GTB20.OrderId,
+				constants.Order_Alice_Num0_Id0_Clob0_Buy6_Price10_GTB20.OrderId,
+				constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10.OrderId,
+				constants.Order_Alice_Num0_Id0_Clob0_Buy6_Price10_GTB20.OrderId,
+				constants.Order_Alice_Num0_Id0_Clob0_Buy6_Price10_GTB20.OrderId,
+				constants.LongTermOrder_Dave_Num0_Id1_Clob0_Sell025BTC_Price50001_GTBT10.OrderId,
+				constants.Order_Bob_Num0_Id0_Clob0_Sell200BTC_Price101_GTB20.OrderId,
+				constants.LongTermOrder_Dave_Num0_Id1_Clob0_Sell025BTC_Price50001_GTBT10.OrderId,
+			},
+			output: []types.OrderId{
+				constants.Order_Bob_Num0_Id0_Clob0_Sell200BTC_Price101_GTB20.OrderId,
+				constants.Order_Alice_Num0_Id0_Clob0_Buy6_Price10_GTB20.OrderId,
+				constants.LongTermOrder_Alice_Num1_Id0_Clob0_Sell15_Price5_GTBT10.OrderId,
+				constants.LongTermOrder_Dave_Num0_Id1_Clob0_Sell025BTC_Price50001_GTBT10.OrderId,
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.output, lib.DedupeSlice(tc.input))
+		})
+	}
+}
+
+func BenchmarkContainsDuplicates_True(b *testing.B) {
+	var result bool
+	input := []uint32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 3, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+	for i := 0; i < b.N; i++ {
+		result = lib.ContainsDuplicates(input)
+	}
+	require.True(b, result)
+}
+
+func BenchmarkContainsDuplicates_False(b *testing.B) {
+	var result bool
+	input := []uint32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+	for i := 0; i < b.N; i++ {
+		result = lib.ContainsDuplicates(input)
+	}
+	require.False(b, result)
+}
 
 func TestContainsDuplicates(t *testing.T) {
 	tests := map[string]struct {
@@ -22,11 +98,15 @@ func TestContainsDuplicates(t *testing.T) {
 			input:    []uint32{},
 			expected: false,
 		},
-		"True": {
-			input:    []uint32{1, 2, 3, 4},
+		"One Item": {
+			input:    []uint32{10},
 			expected: false,
 		},
 		"False": {
+			input:    []uint32{1, 2, 3, 4},
+			expected: false,
+		},
+		"True": {
 			input:    []uint32{1, 2, 3, 4, 3},
 			expected: true,
 		},
@@ -34,6 +114,59 @@ func TestContainsDuplicates(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			require.Equal(t, tc.expected, lib.ContainsDuplicates(tc.input))
+		})
+	}
+}
+
+func BenchmarkMapToSortedSlice(b *testing.B) {
+	input := map[string]string{
+		"d": "4",
+		"b": "2",
+		"a": "1",
+		"c": "3",
+		"e": "5",
+		"f": "6",
+		"g": "7",
+		"h": "8",
+		"i": "9",
+		"j": "10",
+	}
+	for i := 0; i < b.N; i++ {
+		_ = lib.MapToSortedSlice[sort.StringSlice, string, string](input)
+	}
+}
+
+func TestMapToSortedSlice(t *testing.T) {
+	tests := map[string]struct {
+		inputMap       map[string]string
+		expectedResult []string
+	}{
+		"Nil input": {
+			inputMap:       nil,
+			expectedResult: []string{},
+		},
+		"Empty map": {
+			inputMap:       map[string]string{},
+			expectedResult: []string{},
+		},
+		"Single item": {
+			inputMap:       map[string]string{"a": "1"},
+			expectedResult: []string{"1"},
+		},
+		"Multiple items": {
+			inputMap: map[string]string{
+				"d": "4",
+				"b": "2",
+				"a": "1",
+				"c": "3",
+			},
+			expectedResult: []string{"1", "2", "3", "4"},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			actualResult := lib.MapToSortedSlice[sort.StringSlice](tc.inputMap)
+			require.Equal(t, tc.expectedResult, actualResult)
 		})
 	}
 }
@@ -337,4 +470,16 @@ func TestMergeAllMapsWithDistinctKeys(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSliceContains(t *testing.T) {
+	require.True(
+		t,
+		lib.SliceContains([]uint32{1, 2}, 1),
+	)
+
+	require.False(
+		t,
+		lib.SliceContains([]uint32{1, 2}, 3),
+	)
 }

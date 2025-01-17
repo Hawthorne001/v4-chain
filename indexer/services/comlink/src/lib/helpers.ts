@@ -2,6 +2,7 @@ import { logger } from '@dydxprotocol-indexer/base';
 import {
   AssetPositionFromDatabase,
   BlockFromDatabase,
+  CHILD_SUBACCOUNT_MULTIPLIER,
   FundingIndexMap,
   FundingIndexUpdatesTable,
   helpers,
@@ -9,31 +10,48 @@ import {
   LiquidityTiersFromDatabase,
   MarketFromDatabase,
   MarketsMap,
+  MAX_PARENT_SUBACCOUNTS,
   PerpetualMarketFromDatabase,
   PerpetualMarketsMap,
   PerpetualMarketTable,
   PerpetualPositionFromDatabase,
   PerpetualPositionStatus,
+  PnlTicksFromDatabase,
   PositionSide,
   SubaccountFromDatabase,
-  TendermintEventFromDatabase,
-  TendermintEventTable,
+  SubaccountTable,
   USDC_SYMBOL,
+  AssetFromDatabase,
+  AssetColumns,
+  MarketColumns,
+  VaultFromDatabase, VaultTable, perpetualMarketRefresher,
 } from '@dydxprotocol-indexer/postgres';
 import Big from 'big.js';
 import express from 'express';
 import _ from 'lodash';
+import { DateTime } from 'luxon';
 
 import config from '../config';
 import {
+  assetPositionToResponseObject,
+  perpetualPositionToResponseObject,
+  subaccountToResponseObject,
+} from '../request-helpers/request-transformer';
+import {
+  AggregatedPnlTick,
+  AssetById,
   AssetPositionResponseObject,
   AssetPositionsMap,
   MarketType,
+  PerpetualPositionResponseObject,
+  PerpetualPositionsMap,
   PerpetualPositionWithFunding,
   Risk,
+  SubaccountResponseObject,
+  VaultMapping,
 } from '../types';
 import { ZERO, ZERO_USDC_POSITION } from './constants';
-import { NotFoundError } from './errors';
+import { InvalidParamError, NotFoundError } from './errors';
 
 /* ------- GENERIC HELPERS ------- */
 
@@ -54,6 +72,9 @@ export function handleControllerError(
   if (error instanceof NotFoundError) {
     return handleNotFoundError(error.message, res);
   }
+  if (error instanceof InvalidParamError) {
+    return handleInvalidParamError(error.message, res);
+  }
   return handleInternalServerError(
     at,
     message,
@@ -63,7 +84,7 @@ export function handleControllerError(
   );
 }
 
-function handleInternalServerError(
+export function handleInternalServerError(
   at: string,
   message: string,
   error: Error,
@@ -79,10 +100,22 @@ function handleInternalServerError(
     at,
     message,
     error,
+    stacktrace: error.stack,
     params: JSON.stringify(req.params),
     query: JSON.stringify(req.query),
   });
   return createInternalServerErrorResponse(res);
+}
+
+function handleInvalidParamError(
+  message: string,
+  res: express.Response,
+): express.Response {
+  return res.status(400).json({
+    errors: [{
+      msg: message,
+    }],
+  });
 }
 
 function handleNotFoundError(
@@ -167,7 +200,7 @@ export function calculateEquityAndFreeCollateral(
     totalPositionRisk,
   }: {
     signedPositionNotional: Big,
-    totalPositionRisk: Big
+    totalPositionRisk: Big,
   } = perpetualPositions.reduce((acc, position) => {
     // get the positionNotional for each position and the individualRisk of the position
     const {
@@ -318,24 +351,15 @@ export function filterAssetPositions(assetPositions: AssetPositionFromDatabase[]
  * @returns De-duplicated list of perpetual positions. Positions will be ordered in descending
  * chronological order by the last event id of the position.
  */
-export async function filterPositionsByLatestEventIdPerPerpetual(
+export function filterPositionsByLatestEventIdPerPerpetual(
   positions: PerpetualPositionWithFunding[],
-): Promise<PerpetualPositionWithFunding[]> {
-  const events: TendermintEventFromDatabase[] = await TendermintEventTable.findAll(
-    {
-      id: positions.map((position: PerpetualPositionWithFunding) => position.lastEventId),
-    },
-    [],
-  );
-  const eventByIdHex: { [eventId: string]: TendermintEventFromDatabase } = _.keyBy(
-    events,
-    (event) => event.id.toString('hex'),
-  );
+): PerpetualPositionWithFunding[] {
   const sortedPositionsArray: PerpetualPositionWithFunding[] = positions.sort(
     (a: PerpetualPositionWithFunding, b: PerpetualPositionWithFunding): number => {
-      const eventA: TendermintEventFromDatabase = eventByIdHex[a.lastEventId.toString('hex')];
-      const eventB: TendermintEventFromDatabase = eventByIdHex[b.lastEventId.toString('hex')];
-      return -1 * TendermintEventTable.compare(eventA, eventB);
+      // eventId is a 96 bit value, pad both hex-strings to (96/4) = 24 hex chars
+      const eventAHex: string = a.lastEventId.toString('hex').padStart(24, '0');
+      const eventBHex: string = b.lastEventId.toString('hex').padStart(24, '0');
+      return eventBHex.localeCompare(eventAHex);
     },
   );
 
@@ -414,7 +438,7 @@ export function adjustUSDCAssetPosition(
   unsettledFunding: Big,
 ): {
   assetPositionsMap: AssetPositionsMap,
-  adjustedUSDCAssetPositionSize: string
+  adjustedUSDCAssetPositionSize: string,
 } {
   let adjustedAssetPositionsMap: AssetPositionsMap = _.cloneDeep(assetPositionsMap);
   const usdcPosition: AssetPositionResponseObject = _.get(assetPositionsMap, USDC_SYMBOL);
@@ -434,7 +458,8 @@ export function adjustUSDCAssetPosition(
     _.set(
       adjustedAssetPositionsMap,
       USDC_SYMBOL,
-      getUSDCAssetPosition(adjustedSize),
+      getUSDCAssetPosition(adjustedSize,
+        adjustedAssetPositionsMap[USDC_SYMBOL]?.subaccountNumber ?? 0),
     );
     // Remove the USDC position in the map if the adjusted size is zero
   } else {
@@ -447,12 +472,14 @@ export function adjustUSDCAssetPosition(
   };
 }
 
-function getUSDCAssetPosition(signedSize: Big): AssetPositionResponseObject {
+function getUSDCAssetPosition(signedSize: Big, subaccountNumber: number):
+    AssetPositionResponseObject {
   const side: PositionSide = signedSize.gt(ZERO) ? PositionSide.LONG : PositionSide.SHORT;
   return {
     ...ZERO_USDC_POSITION,
     side,
     size: signedSize.abs().toFixed(),
+    subaccountNumber,
   };
 }
 
@@ -491,4 +518,246 @@ export function initializePerpetualPositionsWithFunding(
       unsettledFunding: '0',
     };
   });
+}
+
+/* ------- PARENT/CHILD SUBACCOUNT HELPERS ------- */
+
+/**
+ * Gets a list of all possible child subaccount numbers for a parent subaccount number
+ * Child subaccounts = [128*0+parentSubaccount, 128*1+parentSubaccount ... 128*999+parentSubaccount]
+ * @param parentSubaccount
+ * @returns
+ */
+export function getChildSubaccountNums(parentSubaccountNum: number): number[] {
+  if (parentSubaccountNum >= MAX_PARENT_SUBACCOUNTS) {
+    throw new NotFoundError(`Parent subaccount number must be less than ${MAX_PARENT_SUBACCOUNTS}`);
+  }
+  return Array.from({ length: CHILD_SUBACCOUNT_MULTIPLIER },
+    // eslint-disable-next-line @typescript-eslint/no-shadow
+    (_, i) => MAX_PARENT_SUBACCOUNTS * i + parentSubaccountNum);
+}
+
+/**
+ * Gets the subaccount uuids of all the child subaccounts given a parent subaccount number
+ * @param address
+ * @param parentSubaccountNum
+ * @returns
+ */
+export function getChildSubaccountIds(address: string, parentSubaccountNum: number): string[] {
+  return getChildSubaccountNums(parentSubaccountNum).map(
+    (subaccountNumber: number): string => SubaccountTable.uuid(address, subaccountNumber),
+  );
+}
+
+export function checkIfValidDydxAddress(address: string): boolean {
+  const pattern: RegExp = /^dydx[0-9a-z]{39}$/;
+  return pattern.test(address);
+}
+
+/**
+ * Gets subaccount response objects given the subaccount, perpetual positions and perpetual markets
+ * @param subaccount Subaccount to get response for, from the database
+ * @param positions List of perpetual positions held by the subaccount, from the database
+ * @param markets List of perpetual markets, from the database
+ * @param assetPositions List of asset positions held by the subaccount, from the database
+ * @param assets List of assets from the database
+ * @param perpetualMarketsMap Mapping of perpetual markets to clob pairs, perpetual ids,
+ *                            tickers from the database.
+ * @param latestBlockHeight Latest block height from the database
+ * @param latestFundingIndexMap Latest funding indices per perpetual from the database.
+ * @param lastUpdatedFundingIndexMap Funding indices per perpetual for the last updated block of
+ *                                   the subaccount.
+ *
+ * @returns Response object for the subaccount
+ */
+export function getSubaccountResponse(
+  subaccount: SubaccountFromDatabase,
+  perpetualPositions: PerpetualPositionFromDatabase[],
+  assetPositions: AssetPositionFromDatabase[],
+  assets: AssetFromDatabase[],
+  markets: MarketFromDatabase[],
+  perpetualMarketsMap: PerpetualMarketsMap,
+  latestBlockHeight: string,
+  latestFundingIndexMap: FundingIndexMap,
+  lastUpdatedFundingIndexMap: FundingIndexMap,
+): SubaccountResponseObject {
+  const marketIdToMarket: MarketsMap = _.keyBy(
+    markets,
+    MarketColumns.id,
+  );
+
+  const unsettledFunding: Big = getTotalUnsettledFunding(
+    perpetualPositions,
+    latestFundingIndexMap,
+    lastUpdatedFundingIndexMap,
+  );
+
+  const updatedPerpetualPositions:
+  PerpetualPositionWithFunding[] = getPerpetualPositionsWithUpdatedFunding(
+    initializePerpetualPositionsWithFunding(perpetualPositions),
+    latestFundingIndexMap,
+    lastUpdatedFundingIndexMap,
+  );
+
+  const filteredPerpetualPositions: PerpetualPositionWithFunding[
+  ] = filterPositionsByLatestEventIdPerPerpetual(updatedPerpetualPositions);
+
+  const perpetualPositionResponses:
+  PerpetualPositionResponseObject[] = filteredPerpetualPositions.map(
+    (perpetualPosition: PerpetualPositionWithFunding): PerpetualPositionResponseObject => {
+      return perpetualPositionToResponseObject(
+        perpetualPosition,
+        perpetualMarketsMap,
+        marketIdToMarket,
+        subaccount.subaccountNumber,
+      );
+    },
+  );
+
+  const perpetualPositionsMap: PerpetualPositionsMap = _.keyBy(
+    perpetualPositionResponses,
+    'market',
+  );
+
+  const assetIdToAsset: AssetById = _.keyBy(
+    assets,
+    AssetColumns.id,
+  );
+
+  const sortedAssetPositions:
+  AssetPositionFromDatabase[] = filterAssetPositions(assetPositions);
+
+  const assetPositionResponses: AssetPositionResponseObject[] = sortedAssetPositions.map(
+    (assetPosition: AssetPositionFromDatabase): AssetPositionResponseObject => {
+      return assetPositionToResponseObject(
+        assetPosition,
+        assetIdToAsset,
+        subaccount.subaccountNumber,
+      );
+    },
+  );
+
+  const assetPositionsMap: AssetPositionsMap = _.keyBy(
+    assetPositionResponses,
+    'symbol',
+  );
+
+  const {
+    assetPositionsMap: adjustedAssetPositionsMap,
+    adjustedUSDCAssetPositionSize,
+  }: {
+    assetPositionsMap: AssetPositionsMap,
+    adjustedUSDCAssetPositionSize: string,
+  } = adjustUSDCAssetPosition(assetPositionsMap, unsettledFunding);
+
+  const {
+    equity,
+    freeCollateral,
+  }: {
+    equity: string,
+    freeCollateral: string,
+  } = calculateEquityAndFreeCollateral(
+    filteredPerpetualPositions,
+    perpetualMarketsMap,
+    marketIdToMarket,
+    adjustedUSDCAssetPositionSize,
+  );
+
+  return subaccountToResponseObject({
+    subaccount,
+    equity,
+    freeCollateral,
+    latestBlockHeight,
+    openPerpetualPositions: perpetualPositionsMap,
+    assetPositions: adjustedAssetPositionsMap,
+  });
+}
+
+/* ------- PNL HELPERS ------- */
+
+/**
+ * Aggregates a list of PnL ticks, combining any PnL ticks for the same hour by summing
+ * the equity, totalPnl, and net transfers.
+ * Returns a map of aggregated pnl ticks and the number of ticks the aggreated tick is made up of.
+ * @param pnlTicks
+ * @returns
+ */
+export function aggregateHourlyPnlTicks(
+  pnlTicks: PnlTicksFromDatabase[],
+): AggregatedPnlTick[] {
+  const hourlyPnlTicks: Map<string, PnlTicksFromDatabase> = new Map();
+  const hourlySubaccountIds: Map<string, Set<string>> = new Map();
+  for (const pnlTick of pnlTicks) {
+    const truncatedTime: string = DateTime.fromISO(pnlTick.createdAt).startOf('hour').toISO();
+    if (hourlyPnlTicks.has(truncatedTime)) {
+      const subaccountIds: Set<string> = hourlySubaccountIds.get(truncatedTime) as Set<string>;
+      if (subaccountIds.has(pnlTick.subaccountId)) {
+        continue;
+      }
+      subaccountIds.add(pnlTick.subaccountId);
+      const aggregatedTick: PnlTicksFromDatabase = hourlyPnlTicks.get(
+        truncatedTime,
+      ) as PnlTicksFromDatabase;
+      hourlyPnlTicks.set(
+        truncatedTime,
+        {
+          ...aggregatedTick,
+          equity: (parseFloat(aggregatedTick.equity) + parseFloat(pnlTick.equity)).toString(),
+          totalPnl: (parseFloat(aggregatedTick.totalPnl) + parseFloat(pnlTick.totalPnl)).toString(),
+          netTransfers: (
+            parseFloat(aggregatedTick.netTransfers) + parseFloat(pnlTick.netTransfers)
+          ).toString(),
+        },
+      );
+      hourlySubaccountIds.set(truncatedTime, subaccountIds);
+    } else {
+      hourlyPnlTicks.set(truncatedTime, pnlTick);
+      hourlySubaccountIds.set(truncatedTime, new Set([pnlTick.subaccountId]));
+    }
+  }
+  return Array.from(hourlyPnlTicks.keys()).map((hour: string): AggregatedPnlTick => {
+    return {
+      pnlTick: hourlyPnlTicks.get(hour) as PnlTicksFromDatabase,
+      numTicks: (hourlySubaccountIds.get(hour) as Set<string>).size,
+    };
+  });
+}
+
+/* ------- VAULT HELPERS ------- */
+
+export async function getVaultMapping(): Promise<VaultMapping> {
+  const vaults: VaultFromDatabase[] = await VaultTable.findAll(
+    {},
+    [],
+    {},
+  );
+  const vaultMapping: VaultMapping = _.zipObject(
+    vaults.map((vault: VaultFromDatabase): string => {
+      return SubaccountTable.uuid(vault.address, 0);
+    }),
+    vaults,
+  );
+  const validVaultMapping: VaultMapping = {};
+  for (const subaccountId of _.keys(vaultMapping)) {
+    const perpetual: PerpetualMarketFromDatabase | undefined = perpetualMarketRefresher
+      .getPerpetualMarketFromClobPairId(
+        vaultMapping[subaccountId].clobPairId,
+      );
+    if (perpetual === undefined) {
+      logger.warning({
+        at: 'get-vault-mapping',
+        message: `Vault clob pair id ${vaultMapping[subaccountId]} does not correspond to a ` +
+          'perpetual market.',
+        subaccountId,
+      });
+      continue;
+    }
+    validVaultMapping[subaccountId] = vaultMapping[subaccountId];
+  }
+  return validVaultMapping;
+}
+
+export function getVaultPnlStartDate(): DateTime {
+  const startDate: DateTime = DateTime.fromISO(config.VAULT_PNL_START_DATE).toUTC();
+  return startDate;
 }

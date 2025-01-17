@@ -6,7 +6,7 @@ on:  # yamllint disable-line rule:truthy
   push:
     branches:
       - main
-      - 'release/protocol/v0.[0-9]+.x'  # e.g. release/protocol/v0.1.x
+      - 'release/protocol/v[0-9]+.[0-9]+.x'  # e.g. release/protocol/v0.1.x
       - 'release/protocol/v[0-9]+.x'  # e.g. release/protocol/v1.x
     paths:
       - 'protocol/daemons/**'
@@ -30,7 +30,7 @@ jobs:
         name: Setup Golang
         uses: actions/setup-go@v3
         with:
-          go-version: 1.21
+          go-version: 1.22
       -
         name: Display go version
         run: go version

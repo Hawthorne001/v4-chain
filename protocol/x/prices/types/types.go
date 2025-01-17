@@ -31,6 +31,7 @@ type PricesKeeper interface {
 	GetAllMarketParams(ctx sdk.Context) (marketParams []MarketParam)
 	GetMarketPrice(ctx sdk.Context, id uint32) (marketPrice MarketPrice, err error)
 	GetAllMarketPrices(ctx sdk.Context) (marketPrices []MarketPrice)
+	GetExponent(ctx sdk.Context, ticker string) (exponent int32, err error)
 	HasAuthority(authority string) bool
 
 	// Validation related.
@@ -40,11 +41,6 @@ type PricesKeeper interface {
 		performNonDeterministicValidation bool,
 	) error
 
-	// Proposal related.
-	UpdateSmoothedPrices(
-		ctx sdk.Context,
-		linearInterpolateFunc func(v0 uint64, v1 uint64, ppm uint32) (uint64, error),
-	) error
 	GetValidMarketPriceUpdates(
 		ctx sdk.Context,
 	) *MsgUpdateMarketPrices
@@ -52,8 +48,13 @@ type PricesKeeper interface {
 	// Misc.
 	Logger(ctx sdk.Context) log.Logger
 
+	// Currency Pair ID cache
+	AddCurrencyPairIDToStore(ctx sdk.Context, id uint32, cp slinkytypes.CurrencyPair)
+
 	// Slinky compat
 	GetCurrencyPairFromID(ctx sdk.Context, id uint64) (cp slinkytypes.CurrencyPair, found bool)
 	GetIDForCurrencyPair(ctx sdk.Context, cp slinkytypes.CurrencyPair) (uint64, bool)
 	GetPriceForCurrencyPair(ctx sdk.Context, cp slinkytypes.CurrencyPair) (oracletypes.QuotePrice, error)
+
+	SetNextMarketID(ctx sdk.Context, nextID uint32)
 }

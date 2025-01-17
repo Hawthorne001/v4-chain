@@ -63,9 +63,21 @@ func TestInternalMsgSamples_Gov_Key(t *testing.T) {
 		"/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade",
 		"/cosmos.upgrade.v1beta1.MsgSoftwareUpgradeResponse",
 
+		// accountplus
+		"/dydxprotocol.accountplus.MsgSetActiveState",
+		"/dydxprotocol.accountplus.MsgSetActiveStateResponse",
+
+		// affiliates
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateTiers",
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateTiersResponse",
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateWhitelist",
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateWhitelistResponse",
+
 		// blocktime
 		"/dydxprotocol.blocktime.MsgUpdateDowntimeParams",
 		"/dydxprotocol.blocktime.MsgUpdateDowntimeParamsResponse",
+		"/dydxprotocol.blocktime.MsgUpdateSynchronyParams",
+		"/dydxprotocol.blocktime.MsgUpdateSynchronyParamsResponse",
 
 		// bridge
 		"/dydxprotocol.bridge.MsgCompleteBridge",
@@ -101,6 +113,14 @@ func TestInternalMsgSamples_Gov_Key(t *testing.T) {
 		"/dydxprotocol.govplus.MsgSlashValidator",
 		"/dydxprotocol.govplus.MsgSlashValidatorResponse",
 
+		// listing
+		"/dydxprotocol.listing.MsgSetListingVaultDepositParams",
+		"/dydxprotocol.listing.MsgSetListingVaultDepositParamsResponse",
+		"/dydxprotocol.listing.MsgSetMarketsHardCap",
+		"/dydxprotocol.listing.MsgSetMarketsHardCapResponse",
+		"/dydxprotocol.listing.MsgUpgradeIsolatedPerpetualToCross",
+		"/dydxprotocol.listing.MsgUpgradeIsolatedPerpetualToCrossResponse",
+
 		// perpeutals
 		"/dydxprotocol.perpetuals.MsgCreatePerpetual",
 		"/dydxprotocol.perpetuals.MsgCreatePerpetualResponse",
@@ -121,6 +141,14 @@ func TestInternalMsgSamples_Gov_Key(t *testing.T) {
 		"/dydxprotocol.ratelimit.MsgSetLimitParams",
 		"/dydxprotocol.ratelimit.MsgSetLimitParamsResponse",
 
+		// revshare
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevShareDetailsForMarket",
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevShareDetailsForMarketResponse",
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevenueShare",
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevenueShareResponse",
+		"/dydxprotocol.revshare.MsgUpdateUnconditionalRevShareConfig",
+		"/dydxprotocol.revshare.MsgUpdateUnconditionalRevShareConfigResponse",
+
 		// rewards
 		"/dydxprotocol.rewards.MsgUpdateParams",
 		"/dydxprotocol.rewards.MsgUpdateParamsResponse",
@@ -132,6 +160,14 @@ func TestInternalMsgSamples_Gov_Key(t *testing.T) {
 		// stats
 		"/dydxprotocol.stats.MsgUpdateParams",
 		"/dydxprotocol.stats.MsgUpdateParamsResponse",
+
+		// vault
+		"/dydxprotocol.vault.MsgUnlockShares",
+		"/dydxprotocol.vault.MsgUnlockSharesResponse",
+		"/dydxprotocol.vault.MsgUpdateDefaultQuotingParams",
+		"/dydxprotocol.vault.MsgUpdateDefaultQuotingParamsResponse",
+		"/dydxprotocol.vault.MsgUpdateOperatorParams",
+		"/dydxprotocol.vault.MsgUpdateOperatorParamsResponse",
 
 		// vest
 		"/dydxprotocol.vest.MsgDeleteVestEntry",

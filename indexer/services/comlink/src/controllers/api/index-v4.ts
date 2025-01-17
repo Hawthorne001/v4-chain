@@ -1,6 +1,7 @@
 import express from 'express';
 
 import AddressesController from './v4/addresses-controller';
+import AffiliatesController from './v4/affiliates-controller';
 import AssetPositionsController from './v4/asset-positions-controller';
 import CandlesController from './v4/candles-controller';
 import ComplianceController from './v4/compliance-controller';
@@ -15,15 +16,18 @@ import OrderbooksController from './v4/orderbook-controller';
 import OrdersController from './v4/orders-controller';
 import PerpetualMarketController from './v4/perpetual-markets-controller';
 import PerpetualPositionsController from './v4/perpetual-positions-controller';
+import SocialTradingController from './v4/social-trading-controller';
 import SparklinesController from './v4/sparklines-controller';
 import TimeController from './v4/time-controller';
 import TradesController from './v4/trades-controller';
 import TransfersController from './v4/transfers-controller';
+import VaultController from './v4/vault-controller';
 
 // Keep routers in alphabetical order
 
 const router: express.Router = express.Router();
 router.use('/addresses', AddressesController);
+router.use('/affiliates', AffiliatesController);
 router.use('/assetPositions', AssetPositionsController);
 router.use('/candles', CandlesController);
 router.use('/fills', FillsController);
@@ -42,5 +46,7 @@ router.use('/trades', TradesController);
 router.use('/transfers', TransfersController);
 router.use('/screen', ComplianceController);
 router.use('/compliance', ComplianceV2Controller);
+router.use('/trader', SocialTradingController);
+router.use('/vault', VaultController);
 
 export default router;

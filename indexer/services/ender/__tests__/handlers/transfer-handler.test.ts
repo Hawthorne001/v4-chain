@@ -25,7 +25,7 @@ import {
   assetRefresher,
   WalletTable,
   WalletFromDatabase,
-  testConversionHelpers,
+  testConstants,
 } from '@dydxprotocol-indexer/postgres';
 import { KafkaMessage } from 'kafkajs';
 import { createKafkaMessage, producer } from '@dydxprotocol-indexer/kafka';
@@ -51,6 +51,11 @@ import {
 } from '../helpers/constants';
 import { updateBlockCache } from '../../src/caches/block-cache';
 import { createPostgresFunctions } from '../../src/helpers/postgres/postgres-functions';
+
+const defaultWallet = {
+  ...testConstants.defaultWallet,
+  address: defaultWalletAddress,
+};
 
 describe('transferHandler', () => {
   beforeAll(async () => {
@@ -303,13 +308,10 @@ describe('transferHandler', () => {
     const wallet: WalletFromDatabase | undefined = await WalletTable.findById(
       defaultWalletAddress,
     );
-    expect(wallet).toEqual({
-      address: defaultWalletAddress,
-      totalTradingRewards: testConversionHelpers.denomToHumanReadableConversion(0),
-    });
+    expect(wallet).toEqual(defaultWallet);
   });
 
-  it('creates new deposit for previously non-existent subaccount', async () => {
+  it('creates new deposit for previously non-existent subaccount (also non-existent recipient wallet)', async () => {
     const transactionIndex: number = 0;
 
     const depositEvent: TransferEventV1 = defaultDepositEvent;
@@ -346,18 +348,22 @@ describe('transferHandler', () => {
       newTransfer,
       asset,
     );
-    // Confirm the wallet was created
-    const wallet: WalletFromDatabase | undefined = await WalletTable.findById(
+    // Confirm the wallet was created for the sender and recipient
+    const walletSender: WalletFromDatabase | undefined = await WalletTable.findById(
       defaultWalletAddress,
+    );
+    const walletRecipient: WalletFromDatabase | undefined = await WalletTable.findById(
+      defaultDepositEvent.recipient!.subaccountId!.owner,
     );
     const newRecipientSubaccount: SubaccountFromDatabase | undefined = await
     SubaccountTable.findById(
       defaultRecipientSubaccountId,
     );
     expect(newRecipientSubaccount).toBeDefined();
-    expect(wallet).toEqual({
-      address: defaultWalletAddress,
-      totalTradingRewards: testConversionHelpers.denomToHumanReadableConversion(0),
+    expect(walletSender).toEqual(defaultWallet);
+    expect(walletRecipient).toEqual({
+      ...defaultWallet,
+      address: defaultDepositEvent.recipient!.subaccountId!.owner,
     });
   });
 
@@ -408,10 +414,7 @@ describe('transferHandler', () => {
     const wallet: WalletFromDatabase | undefined = await WalletTable.findById(
       defaultWalletAddress,
     );
-    expect(wallet).toEqual({
-      address: defaultWalletAddress,
-      totalTradingRewards: testConversionHelpers.denomToHumanReadableConversion(0),
-    });
+    expect(wallet).toEqual(defaultWallet);
   });
 
   it('creates new transfer and the recipient subaccount', async () => {
@@ -545,7 +548,7 @@ async function expectNoExistingTransfers(
   subaccountIds: string[],
 ) {
   // Confirm there is no existing transfer to or from the subaccounts
-  const transfers: TransferFromDatabase[] = await TransferTable.findAllToOrFromSubaccountId(
+  const { results: transfers } = await TransferTable.findAllToOrFromSubaccountId(
     {
       subaccountId: subaccountIds,
     },
@@ -572,7 +575,7 @@ async function expectAndReturnNewTransfer(
 ): Promise<TransferFromDatabase> {
   // Confirm there is now a transfer to or from the recipient subaccount
   if (recipientSubaccountId) {
-    const newTransfersRelatedToRecipient: TransferFromDatabase[] = await
+    const { results: newTransfersRelatedToRecipient } = await
     TransferTable.findAllToOrFromSubaccountId(
       {
         subaccountId: [
@@ -588,7 +591,7 @@ async function expectAndReturnNewTransfer(
 
   if (senderSubaccountId) {
     // Confirm there is now a transfer to or from the sender subaccount
-    const newTransfersRelatedToSender: TransferFromDatabase[] = await
+    const { results: newTransfersRelatedToSender } = await
     TransferTable.findAllToOrFromSubaccountId(
       {
         subaccountId: [
@@ -651,6 +654,7 @@ function expectTransfersSubaccountKafkaMessage(
       event.sender!.subaccountId!,
       event.sender!.subaccountId!,
       event.recipient!.subaccountId,
+      blockHeight,
     );
   }
 
@@ -661,6 +665,7 @@ function expectTransfersSubaccountKafkaMessage(
       event.recipient!.subaccountId!,
       event.sender!.subaccountId,
       event.recipient!.subaccountId!,
+      blockHeight,
     );
   }
 

@@ -7,13 +7,13 @@ import {
   StatefulOrderUpdatesCache,
 } from '@dydxprotocol-indexer/redis';
 import {
-  expectOpenOrderIds,
   expectOrderbookLevelCache,
   handleInitialOrderPlace,
   handleOrderUpdate,
 } from '../helpers/helpers';
 import { redisClient as client } from '../../src/helpers/redis/redis-controller';
 import {
+  blockHeightRefresher,
   dbHelpers,
   OrderbookMessageContents,
   perpetualMarketRefresher,
@@ -60,7 +60,10 @@ describe('OrderUpdateHandler', () => {
 
     beforeEach(async () => {
       await testMocks.seedData();
-      await perpetualMarketRefresher.updatePerpetualMarkets();
+      await Promise.all([
+        perpetualMarketRefresher.updatePerpetualMarkets(),
+        blockHeightRefresher.updateBlockHeight(),
+      ]);
       jest.spyOn(stats, 'timing');
       jest.spyOn(stats, 'increment');
       jest.spyOn(OrderbookLevelsCache, 'updatePriceLevel');
@@ -177,12 +180,6 @@ describe('OrderUpdateHandler', () => {
           ]),
         );
 
-        // Check order is added to open orders cache
-        await expectOpenOrderIds(
-          testConstants.defaultPerpetualMarket.clobPairId,
-          [redisTestConstants.defaultRedisOrder.id],
-        );
-
         jest.clearAllMocks();
         const secondTotalFilledQuantums: Long = Long.fromValue(500_350, true);
         const secondUpdate: redisTestConstants.OffChainUpdateOrderUpdateUpdateMessage = {
@@ -225,9 +222,6 @@ describe('OrderUpdateHandler', () => {
           },
         };
         await handleOrderUpdate(thirdUpdate);
-
-        // Order total filled == size, order should be removed from open orders cache
-        await expectOpenOrderIds(testConstants.defaultPerpetualMarket.clobPairId, []);
       },
     );
 
@@ -349,6 +343,7 @@ describe('OrderUpdateHandler', () => {
         expect(stats.increment).toHaveBeenCalledWith(
           'vulcan.order_update_total_filled_exceeds_size',
           1,
+          { instance: '' },
         );
         expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({
           at: 'OrderUpdateHandler#getCappedNewTotalFilledQuantums',
@@ -419,6 +414,7 @@ describe('OrderUpdateHandler', () => {
         expect(stats.increment).toHaveBeenCalledWith(
           'vulcan.order_update_old_total_filled_exceeds_size',
           1,
+          { instance: '' },
         );
         expectTimingStats();
       },
@@ -541,6 +537,7 @@ describe('OrderUpdateHandler', () => {
         1,
         {
           orderFlags: String(redisTestConstants.orderUpdate.orderUpdate.orderId!.orderFlags),
+          instance: '',
         },
       );
     });
@@ -577,6 +574,7 @@ describe('OrderUpdateHandler', () => {
         1,
         {
           orderFlags: String(statefulOrderUpdate.orderUpdate.orderId!.orderFlags),
+          instance: '',
         },
       );
     });
@@ -606,7 +604,7 @@ function expectTimingStat(fnName: string) {
   expect(stats.timing).toHaveBeenCalledWith(
     `vulcan.${STATS_FUNCTION_NAME}.timing`,
     expect.any(Number),
-    { className: 'OrderUpdateHandler', fnName },
+    { className: 'OrderUpdateHandler', fnName, instance: '' },
   );
 }
 

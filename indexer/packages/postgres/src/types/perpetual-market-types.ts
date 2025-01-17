@@ -1,39 +1,41 @@
 /* ------- PERPETUAL MARKET TYPES ------- */
 
 export interface PerpetualMarketCreateObject {
-  id: string;
-  clobPairId: string;
-  ticker: string;
-  marketId: number;
-  status: PerpetualMarketStatus;
-  priceChange24H: string;
-  volume24H: string;
-  trades24H: number;
-  nextFundingRate: string;
-  openInterest: string;
-  quantumConversionExponent: number;
-  atomicResolution: number;
-  subticksPerTick: number;
-  stepBaseQuantums: number;
-  liquidityTierId: number;
+  id: string,
+  clobPairId: string,
+  ticker: string,
+  marketId: number,
+  status: PerpetualMarketStatus,
+  priceChange24H: string,
+  volume24H: string,
+  trades24H: number,
+  nextFundingRate: string,
+  openInterest: string,
+  quantumConversionExponent: number,
+  atomicResolution: number,
+  subticksPerTick: number,
+  stepBaseQuantums: number,
+  liquidityTierId: number,
+  marketType: PerpetualMarketType,
+  baseOpenInterest: string,
 }
 
 export interface PerpetualMarketUpdateObject {
-  id?: string;
-  clobPairId?: string;
-  ticker?: string;
-  marketId?: number;
-  status?: PerpetualMarketStatus;
-  priceChange24H?: string;
-  volume24H?: string;
-  trades24H?: number;
-  nextFundingRate?: string;
-  openInterest?: string;
-  quantumConversionExponent?: number;
-  atomicResolution?: number;
-  subticksPerTick?: number;
-  stepBaseQuantums?: number;
-  liquidityTierId?: number;
+  id?: string,
+  clobPairId?: string,
+  ticker?: string,
+  marketId?: number,
+  status?: PerpetualMarketStatus,
+  priceChange24H?: string,
+  volume24H?: string,
+  trades24H?: number,
+  nextFundingRate?: string,
+  openInterest?: string,
+  quantumConversionExponent?: number,
+  atomicResolution?: number,
+  subticksPerTick?: number,
+  stepBaseQuantums?: number,
+  liquidityTierId?: number,
 }
 
 export enum PerpetualMarketColumns {
@@ -61,4 +63,9 @@ export enum PerpetualMarketStatus {
   POST_ONLY = 'POST_ONLY',
   INITIALIZING = 'INITIALIZING',
   FINAL_SETTLEMENT = 'FINAL_SETTLEMENT',
+}
+
+export enum PerpetualMarketType {
+  CROSS = 'CROSS',
+  ISOLATED = 'ISOLATED',
 }

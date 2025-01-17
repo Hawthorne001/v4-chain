@@ -8,7 +8,6 @@ import {
   defaultFundingIndexUpdateId,
   defaultPerpetualMarket,
   defaultPerpetualMarket2,
-  defaultPerpetualMarket3,
   defaultTendermintEventId2,
   defaultTendermintEventId3,
 } from '../helpers/constants';
@@ -212,11 +211,10 @@ describe('funding index update store', () => {
         '3',
       );
 
-    expect(fundingIndexMap).toEqual({
-      [defaultFundingIndexUpdate.perpetualId]: Big(defaultFundingIndexUpdate.fundingIndex),
-      [fundingIndexUpdates3.perpetualId]: Big(fundingIndexUpdates3.fundingIndex),
-      [defaultPerpetualMarket3.id]: Big(0),
-    });
+    expect(fundingIndexMap[defaultFundingIndexUpdate.perpetualId])
+      .toEqual(Big(defaultFundingIndexUpdate.fundingIndex));
+    expect(fundingIndexMap[fundingIndexUpdates3.perpetualId])
+      .toEqual(Big(fundingIndexUpdates3.fundingIndex));
   });
 
   it('Gets default funding index of 0 in funding index map if no funding indexes', async () => {
@@ -225,11 +223,8 @@ describe('funding index update store', () => {
         '3',
       );
 
-    expect(fundingIndexMap).toEqual({
-      [defaultPerpetualMarket.id]: Big(0),
-      [defaultPerpetualMarket2.id]: Big(0),
-      [defaultPerpetualMarket3.id]: Big(0),
-    });
+    expect(fundingIndexMap[defaultPerpetualMarket.id]).toEqual(Big(0));
+    expect(fundingIndexMap[defaultPerpetualMarket2.id]).toEqual(Big(0));
   });
 
   it(
@@ -242,11 +237,43 @@ describe('funding index update store', () => {
           '3',
         );
 
-      expect(fundingIndexMap).toEqual({
-        [defaultPerpetualMarket.id]: Big(defaultFundingIndexUpdate.fundingIndex),
-        [defaultPerpetualMarket2.id]: Big(0),
-        [defaultPerpetualMarket3.id]: Big(0),
-      });
+      expect(fundingIndexMap[defaultPerpetualMarket.id])
+        .toEqual(Big(defaultFundingIndexUpdate.fundingIndex));
+      expect(fundingIndexMap[defaultPerpetualMarket2.id]).toEqual(Big(0));
     },
   );
+
+  it('Successfully finds funding index maps for multiple effectiveBeforeOrAtHeights', async () => {
+    const fundingIndexUpdates2: FundingIndexUpdatesCreateObject = {
+      ...defaultFundingIndexUpdate,
+      fundingIndex: '124',
+      effectiveAtHeight: updatedHeight,
+      effectiveAt: '1982-05-25T00:00:00.000Z',
+      eventId: defaultTendermintEventId2,
+    };
+    const fundingIndexUpdates3: FundingIndexUpdatesCreateObject = {
+      ...defaultFundingIndexUpdate,
+      eventId: defaultTendermintEventId3,
+      perpetualId: defaultPerpetualMarket2.id,
+    };
+    await Promise.all([
+      FundingIndexUpdatesTable.create(defaultFundingIndexUpdate),
+      FundingIndexUpdatesTable.create(fundingIndexUpdates2),
+      FundingIndexUpdatesTable.create(fundingIndexUpdates3),
+    ]);
+
+    const fundingIndexMaps: {[blockHeight:string]: FundingIndexMap} = await FundingIndexUpdatesTable
+      .findFundingIndexMaps(
+        ['3', '6'],
+      );
+
+    expect(fundingIndexMaps['3'][defaultFundingIndexUpdate.perpetualId])
+      .toEqual(Big(defaultFundingIndexUpdate.fundingIndex));
+    expect(fundingIndexMaps['3'][fundingIndexUpdates3.perpetualId])
+      .toEqual(Big(fundingIndexUpdates3.fundingIndex));
+    expect(fundingIndexMaps['6'][defaultFundingIndexUpdate.perpetualId])
+      .toEqual(Big(fundingIndexUpdates2.fundingIndex));
+    expect(fundingIndexMaps['6'][fundingIndexUpdates3.perpetualId])
+      .toEqual(Big(fundingIndexUpdates3.fundingIndex));
+  });
 });

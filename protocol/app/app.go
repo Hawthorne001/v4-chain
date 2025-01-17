@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math/big"
 	"net/http"
@@ -33,6 +34,7 @@ import (
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
+	"github.com/cosmos/cosmos-sdk/baseapp/oe"
 	"github.com/cosmos/cosmos-sdk/client"
 	cosmosflags "github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/grpc/cmtservice"
@@ -89,7 +91,7 @@ import (
 	"github.com/cosmos/ibc-go/modules/capability"
 	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
 	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	"github.com/dydxprotocol/v4-chain/protocol/daemons/configs"
+	antetypes "github.com/dydxprotocol/v4-chain/protocol/app/ante/types"
 	"github.com/gorilla/mux"
 	"github.com/rakyll/statik/fs"
 	"github.com/spf13/cast"
@@ -103,6 +105,7 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/app/prepare/prices"
 	"github.com/dydxprotocol/v4-chain/protocol/app/process"
 
+	"github.com/dydxprotocol/v4-chain/protocol/app/vote_extensions"
 	"github.com/dydxprotocol/v4-chain/protocol/lib"
 	"github.com/dydxprotocol/v4-chain/protocol/lib/metrics"
 	timelib "github.com/dydxprotocol/v4-chain/protocol/lib/time"
@@ -113,6 +116,7 @@ import (
 
 	// Daemons
 	bridgeclient "github.com/dydxprotocol/v4-chain/protocol/daemons/bridge/client"
+	"github.com/dydxprotocol/v4-chain/protocol/daemons/configs"
 	daemonflags "github.com/dydxprotocol/v4-chain/protocol/daemons/flags"
 	liquidationclient "github.com/dydxprotocol/v4-chain/protocol/daemons/liquidation/client"
 	metricsclient "github.com/dydxprotocol/v4-chain/protocol/daemons/metrics/client"
@@ -128,6 +132,13 @@ import (
 	daemontypes "github.com/dydxprotocol/v4-chain/protocol/daemons/types"
 
 	// Modules
+	accountplusmodule "github.com/dydxprotocol/v4-chain/protocol/x/accountplus"
+	"github.com/dydxprotocol/v4-chain/protocol/x/accountplus/authenticator"
+	accountplusmodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/accountplus/keeper"
+	accountplusmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/accountplus/types"
+	affiliatesmodule "github.com/dydxprotocol/v4-chain/protocol/x/affiliates"
+	affiliatesmodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/affiliates/keeper"
+	affiliatesmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/affiliates/types"
 	assetsmodule "github.com/dydxprotocol/v4-chain/protocol/x/assets"
 	assetsmodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/assets/keeper"
 	assetsmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/assets/types"
@@ -154,6 +165,9 @@ import (
 	govplusmodule "github.com/dydxprotocol/v4-chain/protocol/x/govplus"
 	govplusmodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/govplus/keeper"
 	govplusmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/govplus/types"
+	listingmodule "github.com/dydxprotocol/v4-chain/protocol/x/listing"
+	listingmodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/listing/keeper"
+	listingmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/listing/types"
 	perpetualsmodule "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals"
 	perpetualsmodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/keeper"
 	perpetualsmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/perpetuals/types"
@@ -163,6 +177,9 @@ import (
 	ratelimitmodule "github.com/dydxprotocol/v4-chain/protocol/x/ratelimit"
 	ratelimitmodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/ratelimit/keeper"
 	ratelimitmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/ratelimit/types"
+	revsharemodule "github.com/dydxprotocol/v4-chain/protocol/x/revshare"
+	revsharemodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/revshare/keeper"
+	revsharemoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/revshare/types"
 	rewardsmodule "github.com/dydxprotocol/v4-chain/protocol/x/rewards"
 	rewardsmodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/rewards/keeper"
 	rewardsmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/rewards/types"
@@ -181,6 +198,9 @@ import (
 	vestmodule "github.com/dydxprotocol/v4-chain/protocol/x/vest"
 	vestmodulekeeper "github.com/dydxprotocol/v4-chain/protocol/x/vest/keeper"
 	vestmoduletypes "github.com/dydxprotocol/v4-chain/protocol/x/vest/types"
+	marketmapmodule "github.com/skip-mev/slinky/x/marketmap"
+	marketmapmodulekeeper "github.com/skip-mev/slinky/x/marketmap/keeper"
+	marketmapmoduletypes "github.com/skip-mev/slinky/x/marketmap/types"
 
 	// IBC
 	ica "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts"
@@ -205,13 +225,21 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/indexer/msgsender"
 
 	// Slinky
+	slinkyproposals "github.com/skip-mev/slinky/abci/proposals"
+	"github.com/skip-mev/slinky/abci/strategies/aggregator"
+	compression "github.com/skip-mev/slinky/abci/strategies/codec"
+	"github.com/skip-mev/slinky/abci/strategies/currencypair"
+	"github.com/skip-mev/slinky/abci/ve"
 	oracleconfig "github.com/skip-mev/slinky/oracle/config"
+	"github.com/skip-mev/slinky/pkg/math/voteweighted"
 	oracleclient "github.com/skip-mev/slinky/service/clients/oracle"
 	servicemetrics "github.com/skip-mev/slinky/service/metrics"
+	promserver "github.com/skip-mev/slinky/service/servers/prometheus"
 
-	// Grpc Streaming
-	streaming "github.com/dydxprotocol/v4-chain/protocol/streaming/grpc"
-	streamingtypes "github.com/dydxprotocol/v4-chain/protocol/streaming/grpc/types"
+	// Full Node Streaming
+	streaming "github.com/dydxprotocol/v4-chain/protocol/streaming"
+	streamingtypes "github.com/dydxprotocol/v4-chain/protocol/streaming/types"
+	"github.com/dydxprotocol/v4-chain/protocol/streaming/ws"
 )
 
 var (
@@ -276,6 +304,11 @@ type App struct {
 	FeeGrantKeeper        feegrantkeeper.Keeper
 	ConsensusParamsKeeper consensusparamkeeper.Keeper
 	GovPlusKeeper         govplusmodulekeeper.Keeper
+	AccountPlusKeeper     accountplusmodulekeeper.Keeper
+	AuthenticatorManager  *authenticator.AuthenticatorManager
+	AffiliatesKeeper      affiliatesmodulekeeper.Keeper
+
+	MarketMapKeeper marketmapmodulekeeper.Keeper
 
 	PricesKeeper pricesmodulekeeper.Keeper
 
@@ -287,13 +320,17 @@ type App struct {
 
 	DelayMsgKeeper delaymsgmodulekeeper.Keeper
 
-	FeeTiersKeeper feetiersmodulekeeper.Keeper
+	FeeTiersKeeper *feetiersmodulekeeper.Keeper
+
+	ListingKeeper listingmodulekeeper.Keeper
 
 	PerpetualsKeeper *perpetualsmodulekeeper.Keeper
 
 	VestKeeper vestmodulekeeper.Keeper
 
 	RewardsKeeper rewardsmodulekeeper.Keeper
+
+	RevShareKeeper revsharemodulekeeper.Keeper
 
 	StatsKeeper statsmodulekeeper.Keeper
 
@@ -314,9 +351,11 @@ type App struct {
 	// module configurator
 	configurator module.Configurator
 
-	IndexerEventManager  indexer_manager.IndexerEventManager
-	GrpcStreamingManager streamingtypes.GrpcStreamingManager
-	Server               *daemonserver.Server
+	IndexerEventManager      indexer_manager.IndexerEventManager
+	FullNodeStreamingManager streamingtypes.FullNodeStreamingManager
+	WebsocketStreamingServer *ws.WebsocketServer
+
+	Server *daemonserver.Server
 
 	// startDaemons encapsulates the logic that starts all daemons and daemon services. This function contains a
 	// closure of all relevant data structures that are shared with various keepers. Daemon services startup is
@@ -327,11 +366,13 @@ type App struct {
 	PriceFeedClient    *pricefeedclient.Client
 	LiquidationsClient *liquidationclient.Client
 	BridgeClient       *bridgeclient.Client
+	SlinkyClient       *slinkyclient.Client
 
 	DaemonHealthMonitor *daemonservertypes.HealthMonitor
 
 	// Slinky
-	SlinkyClient *slinkyclient.Client
+	oraclePrometheusServer *promserver.PrometheusServer
+	oracleMetrics          servicemetrics.Metrics
 }
 
 // assertAppPreconditions assert invariants required for an application to start.
@@ -371,6 +412,22 @@ func New(
 	interfaceRegistry := encodingConfig.InterfaceRegistry
 	txConfig := encodingConfig.TxConfig
 
+	// Enable optimistic block execution.
+	if appFlags.OptimisticExecutionEnabled {
+		logger.Info("optimistic execution is enabled.")
+		if appFlags.OptimisticExecutionTestAbortRate > 0 {
+			logger.Warn(fmt.Sprintf(
+				"Test flag optimistic-execution-test-abort-rate is set: %v\n",
+				appFlags.OptimisticExecutionTestAbortRate,
+			))
+		}
+		baseAppOptions = append(
+			baseAppOptions,
+			baseapp.SetOptimisticExecution(
+				oe.WithAbortRate(int(appFlags.OptimisticExecutionTestAbortRate)),
+			))
+	}
+
 	bApp := baseapp.NewBaseApp(appconstants.AppName, logger, db, txConfig.TxDecoder(), baseAppOptions...)
 	bApp.SetCommitMultiStoreTracer(traceStore)
 	bApp.SetVersion(version.Version)
@@ -402,6 +459,7 @@ func New(
 		blocktimemoduletypes.StoreKey,
 		bridgemoduletypes.StoreKey,
 		feetiersmoduletypes.StoreKey,
+		listingmoduletypes.StoreKey,
 		perpetualsmoduletypes.StoreKey,
 		satypes.StoreKey,
 		statsmoduletypes.StoreKey,
@@ -413,6 +471,10 @@ func New(
 		epochsmoduletypes.StoreKey,
 		govplusmoduletypes.StoreKey,
 		vaultmoduletypes.StoreKey,
+		revsharemoduletypes.StoreKey,
+		accountplusmoduletypes.StoreKey,
+		marketmapmoduletypes.StoreKey,
+		affiliatesmoduletypes.StoreKey,
 	)
 	keys[authtypes.StoreKey] = keys[authtypes.StoreKey].WithLocking()
 	tkeys := storetypes.NewTransientStoreKeys(
@@ -421,6 +483,8 @@ func New(
 		statsmoduletypes.TransientStoreKey,
 		rewardsmoduletypes.TransientStoreKey,
 		indexer_manager.TransientStoreKey,
+		streaming.StreamingManagerTransientStoreKey,
+		perpetualsmoduletypes.TransientStoreKey,
 	)
 	memKeys := storetypes.NewMemoryStoreKeys(capabilitytypes.MemStoreKey, clobmoduletypes.MemStoreKey)
 
@@ -445,9 +509,16 @@ func New(
 			if app.SlinkyClient != nil {
 				app.SlinkyClient.Stop()
 			}
+			if app.FullNodeStreamingManager != nil {
+				app.FullNodeStreamingManager.Stop()
+			}
+			if app.WebsocketStreamingServer != nil {
+				app.WebsocketStreamingServer.Shutdown()
+			}
 			return nil
 		},
 	)
+	app.initOracleMetrics(appOpts)
 
 	app.ParamsKeeper = initParamsKeeper(appCodec, cdc, keys[paramstypes.StoreKey], tkeys[paramstypes.TStoreKey])
 
@@ -704,7 +775,12 @@ func New(
 		indexerFlags.SendOffchainData,
 	)
 
-	app.GrpcStreamingManager = getGrpcStreamingManagerFromOptions(appFlags, logger)
+	app.FullNodeStreamingManager, app.WebsocketStreamingServer = getFullNodeStreamingManagerFromOptions(
+		appFlags,
+		appCodec,
+		logger,
+		tkeys[streaming.StreamingManagerTransientStoreKey],
+	)
 
 	timeProvider := &timelib.TimeProviderImpl{}
 
@@ -810,7 +886,9 @@ func New(
 					appFlags,
 					logger,
 				)
-				app.RegisterDaemonWithHealthMonitor(app.SlinkyClient, maxDaemonUnhealthyDuration)
+				app.RegisterDaemonWithHealthMonitor(app.SlinkyClient.GetMarketPairHC(), maxDaemonUnhealthyDuration)
+				app.RegisterDaemonWithHealthMonitor(app.SlinkyClient.GetPriceHC(), maxDaemonUnhealthyDuration)
+				app.RegisterDaemonWithHealthMonitor(app.SlinkyClient.GetSidecarVersionHC(), maxDaemonUnhealthyDuration)
 			}
 		}
 
@@ -859,12 +937,70 @@ func New(
 			)
 		}()
 	}
+	app.StatsKeeper = *statsmodulekeeper.NewKeeper(
+		appCodec,
+		app.EpochsKeeper,
+		keys[statsmoduletypes.StoreKey],
+		tkeys[statsmoduletypes.TransientStoreKey],
+		// set the governance and delaymsg module accounts as the authority for conducting upgrades
+		[]string{
+			lib.GovModuleAddress.String(),
+			delaymsgmoduletypes.ModuleAddress.String(),
+		},
+		app.StakingKeeper,
+	)
+	statsModule := statsmodule.NewAppModule(appCodec, app.StatsKeeper)
+
+	app.AffiliatesKeeper = *affiliatesmodulekeeper.NewKeeper(
+		appCodec,
+		keys[affiliatesmoduletypes.StoreKey],
+		[]string{
+			lib.GovModuleAddress.String(),
+		},
+		app.StatsKeeper,
+		app.IndexerEventManager,
+	)
+	affiliatesModule := affiliatesmodule.NewAppModule(appCodec, app.AffiliatesKeeper)
+
+	app.MarketMapKeeper = *marketmapmodulekeeper.NewKeeper(
+		runtime.NewKVStoreService(keys[marketmapmoduletypes.StoreKey]),
+		appCodec,
+		authtypes.NewModuleAddress(govtypes.ModuleName),
+	)
+
+	marketmapModule := marketmapmodule.NewAppModule(appCodec, &app.MarketMapKeeper)
+
+	app.FeeTiersKeeper = feetiersmodulekeeper.NewKeeper(
+		appCodec,
+		app.StatsKeeper,
+		app.AffiliatesKeeper,
+		keys[feetiersmoduletypes.StoreKey],
+		// set the governance and delaymsg module accounts as the authority for conducting upgrades
+		[]string{
+			lib.GovModuleAddress.String(),
+			delaymsgmoduletypes.ModuleAddress.String(),
+		},
+	)
+	feeTiersModule := feetiersmodule.NewAppModule(appCodec, app.FeeTiersKeeper)
+
+	app.AffiliatesKeeper.SetFeetiersKeeper(app.FeeTiersKeeper)
+
+	app.RevShareKeeper = *revsharemodulekeeper.NewKeeper(
+		appCodec,
+		keys[revsharemoduletypes.StoreKey],
+		[]string{
+			lib.GovModuleAddress.String(),
+		},
+		app.AffiliatesKeeper,
+		*app.FeeTiersKeeper,
+	)
+	revShareModule := revsharemodule.NewAppModule(appCodec, app.RevShareKeeper)
+	app.FeeTiersKeeper.SetRevShareKeeper(app.RevShareKeeper)
 
 	app.PricesKeeper = *pricesmodulekeeper.NewKeeper(
 		appCodec,
 		keys[pricesmoduletypes.StoreKey],
 		indexPriceCache,
-		pricesmoduletypes.NewMarketToSmoothedPrices(pricesmoduletypes.SmoothedPriceTrackingBlockHistoryLength),
 		timeProvider,
 		app.IndexerEventManager,
 		// set the governance and delaymsg module accounts as the authority for conducting upgrades
@@ -872,8 +1008,18 @@ func New(
 			lib.GovModuleAddress.String(),
 			delaymsgmoduletypes.ModuleAddress.String(),
 		},
+		app.RevShareKeeper,
+		&app.MarketMapKeeper,
+		app.FullNodeStreamingManager,
 	)
-	pricesModule := pricesmodule.NewAppModule(appCodec, app.PricesKeeper, app.AccountKeeper, app.BankKeeper)
+	pricesModule := pricesmodule.NewAppModule(
+		appCodec,
+		app.PricesKeeper,
+		app.AccountKeeper,
+		app.BankKeeper,
+		app.RevShareKeeper,
+		&app.MarketMapKeeper,
+	)
 
 	app.AssetsKeeper = *assetsmodulekeeper.NewKeeper(
 		appCodec,
@@ -919,33 +1065,9 @@ func New(
 			lib.GovModuleAddress.String(),
 			delaymsgmoduletypes.ModuleAddress.String(),
 		},
+		tkeys[perpetualsmoduletypes.TransientStoreKey],
 	)
 	perpetualsModule := perpetualsmodule.NewAppModule(appCodec, app.PerpetualsKeeper)
-
-	app.StatsKeeper = *statsmodulekeeper.NewKeeper(
-		appCodec,
-		app.EpochsKeeper,
-		keys[statsmoduletypes.StoreKey],
-		tkeys[statsmoduletypes.TransientStoreKey],
-		// set the governance and delaymsg module accounts as the authority for conducting upgrades
-		[]string{
-			lib.GovModuleAddress.String(),
-			delaymsgmoduletypes.ModuleAddress.String(),
-		},
-	)
-	statsModule := statsmodule.NewAppModule(appCodec, app.StatsKeeper)
-
-	app.FeeTiersKeeper = *feetiersmodulekeeper.NewKeeper(
-		appCodec,
-		app.StatsKeeper,
-		keys[feetiersmoduletypes.StoreKey],
-		// set the governance and delaymsg module accounts as the authority for conducting upgrades
-		[]string{
-			lib.GovModuleAddress.String(),
-			delaymsgmoduletypes.ModuleAddress.String(),
-		},
-	)
-	feeTiersModule := feetiersmodule.NewAppModule(appCodec, app.FeeTiersKeeper)
 
 	app.VestKeeper = *vestmodulekeeper.NewKeeper(
 		appCodec,
@@ -985,18 +1107,40 @@ func New(
 		app.PerpetualsKeeper,
 		app.BlockTimeKeeper,
 		app.IndexerEventManager,
+		app.FullNodeStreamingManager,
 	)
 	subaccountsModule := subaccountsmodule.NewAppModule(
 		appCodec,
 		app.SubaccountsKeeper,
 	)
 
+	// Initialize authenticators
+	app.AuthenticatorManager = authenticator.NewAuthenticatorManager()
+	app.AuthenticatorManager.InitializeAuthenticators(
+		[]accountplusmoduletypes.Authenticator{
+			authenticator.NewAllOf(app.AuthenticatorManager),
+			authenticator.NewAnyOf(app.AuthenticatorManager),
+			authenticator.NewSignatureVerification(app.AccountKeeper),
+			authenticator.NewMessageFilter(),
+			authenticator.NewClobPairIdFilter(),
+			authenticator.NewSubaccountFilter(),
+		},
+	)
+	app.AccountPlusKeeper = *accountplusmodulekeeper.NewKeeper(
+		appCodec,
+		keys[accountplusmoduletypes.StoreKey],
+		app.AuthenticatorManager,
+		[]string{
+			lib.GovModuleAddress.String(),
+		},
+	)
+	accountplusModule := accountplusmodule.NewAppModule(appCodec, app.AccountPlusKeeper)
+
 	clobFlags := clobflags.GetClobFlagValuesFromOptions(appOpts)
 	logger.Info("Parsed CLOB flags", "Flags", clobFlags)
 
-	memClob := clobmodulememclob.NewMemClobPriceTimePriority(
-		app.IndexerEventManager.Enabled() || app.GrpcStreamingManager.Enabled(),
-	)
+	memClob := clobmodulememclob.NewMemClobPriceTimePriority(app.IndexerEventManager.Enabled())
+	memClob.SetGenerateOrderbookUpdates(app.FullNodeStreamingManager.Enabled())
 
 	app.ClobKeeper = clobmodulekeeper.NewKeeper(
 		appCodec,
@@ -1018,13 +1162,15 @@ func New(
 		app.PricesKeeper,
 		app.StatsKeeper,
 		app.RewardsKeeper,
+		app.AffiliatesKeeper,
+		app.AccountPlusKeeper,
 		app.IndexerEventManager,
-		app.GrpcStreamingManager,
+		app.FullNodeStreamingManager,
 		txConfig.TxDecoder(),
 		clobFlags,
-		rate_limit.NewPanicRateLimiter[*clobmoduletypes.MsgPlaceOrder](),
-		rate_limit.NewPanicRateLimiter[*clobmoduletypes.MsgCancelOrder](),
+		rate_limit.NewPanicRateLimiter[sdk.Msg](),
 		daemonLiquidationInfo,
+		app.RevShareKeeper,
 	)
 	clobModule := clobmodule.NewAppModule(
 		appCodec,
@@ -1070,12 +1216,46 @@ func New(
 	app.VaultKeeper = *vaultmodulekeeper.NewKeeper(
 		appCodec,
 		keys[vaultmoduletypes.StoreKey],
+		app.AssetsKeeper,
+		app.BankKeeper,
+		app.ClobKeeper,
+		app.DelayMsgKeeper,
+		app.PerpetualsKeeper,
+		app.PricesKeeper,
+		app.SendingKeeper,
+		app.SubaccountsKeeper,
+		app.IndexerEventManager,
 		[]string{
 			lib.GovModuleAddress.String(),
 			delaymsgmoduletypes.ModuleAddress.String(),
 		},
 	)
 	vaultModule := vaultmodule.NewAppModule(appCodec, app.VaultKeeper)
+	app.FeeTiersKeeper.SetVaultKeeper(app.VaultKeeper)
+
+	app.ListingKeeper = *listingmodulekeeper.NewKeeper(
+		appCodec,
+		keys[listingmoduletypes.StoreKey],
+		[]string{
+			lib.GovModuleAddress.String(),
+		},
+		app.IndexerEventManager,
+		app.PricesKeeper,
+		app.ClobKeeper,
+		&app.MarketMapKeeper,
+		app.PerpetualsKeeper,
+		app.SubaccountsKeeper,
+		app.VaultKeeper,
+	)
+	listingModule := listingmodule.NewAppModule(
+		appCodec,
+		app.ListingKeeper,
+		app.PricesKeeper,
+		app.ClobKeeper,
+		&app.MarketMapKeeper,
+		app.PerpetualsKeeper,
+		app.VaultKeeper,
+	)
 
 	/****  Module Options ****/
 
@@ -1145,10 +1325,17 @@ func New(
 		epochsModule,
 		rateLimitModule,
 		vaultModule,
+		listingModule,
+		revShareModule,
+		accountplusModule,
+		marketmapModule,
+		affiliatesModule,
 	)
 
 	app.ModuleManager.SetOrderPreBlockers(
-		upgradetypes.ModuleName,
+		upgradetypes.ModuleName, // Must be first since upgrades may be state schema breaking.
+		clobmoduletypes.ModuleName,
+		pricesmoduletypes.ModuleName,
 	)
 
 	// During begin block slashing happens after distr.BeginBlocker so that
@@ -1190,6 +1377,11 @@ func New(
 		govplusmoduletypes.ModuleName,
 		delaymsgmoduletypes.ModuleName,
 		vaultmoduletypes.ModuleName,
+		listingmoduletypes.ModuleName,
+		revsharemoduletypes.ModuleName,
+		accountplusmoduletypes.ModuleName,
+		marketmapmoduletypes.ModuleName,
+		affiliatesmoduletypes.ModuleName,
 	)
 
 	app.ModuleManager.SetOrderPrepareCheckStaters(
@@ -1229,7 +1421,15 @@ func New(
 		epochsmoduletypes.ModuleName,
 		govplusmoduletypes.ModuleName,
 		delaymsgmoduletypes.ModuleName,
+		// Vault endblocker should be after clob endblocker. Otherwise,
+		// the block after the one where vault orders expire won't have
+		// any vault orders.
 		vaultmoduletypes.ModuleName,
+		listingmoduletypes.ModuleName,
+		revsharemoduletypes.ModuleName,
+		accountplusmoduletypes.ModuleName,
+		marketmapmoduletypes.ModuleName,
+		affiliatesmoduletypes.ModuleName,
 		authz.ModuleName,                // No-op.
 		blocktimemoduletypes.ModuleName, // Must be last
 	)
@@ -1259,6 +1459,7 @@ func New(
 		feegrant.ModuleName,
 		consensusparamtypes.ModuleName,
 		icatypes.ModuleName,
+		marketmapmoduletypes.ModuleName, // must be before prices
 		pricesmoduletypes.ModuleName,
 		assetsmoduletypes.ModuleName,
 		blocktimemoduletypes.ModuleName,
@@ -1274,6 +1475,10 @@ func New(
 		govplusmoduletypes.ModuleName,
 		delaymsgmoduletypes.ModuleName,
 		vaultmoduletypes.ModuleName,
+		listingmoduletypes.ModuleName,
+		revsharemoduletypes.ModuleName,
+		accountplusmoduletypes.ModuleName,
+		affiliatesmoduletypes.ModuleName,
 		authz.ModuleName,
 	)
 
@@ -1299,6 +1504,7 @@ func New(
 		feegrant.ModuleName,
 		consensusparamtypes.ModuleName,
 		icatypes.ModuleName,
+		marketmapmoduletypes.ModuleName,
 		pricesmoduletypes.ModuleName,
 		assetsmoduletypes.ModuleName,
 		blocktimemoduletypes.ModuleName,
@@ -1314,6 +1520,10 @@ func New(
 		govplusmoduletypes.ModuleName,
 		delaymsgmoduletypes.ModuleName,
 		vaultmoduletypes.ModuleName,
+		listingmoduletypes.ModuleName,
+		revsharemoduletypes.ModuleName,
+		accountplusmoduletypes.ModuleName,
+		affiliatesmoduletypes.ModuleName,
 		authz.ModuleName,
 
 		// Auth must be migrated after staking.
@@ -1356,51 +1566,12 @@ func New(
 	app.SetPrecommiter(app.Precommitter)
 	app.SetPrepareCheckStater(app.PrepareCheckStater)
 
-	// PrepareProposal setup.
-	priceUpdateGenerator := prices.NewDefaultPriceUpdateGenerator(app.PricesKeeper)
-	if appFlags.NonValidatingFullNode {
-		app.SetPrepareProposal(prepare.FullNodePrepareProposalHandler())
-	} else {
-		app.SetPrepareProposal(
-			prepare.PrepareProposalHandler(
-				txConfig,
-				app.BridgeKeeper,
-				app.ClobKeeper,
-				app.PerpetualsKeeper,
-				priceUpdateGenerator,
-			),
-		)
-	}
+	// ProposalHandler setup.
+	prepareProposalHandler, processProposalHandler := app.createProposalHandlers(appFlags, txConfig, appOpts)
+	app.SetPrepareProposal(prepareProposalHandler)
+	app.SetProcessProposal(processProposalHandler)
 
-	// ProcessProposal setup.
-	priceUpdateDecoder := process.NewDefaultUpdateMarketPriceTxDecoder(app.PricesKeeper, app.txConfig.TxDecoder())
-	if appFlags.NonValidatingFullNode {
-		// Note: If the command-line flag `--non-validating-full-node` is enabled, this node will use
-		// an implementation of `ProcessProposal` which always returns `abci.ResponseProcessProposal_ACCEPT`.
-		// Full-nodes do not participate in consensus, and therefore should not participate in voting / `ProcessProposal`.
-		app.SetProcessProposal(
-			process.FullNodeProcessProposalHandler(
-				txConfig,
-				app.BridgeKeeper,
-				app.ClobKeeper,
-				app.StakingKeeper,
-				app.PerpetualsKeeper,
-				priceUpdateDecoder,
-			),
-		)
-	} else {
-		app.SetProcessProposal(
-			process.ProcessProposalHandler(
-				txConfig,
-				app.BridgeKeeper,
-				app.ClobKeeper,
-				app.StakingKeeper,
-				app.PerpetualsKeeper,
-				app.PricesKeeper,
-				priceUpdateDecoder,
-			),
-		)
-	}
+	app.SetBlockDelayGetter(app.BlockTimeKeeper.GetBlockDelay)
 
 	// Note that panics from out of gas errors won't get logged, since the `OutOfGasMiddleware` is added in front of this,
 	// so error will get handled by that middleware and subsequent middlewares won't get executed.
@@ -1424,16 +1595,6 @@ func New(
 		if err := app.LoadLatestVersion(); err != nil {
 			tmos.Exit(err.Error())
 		}
-
-		// Hydrate memStores used for caching state.
-		app.hydrateMemStores()
-
-		// Hydrate the `memclob` with all ordersbooks from state,
-		// and hydrate the next `checkState` as well as the `memclob` with stateful orders.
-		app.hydrateMemclobWithOrderbooksAndStatefulOrders()
-
-		// Hydrate the keeper in-memory data structures.
-		app.hydrateKeeperInMemoryDataStructures()
 	}
 	app.initializeRateLimiters()
 
@@ -1451,7 +1612,145 @@ func New(
 }
 
 func (app *App) initSlinkySidecarClient(appOpts servertypes.AppOptions) oracleclient.OracleClient {
-	// Slinky setup
+	// Create the oracle service.
+	cfg, err := oracleconfig.ReadConfigFromAppOpts(appOpts)
+	if err != nil {
+		panic(err)
+	}
+	slinkyClient, err := oracleclient.NewClientFromConfig(
+		cfg,
+		app.Logger().With("client", "oracle"),
+		app.oracleMetrics,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return slinkyClient
+}
+
+func (app *App) createProposalHandlers(
+	appFlags flags.Flags,
+	txConfig client.TxConfig,
+	appOpts servertypes.AppOptions,
+) (sdk.PrepareProposalHandler, sdk.ProcessProposalHandler) {
+	var priceUpdateDecoder process.UpdateMarketPriceTxDecoder = process.NewDefaultUpdateMarketPriceTxDecoder(
+		app.PricesKeeper, app.txConfig.TxDecoder())
+	// If the node is a NonValidatingFullNode, we don't need to run any oracle code
+	// Note: If the command-line flag `--non-validating-full-node` is enabled, this node will use
+	// an implementation of `ProcessProposal` which always returns `abci.ResponseProcessProposal_ACCEPT`.
+	// Full-nodes do not participate in consensus, and therefore should not participate in voting / `ProcessProposal`.
+	if appFlags.NonValidatingFullNode {
+		if app.oracleMetrics == nil {
+			app.oracleMetrics = servicemetrics.NewNopMetrics()
+		}
+		return prepare.FullNodePrepareProposalHandler(), process.FullNodeProcessProposalHandler(
+			txConfig,
+			app.BridgeKeeper,
+			app.ClobKeeper,
+			app.StakingKeeper,
+			app.PerpetualsKeeper,
+			priceUpdateDecoder,
+		)
+	}
+	strategy := currencypair.NewDefaultCurrencyPairStrategy(app.PricesKeeper)
+	var priceUpdateGenerator prices.PriceUpdateGenerator = prices.NewDefaultPriceUpdateGenerator(app.PricesKeeper)
+
+	veCodec := compression.NewCompressionVoteExtensionCodec(
+		compression.NewDefaultVoteExtensionCodec(),
+		compression.NewZLibCompressor(),
+	)
+	extCommitCodec := compression.NewCompressionExtendedCommitCodec(
+		compression.NewDefaultExtendedCommitCodec(),
+		compression.NewZLibCompressor(),
+	)
+
+	// Set Price Update Generators/Decoders for Slinky
+	if appFlags.VEOracleEnabled {
+		priceUpdateGenerator = prices.NewSlinkyPriceUpdateGenerator(
+			aggregator.NewDefaultVoteAggregator(
+				app.Logger(),
+				voteweighted.MedianFromContext(
+					app.Logger(),
+					app.StakingKeeper,
+					voteweighted.DefaultPowerThreshold,
+				),
+				strategy,
+			),
+			extCommitCodec,
+			veCodec,
+			strategy,
+		)
+		priceUpdateDecoder = process.NewSlinkyMarketPriceDecoder(
+			priceUpdateDecoder,
+			priceUpdateGenerator,
+		)
+	}
+	// Generate the dydx handlers
+	dydxPrepareProposalHandler := prepare.PrepareProposalHandler(
+		txConfig,
+		app.BridgeKeeper,
+		app.ClobKeeper,
+		app.PerpetualsKeeper,
+		priceUpdateGenerator,
+	)
+
+	// ProcessProposal setup.
+	var dydxProcessProposalHandler = process.ProcessProposalHandler(
+		txConfig,
+		app.BridgeKeeper,
+		app.ClobKeeper,
+		app.StakingKeeper,
+		app.PerpetualsKeeper,
+		app.PricesKeeper,
+		priceUpdateDecoder,
+	)
+
+	// Wrap dydx handlers with slinky handlers
+	if appFlags.VEOracleEnabled {
+		app.initOracle(priceUpdateDecoder)
+		proposalHandler := slinkyproposals.NewProposalHandler(
+			app.Logger(),
+			dydxPrepareProposalHandler,
+			dydxProcessProposalHandler,
+			ve.NewDefaultValidateVoteExtensionsFn(app.StakingKeeper),
+			veCodec,
+			extCommitCodec,
+			strategy,
+			app.oracleMetrics,
+			slinkyproposals.RetainOracleDataInWrappedProposalHandler(),
+		)
+		return proposalHandler.PrepareProposalHandler(), proposalHandler.ProcessProposalHandler()
+	}
+	return dydxPrepareProposalHandler, dydxProcessProposalHandler
+}
+
+func (app *App) initOracle(pricesTxDecoder process.UpdateMarketPriceTxDecoder) {
+	// Vote Extension setup.
+	slinkyVoteExtensionsHandler := ve.NewVoteExtensionHandler(
+		app.Logger(),
+		vote_extensions.NewOraclePrices(app.PricesKeeper),
+		time.Second,
+		currencypair.NewDefaultCurrencyPairStrategy(app.PricesKeeper),
+		compression.NewCompressionVoteExtensionCodec(
+			compression.NewDefaultVoteExtensionCodec(),
+			compression.NewZLibCompressor(),
+		),
+		// TODO we can move the UpdateMarketPrices in extend vote to this in the future.
+		vote_extensions.NoopPriceApplier{},
+		app.oracleMetrics,
+	)
+
+	dydxExtendVoteHandler := vote_extensions.ExtendVoteHandler{
+		SlinkyExtendVoteHandler: slinkyVoteExtensionsHandler.ExtendVoteHandler(),
+		PricesTxDecoder:         pricesTxDecoder,
+		PricesKeeper:            app.PricesKeeper,
+	}
+
+	app.SetExtendVoteHandler(dydxExtendVoteHandler.ExtendVoteHandler())
+	app.SetVerifyVoteExtensionHandler(slinkyVoteExtensionsHandler.VerifyVoteExtensionHandler())
+}
+
+func (app *App) initOracleMetrics(appOpts servertypes.AppOptions) {
 	cfg, err := oracleconfig.ReadConfigFromAppOpts(appOpts)
 	if err != nil {
 		panic(err)
@@ -1460,16 +1759,7 @@ func (app *App) initSlinkySidecarClient(appOpts servertypes.AppOptions) oraclecl
 	if err != nil {
 		panic(err)
 	}
-	// Create the oracle service.
-	slinkyClient, err := oracleclient.NewClientFromConfig(
-		cfg,
-		app.Logger().With("client", "oracle"),
-		oracleMetrics,
-	)
-	if err != nil {
-		panic(err)
-	}
-	return slinkyClient
+	app.oracleMetrics = oracleMetrics
 }
 
 // RegisterDaemonWithHealthMonitor registers a daemon service with the update monitor, which will commence monitoring
@@ -1497,15 +1787,6 @@ func (app *App) DisableHealthMonitorForTesting() {
 	app.DaemonHealthMonitor.DisableForTesting()
 }
 
-// hydrateMemStores hydrates the memStores used for caching state.
-func (app *App) hydrateMemStores() {
-	// Create an `uncachedCtx` where the underlying MultiStore is the `rootMultiStore`.
-	// We use this to hydrate the `memStore` state with values from the underlying `rootMultiStore`.
-	uncachedCtx := app.BaseApp.NewUncachedContext(true, tmproto.Header{})
-	// Initialize memstore in clobKeeper with order fill amounts and stateful orders.
-	app.ClobKeeper.InitMemStore(uncachedCtx)
-}
-
 // initializeRateLimiters initializes the rate limiters from state if the application is
 // not started from genesis.
 func (app *App) initializeRateLimiters() {
@@ -1515,57 +1796,42 @@ func (app *App) initializeRateLimiters() {
 	app.ClobKeeper.InitalizeBlockRateLimitFromStateIfExists(uncachedCtx)
 }
 
-// hydrateMemclobWithOrderbooksAndStatefulOrders hydrates the memclob with orderbooks and stateful orders
-// from state.
-func (app *App) hydrateMemclobWithOrderbooksAndStatefulOrders() {
-	// Create a `checkStateCtx` where the underlying MultiStore is the `CacheMultiStore` for
-	// the `checkState`. We do this to avoid performing any state writes to the `rootMultiStore`
-	// directly.
-	checkStateCtx := app.BaseApp.NewContext(true)
-
-	// Initialize memclob in clobKeeper with orderbooks using `ClobPairs` in state.
-	app.ClobKeeper.InitMemClobOrderbooks(checkStateCtx)
-	// Initialize memclob with all existing stateful orders.
-	// TODO(DEC-1348): Emit indexer messages to indicate that application restarted.
-	app.ClobKeeper.InitStatefulOrders(checkStateCtx)
-}
-
-// hydrateKeeperInMemoryDataStructures hydrates the keeper with ClobPairId and PerpetualId mapping
-// and untriggered conditional orders from state.
-func (app *App) hydrateKeeperInMemoryDataStructures() {
-	// Create a `checkStateCtx` where the underlying MultiStore is the `CacheMultiStore` for
-	// the `checkState`. We do this to avoid performing any state writes to the `rootMultiStore`
-	// directly.
-	checkStateCtx := app.BaseApp.NewContext(true)
-
-	// Initialize the untriggered conditional orders data structure with untriggered
-	// conditional orders in state.
-	app.ClobKeeper.HydrateClobPairAndPerpetualMapping(checkStateCtx)
-	// Initialize the untriggered conditional orders data structure with untriggered
-	// conditional orders in state.
-	app.ClobKeeper.HydrateUntriggeredConditionalOrders(checkStateCtx)
-}
-
 // GetBaseApp returns the base app of the application
 func (app *App) GetBaseApp() *baseapp.BaseApp { return app.BaseApp }
 
 // PreBlocker application updates before each begin block.
 func (app *App) PreBlocker(ctx sdk.Context, _ *abci.RequestFinalizeBlock) (*sdk.ResponsePreBlock, error) {
+	app.scheduleForkUpgrade(ctx)
+
+	// Set gas meter to the free gas meter.
+	// This is because there is currently non-deterministic gas usage in the
+	// pre-blocker, e.g. due to hydration of in-memory data structures.
+	//
+	// Note that we don't need to reset the gas meter after the pre-blocker
+	// because Go is pass by value.
+	ctx = ctx.WithGasMeter(antetypes.NewFreeInfiniteGasMeter())
 	return app.ModuleManager.PreBlock(ctx)
 }
 
 // BeginBlocker application updates every begin block
 func (app *App) BeginBlocker(ctx sdk.Context) (sdk.BeginBlock, error) {
+	ctx = ctx.WithExecMode(lib.ExecModeBeginBlock)
+
 	// Update the proposer address in the logger for the panic logging middleware.
 	proposerAddr := sdk.ConsAddress(ctx.BlockHeader().ProposerAddress)
 	middleware.Logger = ctx.Logger().With("proposer_cons_addr", proposerAddr.String())
 
-	app.scheduleForkUpgrade(ctx)
 	return app.ModuleManager.BeginBlock(ctx)
 }
 
 // EndBlocker application updates every end block
 func (app *App) EndBlocker(ctx sdk.Context) (sdk.EndBlock, error) {
+	// Measure the lag between current timestamp and the end blocker time stamp
+	// as an indicator of whether the node is lagging behind.
+	metrics.ModuleMeasureSince(metrics.EndBlocker, metrics.EndBlockerLag, ctx.BlockTime())
+
+	ctx = ctx.WithExecMode(lib.ExecModeEndBlock)
+
 	// Reset the logger for middleware.
 	// Note that the middleware is only used by `CheckTx` and `DeliverTx`, and not `EndBlocker`.
 	// Panics from `EndBlocker` will not be logged by the middleware and will lead to consensus failures.
@@ -1575,8 +1841,6 @@ func (app *App) EndBlocker(ctx sdk.Context) (sdk.EndBlock, error) {
 	if err != nil {
 		return response, err
 	}
-	block := app.IndexerEventManager.ProduceBlock(ctx)
-	app.IndexerEventManager.SendOnchainData(block)
 	return response, err
 }
 
@@ -1585,10 +1849,14 @@ func (app *App) Precommitter(ctx sdk.Context) {
 	if err := app.ModuleManager.Precommit(ctx); err != nil {
 		panic(err)
 	}
+	block := app.IndexerEventManager.ProduceBlock(ctx)
+	app.IndexerEventManager.SendOnchainData(block)
 }
 
 // PrepareCheckStater application updates after commit and before any check state is invoked.
 func (app *App) PrepareCheckStater(ctx sdk.Context) {
+	ctx = ctx.WithExecMode(lib.ExecModePrepareCheckState)
+
 	if err := app.ModuleManager.PrepareCheckState(ctx); err != nil {
 		panic(err)
 	}
@@ -1712,6 +1980,11 @@ func (app *App) SimulationManager() *module.SimulationManager {
 	return nil
 }
 
+// GetKVStoreKey gets KV Store keys.
+func (app *App) GetKVStoreKey() map[string]*storetypes.KVStoreKey {
+	return app.keys
+}
+
 // buildAnteHandler builds an AnteHandler object configured for the app.
 func (app *App) buildAnteHandler(txConfig client.TxConfig) sdk.AnteHandler {
 	anteHandler, err := NewAnteHandler(
@@ -1723,9 +1996,13 @@ func (app *App) buildAnteHandler(txConfig client.TxConfig) sdk.AnteHandler {
 				FeegrantKeeper:  app.FeeGrantKeeper,
 				SigGasConsumer:  ante.DefaultSigVerificationGasConsumer,
 			},
-			ClobKeeper:   app.ClobKeeper,
-			Codec:        app.appCodec,
-			AuthStoreKey: app.keys[authtypes.StoreKey],
+			AccountplusKeeper: &app.AccountPlusKeeper,
+			ClobKeeper:        app.ClobKeeper,
+			Codec:             app.appCodec,
+			AuthStoreKey:      app.keys[authtypes.StoreKey],
+			PerpetualsKeeper:  app.PerpetualsKeeper,
+			PricesKeeper:      app.PricesKeeper,
+			MarketMapKeeper:   &app.MarketMapKeeper,
 		},
 	)
 	if err != nil {
@@ -1746,6 +2023,9 @@ func (app *App) setAnteHandler(txConfig client.TxConfig) {
 // Close invokes an ordered shutdown of routines.
 func (app *App) Close() error {
 	app.BaseApp.Close()
+	if app.oraclePrometheusServer != nil {
+		app.oraclePrometheusServer.Close()
+	}
 	return app.closeOnce()
 }
 
@@ -1825,15 +2105,44 @@ func getIndexerFromOptions(
 	return indexerMessageSender, indexerFlags
 }
 
-// getGrpcStreamingManagerFromOptions returns an instance of a streamingtypes.GrpcStreamingManager from the specified
-// options. This function will default to returning a no-op instance.
-func getGrpcStreamingManagerFromOptions(
+// getFullNodeStreamingManagerFromOptions returns an instance of a streamingtypes.FullNodeStreamingManager
+// from the specified options. This function will default to returning a no-op instance.
+func getFullNodeStreamingManagerFromOptions(
 	appFlags flags.Flags,
+	cdc codec.Codec,
 	logger log.Logger,
-) (manager streamingtypes.GrpcStreamingManager) {
+	streamingManagerTransientStoreKey storetypes.StoreKey,
+) (manager streamingtypes.FullNodeStreamingManager, wsServer *ws.WebsocketServer) {
+	logger = logger.With(log.ModuleKey, "full-node-streaming")
 	if appFlags.GrpcStreamingEnabled {
-		logger.Info("GRPC streaming is enabled")
-		return streaming.NewGrpcStreamingManager()
+		logger.Info("Full node streaming is enabled")
+		if appFlags.FullNodeStreamingSnapshotInterval > 0 {
+			logger.Info("Interval snapshots enabled")
+		}
+		manager := streaming.NewFullNodeStreamingManager(
+			logger,
+			appFlags.GrpcStreamingFlushIntervalMs,
+			appFlags.GrpcStreamingMaxBatchSize,
+			appFlags.GrpcStreamingMaxChannelBufferSize,
+			appFlags.FullNodeStreamingSnapshotInterval,
+			streamingManagerTransientStoreKey,
+			cdc,
+		)
+
+		// Start websocket server.
+		if appFlags.WebsocketStreamingEnabled {
+			port := appFlags.WebsocketStreamingPort
+			logger.Info("Websocket full node streaming is enabled")
+			wsServer = ws.NewWebsocketServer(
+				manager,
+				cdc,
+				logger,
+				port,
+			)
+			wsServer.Start()
+		}
+
+		return manager, wsServer
 	}
-	return streaming.NewNoopGrpcStreamingManager()
+	return streaming.NewNoopGrpcStreamingManager(), wsServer
 }

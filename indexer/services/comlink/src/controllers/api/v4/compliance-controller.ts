@@ -1,8 +1,13 @@
 import { logger, stats, TooManyRequestsError } from '@dydxprotocol-indexer/base';
-import { ComplianceClientResponse, INDEXER_COMPLIANCE_BLOCKED_PAYLOAD } from '@dydxprotocol-indexer/compliance';
-import { ComplianceDataFromDatabase, ComplianceTable } from '@dydxprotocol-indexer/postgres';
+import {
+  ComplianceClientResponse,
+  INDEXER_COMPLIANCE_BLOCKED_PAYLOAD,
+  NOT_IN_BLOCKCHAIN_RISK_SCORE,
+} from '@dydxprotocol-indexer/compliance';
+import { ComplianceDataCreateObject, ComplianceDataFromDatabase, ComplianceTable } from '@dydxprotocol-indexer/postgres';
 import express from 'express';
 import { checkSchema, matchedData } from 'express-validator';
+import _ from 'lodash';
 import { DateTime } from 'luxon';
 import {
   Controller, Get, Query, Route,
@@ -84,8 +89,19 @@ export class ComplianceControllerHelper extends Controller {
       ComplianceClientResponse = await complianceProvider.client.getComplianceResponse(
         address,
       );
+      // Don't upsert invalid addresses (address causing ellitic error) to compliance table.
+      // When the elliptic request fails with 404, getComplianceResponse returns
+      // riskScore=NOT_IN_BLOCKCHAIN_RISK_SCORE
+      if (response.riskScore === undefined ||
+        Number(response.riskScore) === NOT_IN_BLOCKCHAIN_RISK_SCORE) {
+        return {
+          restricted: false,
+          reason: undefined,
+        };
+      }
+
       complianceData = await ComplianceTable.upsert({
-        ...response,
+        ..._.omitBy(response, _.isUndefined) as ComplianceDataCreateObject,
         provider: complianceProvider.provider,
         updatedAt: DateTime.utc().toISO(),
       });

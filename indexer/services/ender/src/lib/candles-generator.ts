@@ -26,20 +26,24 @@ import _ from 'lodash';
 import { DateTime } from 'luxon';
 
 import { getCandle } from '../caches/candle-cache';
+import { getOrderbookMidPrice } from '../caches/orderbook-mid-price-memory-cache';
 import config from '../config';
 import { KafkaPublisher } from './kafka-publisher';
 import { ConsolidatedKafkaEvent, SingleTradeMessage } from './types';
 
 type BlockCandleUpdatesMap = { [ticker: string]: BlockCandleUpdate};
 type BlockCandleUpdate = {
-  low: string;
-  high: string;
-  open: string;
-  close: string;
-  baseTokenVolume: string;
-  usdVolume: string;
-  trades: number;
+  low: string,
+  high: string,
+  open: string,
+  close: string,
+  baseTokenVolume: string,
+  usdVolume: string,
+  trades: number,
 };
+
+type OrderbookMidPrice = string | undefined;
+
 type OpenInterestMap = { [ticker: string]: string };
 
 export class CandlesGenerator {
@@ -100,7 +104,6 @@ export class CandlesGenerator {
       if (ticker === undefined) {
         throw Error(`Could not find ticker for clobPairId: ${tradeMessage.clobPairId}`);
       }
-
       // There should only be a single trade in SingleTradeMessage
       const contents: TradeMessageContents = JSON.parse(tradeMessage.contents);
       const tradeContent: TradeContent = contents.trades[0];
@@ -167,6 +170,7 @@ export class CandlesGenerator {
     const promises: Promise<CandleFromDatabase | undefined>[] = [];
 
     const openInterestMap: OpenInterestMap = await this.getOpenInterestMap();
+    const orderbookMidPriceMap = getOrderbookMidPriceMap();
     _.forEach(
       Object.values(perpetualMarketRefresher.getPerpetualMarketsMap()),
       (perpetualMarket: PerpetualMarketFromDatabase) => {
@@ -176,11 +180,12 @@ export class CandlesGenerator {
         _.forEach(
           Object.values(CandleResolution),
           (resolution: CandleResolution) => {
-            promises.push(this.createUpdateOrPassPostgresCandle(
+            promises.push(...this.createUpdateOrPassPostgresCandle(
               blockCandleUpdate,
               perpetualMarket.ticker,
               resolution,
               openInterestMap,
+              orderbookMidPriceMap[perpetualMarket.ticker],
             ));
           },
         );
@@ -200,17 +205,26 @@ export class CandlesGenerator {
    * Cases:
    * - Candle doesn't exist & there is no block update - do nothing
    * - Candle doesn't exist & there is a block update - create candle
-   * - Candle exists & !sameStartTime & there is a block update - create candle
-   * - Candle exists & !sameStartTime & there is no block update - create empty candle
+   * - Candle exists & !sameStartTime & there is a block update - create candle,
+   *   update previous candle orderbookMidPriceClose
+   * - Candle exists & !sameStartTime & there is no block update - create empty candle,
+   *   update previous candle orderbookMidPriceClose
    * - Candle exists & sameStartTime & no block update - do nothing
    * - Candle exists & sameStartTime & block update - update candle
+   *
+   * The orderbookMidPriceClose/Open are updated for each candle at the start and end of
+   * each resolution period.
+   * Whenever we create a new candle we set the orderbookMidPriceClose/Open
+   * If there is a previous candle & we're creating a new one (this occurs at the
+   * beginning of a resolution period) set the previous candles orderbookMidPriceClose
    */
-  private async createUpdateOrPassPostgresCandle(
+  private createUpdateOrPassPostgresCandle(
     blockCandleUpdate: BlockCandleUpdate | undefined,
     ticker: string,
     resolution: CandleResolution,
     openInterestMap: OpenInterestMap,
-  ): Promise<CandleFromDatabase | undefined> {
+    orderbookMidPrice: OrderbookMidPrice,
+  ): Promise<CandleFromDatabase | undefined>[] {
     const currentStartTime: DateTime = CandlesGenerator.calculateNormalizedCandleStartTime(
       this.blockTimestamp,
       resolution,
@@ -224,48 +238,59 @@ export class CandlesGenerator {
     if (existingCandle === undefined) {
       // - Candle doesn't exist & there is no block update - do nothing
       if (blockCandleUpdate === undefined) {
-        return;
+        return [];
       }
       // - Candle doesn't exist & there is a block update - create candle
-      return this.createCandleInPostgres(
+      return [this.createCandleInPostgres(
         currentStartTime,
         blockCandleUpdate,
         ticker,
         resolution,
         openInterestMap,
-      );
+        orderbookMidPrice,
+      )];
     }
 
     const sameStartTime: boolean = existingCandle.startedAt === currentStartTime.toISO();
     if (!sameStartTime) {
       // - Candle exists & !sameStartTime & there is a block update - create candle
+      //   update previous candle orderbookMidPriceClose
+
+      const previousCandleUpdate = this.updateCandleWithOrderbookMidPriceInPostgres(
+        existingCandle,
+        orderbookMidPrice,
+      );
+
       if (blockCandleUpdate !== undefined) {
-        return this.createCandleInPostgres(
+        return [previousCandleUpdate, this.createCandleInPostgres(
           currentStartTime,
           blockCandleUpdate,
           ticker,
           resolution,
           openInterestMap,
-        );
+          orderbookMidPrice,
+        )];
       }
       // - Candle exists & !sameStartTime & there is no block update - create empty candle
-      return this.createEmptyCandleInPostgres(
+      //   update previous candle orderbookMidPriceClose/Open
+      return [previousCandleUpdate, this.createEmptyCandleInPostgres(
         currentStartTime,
         ticker,
         resolution,
         openInterestMap,
         existingCandle,
-      );
+        orderbookMidPrice,
+      )];
     }
     if (blockCandleUpdate === undefined) {
       // - Candle exists & sameStartTime & no block update - do nothing
-      return;
+      return [];
     }
     // - Candle exists & sameStartTime & block update - update candle
-    return this.updateCandleInPostgres(
+    return [this.updateCandleInPostgres(
       existingCandle,
       blockCandleUpdate,
-    );
+    )];
   }
 
   /**
@@ -344,6 +369,7 @@ export class CandlesGenerator {
     ticker: string,
     resolution: CandleResolution,
     openInterestMap: OpenInterestMap,
+    orderbookMidPrice: OrderbookMidPrice,
   ): Promise<CandleFromDatabase> {
     const candle: CandleCreateObject = {
       startedAt: startedAt.toISO(),
@@ -357,6 +383,8 @@ export class CandlesGenerator {
       usdVolume: blockCandleUpdate.usdVolume,
       trades: blockCandleUpdate.trades,
       startingOpenInterest: openInterestMap[ticker] ?? '0',
+      orderbookMidPriceClose: orderbookMidPrice,
+      orderbookMidPriceOpen: orderbookMidPrice,
     };
 
     return CandleTable.create(candle, this.writeOptions);
@@ -373,6 +401,7 @@ export class CandlesGenerator {
     resolution: CandleResolution,
     openInterestMap: OpenInterestMap,
     existingCandle: CandleFromDatabase,
+    orderbookMidPrice: OrderbookMidPrice,
   ): Promise<CandleFromDatabase> {
     const candle: CandleCreateObject = {
       startedAt: startedAt.toISO(),
@@ -386,6 +415,8 @@ export class CandlesGenerator {
       usdVolume: '0',
       trades: 0,
       startingOpenInterest: openInterestMap[ticker] ?? '0',
+      orderbookMidPriceClose: orderbookMidPrice,
+      orderbookMidPriceOpen: orderbookMidPrice,
     };
 
     return CandleTable.create(candle, this.writeOptions);
@@ -411,6 +442,8 @@ export class CandlesGenerator {
           baseTokenVolume: blockCandleUpdate.baseTokenVolume,
           usdVolume: blockCandleUpdate.usdVolume,
           trades: blockCandleUpdate.trades,
+          orderbookMidPriceOpen: existingCandle.orderbookMidPriceOpen ?? undefined,
+          orderbookMidPriceClose: existingCandle.orderbookMidPriceClose ?? undefined,
         },
         this.writeOptions,
       ) as Promise<CandleFromDatabase>;
@@ -432,6 +465,28 @@ export class CandlesGenerator {
       ).toFixed(),
       usdVolume: Big(existingCandle.usdVolume).plus(blockCandleUpdate.usdVolume).toFixed(),
       trades: existingCandle.trades + blockCandleUpdate.trades,
+      orderbookMidPriceClose: existingCandle.orderbookMidPriceClose ?? undefined,
+      orderbookMidPriceOpen: existingCandle.orderbookMidPriceOpen ?? undefined,
+    };
+
+    return CandleTable.update(candle, this.writeOptions) as Promise<CandleFromDatabase>;
+  }
+
+  private async updateCandleWithOrderbookMidPriceInPostgres(
+    existingCandle: CandleFromDatabase,
+    orderbookMidPrice: OrderbookMidPrice,
+  ): Promise<CandleFromDatabase> {
+
+    const candle: CandleUpdateObject = {
+      id: existingCandle.id,
+      low: existingCandle.low,
+      high: existingCandle.high,
+      close: existingCandle.close,
+      baseTokenVolume: existingCandle.baseTokenVolume,
+      usdVolume: existingCandle.usdVolume,
+      trades: existingCandle.trades,
+      orderbookMidPriceOpen: existingCandle.orderbookMidPriceOpen ?? undefined,
+      orderbookMidPriceClose: orderbookMidPrice,
     };
 
     return CandleTable.update(candle, this.writeOptions) as Promise<CandleFromDatabase>;
@@ -472,4 +527,20 @@ export class CandlesGenerator {
 
     return DateTime.fromSeconds(normalizedTimeSeconds).toUTC();
   }
+}
+
+/**
+   * Get the cached orderbook mid price for a given ticker
+*/
+export function getOrderbookMidPriceMap(): { [ticker: string]: OrderbookMidPrice } {
+  const start: number = Date.now();
+  const perpetualMarkets = Object.values(perpetualMarketRefresher.getPerpetualMarketsMap());
+
+  const priceMap: { [ticker: string]: OrderbookMidPrice } = {};
+  perpetualMarkets.forEach((perpetualMarket: PerpetualMarketFromDatabase) => {
+    priceMap[perpetualMarket.ticker] = getOrderbookMidPrice(perpetualMarket.ticker);
+  });
+
+  stats.timing(`${config.SERVICE_NAME}.get_orderbook_mid_price_map.timing`, Date.now() - start);
+  return priceMap;
 }

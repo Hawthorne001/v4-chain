@@ -17,13 +17,17 @@ import {
   TradeType,
   TransferFromDatabase,
 } from '@dydxprotocol-indexer/postgres';
-import { IndexerSubaccountId, SubaccountMessage, TradeMessage } from '@dydxprotocol-indexer/v4-protos';
+import {
+  BlockHeightMessage, IndexerSubaccountId, SubaccountMessage, TradeMessage,
+} from '@dydxprotocol-indexer/v4-protos';
 import Big from 'big.js';
 import _ from 'lodash';
 import { AnnotatedSubaccountMessage, ConsolidatedKafkaEvent, SingleTradeMessage } from '../../src/lib/types';
 
 import { KafkaPublisher } from '../../src/lib/kafka-publisher';
 import {
+  defaultDateTime,
+  defaultSubaccountId,
   defaultSubaccountMessage,
   defaultTradeContent,
   defaultTradeKafkaEvent,
@@ -43,6 +47,7 @@ import {
 } from '../../src/helpers/kafka-helper';
 import { DateTime } from 'luxon';
 import { convertToSubaccountMessage } from '../../src/lib/helper';
+import { defaultBlock } from '@dydxprotocol-indexer/postgres/build/__tests__/helpers/constants';
 
 describe('kafka-publisher', () => {
   let producerSendMock: jest.SpyInstance;
@@ -65,6 +70,9 @@ describe('kafka-publisher', () => {
     expect(producerSendMock).toHaveBeenCalledWith({
       topic: subaccountKafkaEvent.topic,
       messages: [{
+        key: Buffer.from(Uint8Array.from(
+          IndexerSubaccountId.encode(defaultSubaccountId).finish(),
+        )),
         value: Buffer.from(SubaccountMessage.encode(subaccountKafkaEvent.message).finish()),
       }],
     });
@@ -102,6 +110,30 @@ describe('kafka-publisher', () => {
     expect(producerSendMock).toHaveBeenCalledWith({
       topic: defaultTradeKafkaEvent.topic,
       messages: [{ value: Buffer.from(TradeMessage.encode(expectedTradeMessage).finish()) }],
+    });
+  });
+
+  it('successfully publishes block height messages', async () => {
+    const message: BlockHeightMessage = {
+      blockHeight: String(defaultBlock),
+      version: '1.0.0',
+      time: defaultDateTime.toString(),
+    };
+    const blockHeightEvent: ConsolidatedKafkaEvent = {
+      topic: KafkaTopics.TO_WEBSOCKETS_BLOCK_HEIGHT,
+      message,
+    };
+
+    const publisher: KafkaPublisher = new KafkaPublisher();
+    publisher.addEvents([blockHeightEvent]);
+
+    await publisher.publish();
+    expect(producerSendMock).toHaveBeenCalledTimes(1);
+    expect(producerSendMock).toHaveBeenCalledWith({
+      topic: blockHeightEvent.topic,
+      messages: [{
+        value: Buffer.from(BlockHeightMessage.encode(blockHeightEvent.message).finish()),
+      }],
     });
   });
 
@@ -254,6 +286,7 @@ describe('kafka-publisher', () => {
       createdAtHeight: testConstants.createdHeight,
       clientMetadata: '0',
       fee: '1.1',
+      affiliateRevShare: '0',
     };
     const order: OrderFromDatabase = {
       ...testConstants.defaultOrderGoodTilBlockTime,
@@ -392,6 +425,10 @@ describe('kafka-publisher', () => {
         topic: KafkaTopics.TO_WEBSOCKETS_SUBACCOUNTS,
         messages: _.map(expectedMsgs, (message: SubaccountMessage) => {
           return {
+            key: message.subaccountId !== undefined
+              ? Buffer.from(Uint8Array.from(
+                IndexerSubaccountId.encode(message.subaccountId).finish(),
+              )) : undefined,
             value: Buffer.from(Uint8Array.from(SubaccountMessage.encode(message).finish())),
           };
         }),

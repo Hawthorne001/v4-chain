@@ -7,16 +7,50 @@ import (
 
 // ContainsDuplicates returns true if the slice contains duplicates, false if not.
 func ContainsDuplicates[V comparable](values []V) bool {
-	seenValues := make(map[V]bool)
-	for _, val := range values {
-		if _, exists := seenValues[val]; exists {
+	// Optimize edge case. If values is nil, len(values) returns 0.
+	if len(values) <= 1 {
+		return false
+	}
+
+	// Store each value as a key in the mapping.
+	seenValues := make(map[V]struct{}, len(values))
+	for i, val := range values {
+		// Add the value to the mapping.
+		seenValues[val] = struct{}{}
+
+		// Return early if the size of the mapping did not grow.
+		if len(seenValues) <= i {
 			return true
 		}
-
-		seenValues[val] = true
 	}
 
 	return false
+}
+
+// MapToSortedSlice returns a slice of values from a map, sorted by key.
+func MapToSortedSlice[R interface {
+	~[]K
+	sort.Interface
+}, K comparable, V any](m map[K]V) []V {
+	keys := GetSortedKeys[R](m)
+	values := make([]V, 0, len(m))
+	for _, key := range keys {
+		values = append(values, m[key])
+	}
+	return values
+}
+
+// DedupeSlice deduplicates a slice of comparable values.
+func DedupeSlice[V comparable](values []V) []V {
+	seenValues := make(map[V]struct{})
+	deduped := make([]V, 0)
+	for _, val := range values {
+		if _, seen := seenValues[val]; !seen {
+			deduped = append(deduped, val)
+		}
+		seenValues[val] = struct{}{}
+	}
+	return deduped
 }
 
 // GetSortedKeys returns the keys of the map in sorted order.
@@ -105,4 +139,26 @@ func MergeAllMapsMustHaveDistinctKeys[K comparable, V any](maps ...map[K]V) map[
 		}
 	}
 	return combinedMap
+}
+
+// MergeMaps merges all the maps into a single map.
+// Does not require maps to have distinct keys.
+func MergeMaps[K comparable, V any](maps ...map[K]V) map[K]V {
+	combinedMap := make(map[K]V)
+	for _, m := range maps {
+		for k, v := range m {
+			combinedMap[k] = v
+		}
+	}
+	return combinedMap
+}
+
+// Check if slice contains a particular value
+func SliceContains[T comparable](list []T, value T) bool {
+	for _, v := range list {
+		if v == value {
+			return true
+		}
+	}
+	return false
 }

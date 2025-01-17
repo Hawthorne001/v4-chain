@@ -148,9 +148,28 @@ var (
 		"/cosmos.upgrade.v1beta1.MsgSoftwareUpgradeResponse":    {},
 		"/cosmos.upgrade.v1beta1.SoftwareUpgradeProposal":       {},
 
+		// affiliates
+		"/dydxprotocol.affiliates.MsgRegisterAffiliate":                {},
+		"/dydxprotocol.affiliates.MsgRegisterAffiliateResponse":        {},
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateTiers":             {},
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateTiersResponse":     {},
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateWhitelist":         {},
+		"/dydxprotocol.affiliates.MsgUpdateAffiliateWhitelistResponse": {},
+
+		// accountplus
+		"/dydxprotocol.accountplus.MsgAddAuthenticator":            {},
+		"/dydxprotocol.accountplus.MsgAddAuthenticatorResponse":    {},
+		"/dydxprotocol.accountplus.MsgRemoveAuthenticator":         {},
+		"/dydxprotocol.accountplus.MsgRemoveAuthenticatorResponse": {},
+		"/dydxprotocol.accountplus.MsgSetActiveState":              {},
+		"/dydxprotocol.accountplus.MsgSetActiveStateResponse":      {},
+		"/dydxprotocol.accountplus.TxExtension":                    {},
+
 		// blocktime
-		"/dydxprotocol.blocktime.MsgUpdateDowntimeParams":         {},
-		"/dydxprotocol.blocktime.MsgUpdateDowntimeParamsResponse": {},
+		"/dydxprotocol.blocktime.MsgUpdateDowntimeParams":          {},
+		"/dydxprotocol.blocktime.MsgUpdateDowntimeParamsResponse":  {},
+		"/dydxprotocol.blocktime.MsgUpdateSynchronyParams":         {},
+		"/dydxprotocol.blocktime.MsgUpdateSynchronyParamsResponse": {},
 
 		// bridge
 		"/dydxprotocol.bridge.MsgAcknowledgeBridges":          {},
@@ -196,6 +215,16 @@ var (
 		"/dydxprotocol.govplus.MsgSlashValidator":         {},
 		"/dydxprotocol.govplus.MsgSlashValidatorResponse": {},
 
+		// listing
+		"/dydxprotocol.listing.MsgSetMarketsHardCap":                       {},
+		"/dydxprotocol.listing.MsgSetMarketsHardCapResponse":               {},
+		"/dydxprotocol.listing.MsgCreateMarketPermissionless":              {},
+		"/dydxprotocol.listing.MsgCreateMarketPermissionlessResponse":      {},
+		"/dydxprotocol.listing.MsgSetListingVaultDepositParams":            {},
+		"/dydxprotocol.listing.MsgSetListingVaultDepositParamsResponse":    {},
+		"/dydxprotocol.listing.MsgUpgradeIsolatedPerpetualToCross":         {},
+		"/dydxprotocol.listing.MsgUpgradeIsolatedPerpetualToCrossResponse": {},
+
 		// perpetuals
 		"/dydxprotocol.perpetuals.MsgAddPremiumVotes":               {},
 		"/dydxprotocol.perpetuals.MsgAddPremiumVotesResponse":       {},
@@ -235,14 +264,38 @@ var (
 		"/dydxprotocol.stats.MsgUpdateParamsResponse": {},
 
 		// vault
-		"/dydxprotocol.vault.MsgDepositToVault":         {},
-		"/dydxprotocol.vault.MsgDepositToVaultResponse": {},
+		"/dydxprotocol.vault.MsgAllocateToVault":                    {},
+		"/dydxprotocol.vault.MsgAllocateToVaultResponse":            {},
+		"/dydxprotocol.vault.MsgDepositToMegavault":                 {},
+		"/dydxprotocol.vault.MsgDepositToMegavaultResponse":         {},
+		"/dydxprotocol.vault.MsgRetrieveFromVault":                  {},
+		"/dydxprotocol.vault.MsgRetrieveFromVaultResponse":          {},
+		"/dydxprotocol.vault.MsgSetVaultParams":                     {},
+		"/dydxprotocol.vault.MsgSetVaultParamsResponse":             {},
+		"/dydxprotocol.vault.MsgSetVaultQuotingParams":              {}, // deprecated
+		"/dydxprotocol.vault.MsgUnlockShares":                       {},
+		"/dydxprotocol.vault.MsgUnlockSharesResponse":               {},
+		"/dydxprotocol.vault.MsgUpdateDefaultQuotingParams":         {},
+		"/dydxprotocol.vault.MsgUpdateDefaultQuotingParamsResponse": {},
+		"/dydxprotocol.vault.MsgUpdateOperatorParams":               {},
+		"/dydxprotocol.vault.MsgUpdateOperatorParamsResponse":       {},
+		"/dydxprotocol.vault.MsgUpdateParams":                       {}, // deprecated
+		"/dydxprotocol.vault.MsgWithdrawFromMegavault":              {},
+		"/dydxprotocol.vault.MsgWithdrawFromMegavaultResponse":      {},
 
 		// vest
 		"/dydxprotocol.vest.MsgSetVestEntry":            {},
 		"/dydxprotocol.vest.MsgSetVestEntryResponse":    {},
 		"/dydxprotocol.vest.MsgDeleteVestEntry":         {},
 		"/dydxprotocol.vest.MsgDeleteVestEntryResponse": {},
+
+		// revshare
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevenueShare":                     {},
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevenueShareResponse":             {},
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevShareDetailsForMarket":         {},
+		"/dydxprotocol.revshare.MsgSetMarketMapperRevShareDetailsForMarketResponse": {},
+		"/dydxprotocol.revshare.MsgUpdateUnconditionalRevShareConfig":               {},
+		"/dydxprotocol.revshare.MsgUpdateUnconditionalRevShareConfigResponse":       {},
 
 		// rewards
 		"/dydxprotocol.rewards.MsgUpdateParams":         {},
@@ -340,6 +393,20 @@ var (
 		"/ibc.applications.interchain_accounts.controller.v1.MsgUpdateParamsResponse":              {},
 		"/ibc.applications.interchain_accounts.host.v1.MsgUpdateParams":                            {},
 		"/ibc.applications.interchain_accounts.host.v1.MsgUpdateParamsResponse":                    {},
+
+		// slinky marketmap messages
+		"/slinky.marketmap.v1.MsgCreateMarkets":                   {},
+		"/slinky.marketmap.v1.MsgCreateMarketsResponse":           {},
+		"/slinky.marketmap.v1.MsgParams":                          {},
+		"/slinky.marketmap.v1.MsgParamsResponse":                  {},
+		"/slinky.marketmap.v1.MsgRemoveMarkets":                   {},
+		"/slinky.marketmap.v1.MsgRemoveMarketsResponse":           {},
+		"/slinky.marketmap.v1.MsgRemoveMarketAuthorities":         {},
+		"/slinky.marketmap.v1.MsgRemoveMarketAuthoritiesResponse": {},
+		"/slinky.marketmap.v1.MsgUpdateMarkets":                   {},
+		"/slinky.marketmap.v1.MsgUpdateMarketsResponse":           {},
+		"/slinky.marketmap.v1.MsgUpsertMarkets":                   {},
+		"/slinky.marketmap.v1.MsgUpsertMarketsResponse":           {},
 	}
 
 	// DisallowMsgs are messages that cannot be externally submitted.

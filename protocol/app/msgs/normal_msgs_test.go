@@ -118,6 +118,17 @@ func TestNormalMsgs_Key(t *testing.T) {
 		"/cosmos.upgrade.v1beta1.CancelSoftwareUpgradeProposal",
 		"/cosmos.upgrade.v1beta1.SoftwareUpgradeProposal",
 
+		// accountplus
+		"/dydxprotocol.accountplus.MsgAddAuthenticator",
+		"/dydxprotocol.accountplus.MsgAddAuthenticatorResponse",
+		"/dydxprotocol.accountplus.MsgRemoveAuthenticator",
+		"/dydxprotocol.accountplus.MsgRemoveAuthenticatorResponse",
+		"/dydxprotocol.accountplus.TxExtension",
+
+		// affiliates
+		"/dydxprotocol.affiliates.MsgRegisterAffiliate",
+		"/dydxprotocol.affiliates.MsgRegisterAffiliateResponse",
+
 		// clob
 		"/dydxprotocol.clob.MsgBatchCancel",
 		"/dydxprotocol.clob.MsgBatchCancelResponse",
@@ -125,6 +136,10 @@ func TestNormalMsgs_Key(t *testing.T) {
 		"/dydxprotocol.clob.MsgCancelOrderResponse",
 		"/dydxprotocol.clob.MsgPlaceOrder",
 		"/dydxprotocol.clob.MsgPlaceOrderResponse",
+
+		// listing
+		"/dydxprotocol.listing.MsgCreateMarketPermissionless",
+		"/dydxprotocol.listing.MsgCreateMarketPermissionlessResponse",
 
 		// perpetuals
 
@@ -139,8 +154,16 @@ func TestNormalMsgs_Key(t *testing.T) {
 		"/dydxprotocol.sending.MsgWithdrawFromSubaccountResponse",
 
 		// vault
-		"/dydxprotocol.vault.MsgDepositToVault",
-		"/dydxprotocol.vault.MsgDepositToVaultResponse",
+		"/dydxprotocol.vault.MsgAllocateToVault",
+		"/dydxprotocol.vault.MsgAllocateToVaultResponse",
+		"/dydxprotocol.vault.MsgDepositToMegavault",
+		"/dydxprotocol.vault.MsgDepositToMegavaultResponse",
+		"/dydxprotocol.vault.MsgRetrieveFromVault",
+		"/dydxprotocol.vault.MsgRetrieveFromVaultResponse",
+		"/dydxprotocol.vault.MsgSetVaultParams",
+		"/dydxprotocol.vault.MsgSetVaultParamsResponse",
+		"/dydxprotocol.vault.MsgWithdrawFromMegavault",
+		"/dydxprotocol.vault.MsgWithdrawFromMegavaultResponse",
 
 		// ibc application module: ICA
 		"/ibc.applications.interchain_accounts.v1.InterchainAccount",
@@ -216,6 +239,20 @@ func TestNormalMsgs_Key(t *testing.T) {
 		"/ibc.lightclients.tendermint.v1.ConsensusState",
 		"/ibc.lightclients.tendermint.v1.Header",
 		"/ibc.lightclients.tendermint.v1.Misbehaviour",
+
+		// slinky marketmap messages
+		"/slinky.marketmap.v1.MsgCreateMarkets",
+		"/slinky.marketmap.v1.MsgCreateMarketsResponse",
+		"/slinky.marketmap.v1.MsgParams",
+		"/slinky.marketmap.v1.MsgParamsResponse",
+		"/slinky.marketmap.v1.MsgRemoveMarketAuthorities",
+		"/slinky.marketmap.v1.MsgRemoveMarketAuthoritiesResponse",
+		"/slinky.marketmap.v1.MsgRemoveMarkets",
+		"/slinky.marketmap.v1.MsgRemoveMarketsResponse",
+		"/slinky.marketmap.v1.MsgUpdateMarkets",
+		"/slinky.marketmap.v1.MsgUpdateMarketsResponse",
+		"/slinky.marketmap.v1.MsgUpsertMarkets",
+		"/slinky.marketmap.v1.MsgUpsertMarketsResponse",
 	}
 
 	require.Equal(t, expectedMsgs, lib.GetSortedKeys[sort.StringSlice](msgs.NormalMsgs))

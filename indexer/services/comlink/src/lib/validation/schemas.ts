@@ -1,20 +1,47 @@
-import { perpetualMarketRefresher } from '@dydxprotocol-indexer/postgres';
-import { checkSchema, ParamSchema } from 'express-validator';
+import { isValidLanguageCode } from '@dydxprotocol-indexer/notifications';
+import {
+  perpetualMarketRefresher,
+  MAX_PARENT_SUBACCOUNTS,
+  CHILD_SUBACCOUNT_MULTIPLIER,
+} from '@dydxprotocol-indexer/postgres';
+import { decode } from 'bech32';
+import { body, checkSchema, ParamSchema } from 'express-validator';
 
 import config from '../../config';
-import { MAX_SUBACCOUNT_NUMBER } from '../../constants';
 
 export const CheckSubaccountSchema = checkSchema({
   address: {
     in: ['params', 'query'],
     isString: true,
+    custom: {
+      options: isValidAddress,
+    },
+    errorMessage: 'address must be a valid dydx address',
   },
   subaccountNumber: {
     in: ['params', 'query'],
     isInt: {
-      options: { gt: -1, lt: MAX_SUBACCOUNT_NUMBER + 1 },
+      options: { gt: -1, lt: MAX_PARENT_SUBACCOUNTS * CHILD_SUBACCOUNT_MULTIPLIER + 1 },
     },
-    errorMessage: 'subaccountNumber must be a non-negative integer less than 128',
+    errorMessage: 'subaccountNumber must be a non-negative integer less than 128001',
+  },
+});
+
+export const CheckParentSubaccountSchema = checkSchema({
+  address: {
+    in: ['params', 'query'],
+    isString: true,
+    custom: {
+      options: isValidAddress,
+    },
+    errorMessage: 'address must be a valid dydx address',
+  },
+  parentSubaccountNumber: {
+    in: ['params', 'query'],
+    isInt: {
+      options: { gt: -1, lt: MAX_PARENT_SUBACCOUNTS },
+    },
+    errorMessage: 'parentSubaccountNumber must be a non-negative integer less than 128',
   },
 });
 
@@ -22,6 +49,10 @@ export const checkAddressSchemaRecord: Record<string, ParamSchema> = {
   address: {
     in: ['params'],
     isString: true,
+    custom: {
+      options: isValidAddress,
+    },
+    errorMessage: 'address must be a valid address',
   },
 };
 
@@ -46,6 +77,17 @@ const limitSchemaRecord: Record<string, ParamSchema> = {
         return true;
       },
     },
+  },
+};
+
+const paginationSchemaRecord: Record<string, ParamSchema> = {
+  page: {
+    in: ['query'],
+    optional: true,
+    isInt: {
+      options: { gt: 0 },
+    },
+    errorMessage: 'page must be a non-negative integer',
   },
 };
 
@@ -97,7 +139,35 @@ const createdOnOrAfterSchemaRecord: Record<string, ParamSchema> = {
   },
 };
 
+const transferBetweenSchemaRecord: Record<string, ParamSchema> = {
+  ...createdBeforeOrAtSchemaRecord,
+  sourceAddress: {
+    in: ['params', 'query'],
+    isString: true,
+  },
+  sourceSubaccountNumber: {
+    in: ['params', 'query'],
+    isInt: {
+      options: { gt: -1, lt: MAX_PARENT_SUBACCOUNTS * CHILD_SUBACCOUNT_MULTIPLIER + 1 },
+    },
+    errorMessage: 'subaccountNumber must be a non-negative integer less than 128001',
+  },
+  recipientAddress: {
+    in: ['params', 'query'],
+    isString: true,
+  },
+  recipientSubaccountNumber: {
+    in: ['params', 'query'],
+    isInt: {
+      options: { gt: -1, lt: MAX_PARENT_SUBACCOUNTS * CHILD_SUBACCOUNT_MULTIPLIER + 1 },
+    },
+    errorMessage: 'subaccountNumber must be a non-negative integer less than 128001',
+  },
+};
+
 export const CheckLimitSchema = checkSchema(limitSchemaRecord);
+
+export const CheckPaginationSchema = checkSchema(paginationSchemaRecord);
 
 export const CheckLimitAndCreatedBeforeOrAtSchema = checkSchema({
   ...limitSchemaRecord,
@@ -154,3 +224,74 @@ export const CheckHistoricalBlockTradingRewardsSchema = checkSchema({
     errorMessage: 'startingBeforeOrAtHeight must be a non-negative integer',
   },
 });
+
+export const CheckTransferBetweenSchema = checkSchema(transferBetweenSchemaRecord);
+
+export const RegisterTokenValidationSchema = [
+  body('token')
+    .exists().withMessage('Token is required')
+    .isString()
+    .withMessage('Token must be a string')
+    .notEmpty()
+    .withMessage('Token cannot be empty'),
+  body('timestamp')
+    .exists().withMessage('timestamp is required')
+    .isNumeric()
+    .withMessage('timestamp must be a number')
+    .notEmpty()
+    .withMessage('timestamp cannot be empty'),
+  body('message')
+    .exists().withMessage('message is required')
+    .isString()
+    .withMessage('message must be a string')
+    .notEmpty()
+    .withMessage('message cannot be empty'),
+  body('signedMessage')
+    .exists().withMessage('signedMessage is required')
+    .isString()
+    .withMessage('signedMessage must be a string')
+    .notEmpty()
+    .withMessage('signedMessage cannot be empty'),
+  body('pubKey')
+    .exists().withMessage('pubKey is required')
+    .isString()
+    .withMessage('pubKey must be a string')
+    .notEmpty()
+    .withMessage('pubKey cannot be empty'),
+  body('walletIsKeplr')
+    .exists().withMessage('walletIsKeplr is required')
+    .isBoolean()
+    .withMessage('walletIsKeplr must be a boolean')
+    .notEmpty()
+    .withMessage('walletIsKeplr cannot be empty'),
+  body('language')
+    .optional()
+    .isString()
+    .withMessage('Language must be a string')
+    .custom((value: string) => {
+      if (!isValidLanguageCode(value)) {
+        throw new Error('Invalid language code');
+      }
+      return true;
+    }),
+];
+
+function verifyIsBech32(address: string): Error | undefined {
+  try {
+    decode(address);
+  } catch (error) {
+    return error;
+  }
+
+  return undefined;
+}
+
+export function isValidDydxAddress(address: string): boolean {
+  // An address is valid if it starts with `dydx1` and is Bech32 format.
+  return address.startsWith('dydx1') && (verifyIsBech32(address) === undefined);
+}
+
+export function isValidAddress(address: string): boolean {
+  // Address is valid if its under 90 characters and alphanumeric
+  return address.length <= 90 && /^[a-zA-Z0-9]*$/.test(address);
+}

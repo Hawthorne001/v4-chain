@@ -14,7 +14,16 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/lib/metrics"
 	"github.com/dydxprotocol/v4-chain/protocol/x/clob/keeper"
 	"github.com/dydxprotocol/v4-chain/protocol/x/clob/types"
+	satypes "github.com/dydxprotocol/v4-chain/protocol/x/subaccounts/types"
 )
+
+// PreBlocker executes all ABCI PreBlock logic respective to the clob module.
+func PreBlocker(
+	ctx sdk.Context,
+	keeper types.ClobKeeper,
+) {
+	keeper.Initialize(ctx)
+}
 
 // BeginBlocker executes all ABCI BeginBlock logic respective to the clob module.
 func BeginBlocker(
@@ -34,6 +43,24 @@ func BeginBlocker(
 			BlockHeight: lib.MustConvertIntegerToUint32(ctx.BlockHeight()),
 		},
 	)
+	keeper.ResetAllDeliveredOrderIds(ctx)
+}
+
+// Precommit executes all ABCI Precommit logic respective to the clob module.
+func Precommit(
+	ctx sdk.Context,
+	keeper keeper.Keeper,
+) {
+	// Process all staged finalize block events, and apply necessary side effects
+	// (e.g. MemClob orderbook creation) that could not be done during FinalizeBlock.
+	// Note: this must be done in `Precommit` which is prior to `PrepareCheckState`, when
+	// MemClob could access the new orderbooks.
+	keeper.ProcessStagedFinalizeBlockEvents(ctx)
+
+	if streamingManager := keeper.GetFullNodeStreamingManager(); !streamingManager.Enabled() {
+		return
+	}
+	keeper.StreamBatchUpdatesAfterFinalizeBlock(ctx)
 }
 
 // EndBlocker executes all ABCI EndBlock logic respective to the clob module.
@@ -52,7 +79,7 @@ func EndBlocker(
 	keeper.PruneStateFillAmountsForShortTermOrders(ctx)
 
 	// Prune expired stateful orders completely from state.
-	expiredStatefulOrderIds := keeper.RemoveExpiredStatefulOrdersTimeSlices(ctx, ctx.BlockTime())
+	expiredStatefulOrderIds := keeper.RemoveExpiredStatefulOrders(ctx, ctx.BlockTime())
 	for _, orderId := range expiredStatefulOrderIds {
 		// Remove the order fill amount from state.
 		keeper.RemoveOrderFillAmount(ctx, orderId)
@@ -61,9 +88,10 @@ func EndBlocker(
 		keeper.DeleteLongTermOrderPlacement(ctx, orderId)
 
 		// Emit an on-chain indexer event for Stateful Order Expiration.
-		keeper.GetIndexerEventManager().AddTxnEvent(
+		keeper.GetIndexerEventManager().AddBlockEvent(
 			ctx,
 			indexerevents.SubtypeStatefulOrder,
+			indexer_manager.IndexerTendermintEvent_BLOCK_EVENT_END_BLOCK,
 			indexerevents.StatefulOrderEventVersion,
 			indexer_manager.GetBytes(
 				indexerevents.NewStatefulOrderRemovalEvent(
@@ -79,27 +107,9 @@ func EndBlocker(
 		)
 	}
 
-	// Prune expired untriggered conditional orders from the in-memory UntriggeredConditionalOrders struct.
-	keeper.PruneUntriggeredConditionalOrders(
-		expiredStatefulOrderIds,
-		processProposerMatchesEvents.PlacedStatefulCancellationOrderIds,
-	)
-
 	// Update the memstore with expired order ids.
 	// These expired stateful order ids will be purged from the memclob in `Commit`.
 	processProposerMatchesEvents.ExpiredStatefulOrderIds = expiredStatefulOrderIds
-
-	// Before triggering conditional orders, add newly-placed conditional orders to the clob keeper's
-	// in-memory UntriggeredConditionalOrders data structure to allow conditional orders to
-	// trigger in the same block they are placed. Skip triggering orders which have been cancelled
-	// or expired.
-	// TODO(CLOB-773) Support conditional order replacements. Ensure replacements are de-duplicated.
-	keeper.AddUntriggeredConditionalOrders(
-		ctx,
-		processProposerMatchesEvents.PlacedConditionalOrderIds,
-		lib.UniqueSliceToSet(processProposerMatchesEvents.GetPlacedStatefulCancellationOrderIds()),
-		lib.UniqueSliceToSet(expiredStatefulOrderIds),
-	)
 
 	// Poll out all triggered conditional orders from `UntriggeredConditionalOrders` and update state.
 	triggeredConditionalOrderIds := keeper.MaybeTriggerConditionalOrders(ctx)
@@ -112,9 +122,6 @@ func EndBlocker(
 		ctx,
 		processProposerMatchesEvents,
 	)
-
-	// Prune any rate limiting information that is no longer relevant.
-	keeper.PruneRateLimits(ctx)
 
 	// Emit relevant metrics at the end of every block.
 	metrics.SetGauge(
@@ -133,6 +140,18 @@ func PrepareCheckState(
 		// Prepare check state is for the next block.
 		log.BlockHeight, ctx.BlockHeight()+1,
 	)
+
+	// We just committed block `h`, preparing `CheckState` of `h+1`
+	// Before we modify the `CheckState`, we first take the snapshot of
+	// the subscribed subaccounts at the end of block `h`. This we send finalized state of
+	// the subaccounts below in `InitializeNewStreams`.
+	var subaccountSnapshots map[satypes.SubaccountId]*satypes.StreamSubaccountUpdate
+	if keeper.GetFullNodeStreamingManager().Enabled() {
+		subaccountSnapshots = keeper.GetSubaccountSnapshotsForInitStreams(ctx)
+	}
+
+	// Prune any rate limiting information that is no longer relevant.
+	keeper.PruneRateLimits(ctx)
 
 	// Get the events generated from processing the matches in the latest block.
 	processProposerMatchesEvents := keeper.GetProcessProposerMatchesEvents(ctx)
@@ -161,19 +180,47 @@ func PrepareCheckState(
 		ctx,
 		processProposerMatchesEvents.OrderIdsFilledInLastBlock,
 		processProposerMatchesEvents.ExpiredStatefulOrderIds,
-		processProposerMatchesEvents.PlacedStatefulCancellationOrderIds,
+		keeper.GetDeliveredCancelledOrderIds(ctx),
 		processProposerMatchesEvents.RemovedStatefulOrderIds,
 		offchainUpdates,
 	)
 
-	// 3. Place all stateful order placements included in the last block on the memclob.
+	// 3. Go through the orders two times and only place the post only orders during the first pass.
+	longTermOrderIds := keeper.GetDeliveredLongTermOrderIds(ctx)
+	offchainUpdates = keeper.PlaceStatefulOrdersFromLastBlock(
+		ctx,
+		longTermOrderIds,
+		offchainUpdates,
+		true, // post only
+	)
+
+	offchainUpdates = keeper.PlaceConditionalOrdersTriggeredInLastBlock(
+		ctx,
+		processProposerMatchesEvents.ConditionalOrderIdsTriggeredInLastBlock,
+		offchainUpdates,
+		true, // post only
+	)
+
+	replayUpdates := keeper.MemClob.ReplayOperations(
+		ctx,
+		localValidatorOperationsQueue,
+		shortTermOrderTxBytes,
+		offchainUpdates,
+		true, // post only
+	)
+	if replayUpdates != nil {
+		offchainUpdates = replayUpdates
+	}
+
+	// 4. Place all stateful order placements included in the last block on the memclob.
 	// Note telemetry is measured outside of the function call because `PlaceStatefulOrdersFromLastBlock`
 	// is called within `PlaceConditionalOrdersTriggeredInLastBlock`.
 	startPlaceLongTermOrders := time.Now()
 	offchainUpdates = keeper.PlaceStatefulOrdersFromLastBlock(
 		ctx,
-		processProposerMatchesEvents.PlacedLongTermOrderIds,
+		longTermOrderIds,
 		offchainUpdates,
+		false, // post only
 	)
 	telemetry.MeasureSince(
 		startPlaceLongTermOrders,
@@ -182,33 +229,33 @@ func PrepareCheckState(
 		metrics.Latency,
 	)
 	telemetry.SetGauge(
-		float32(len(processProposerMatchesEvents.PlacedLongTermOrderIds)),
+		float32(len(longTermOrderIds)),
 		types.ModuleName,
 		metrics.PlaceLongTermOrdersFromLastBlock,
 		metrics.Count,
 	)
 
-	// 4. Place all conditional orders triggered in EndBlocker of last block on the memclob.
+	// 5. Place all conditional orders triggered in EndBlocker of last block on the memclob.
 	offchainUpdates = keeper.PlaceConditionalOrdersTriggeredInLastBlock(
 		ctx,
 		processProposerMatchesEvents.ConditionalOrderIdsTriggeredInLastBlock,
 		offchainUpdates,
+		false, // post only
 	)
 
-	// 5. Replay the local validator’s operations onto the book.
-	replayUpdates := keeper.MemClob.ReplayOperations(
+	// 6. Replay the local validator’s operations onto the book.
+	replayUpdates = keeper.MemClob.ReplayOperations(
 		ctx,
 		localValidatorOperationsQueue,
 		shortTermOrderTxBytes,
 		offchainUpdates,
+		false, // post only
 	)
-
-	// TODO(CLOB-275): Do not gracefully handle panics in `PrepareCheckState`.
 	if replayUpdates != nil {
 		offchainUpdates = replayUpdates
 	}
 
-	// 6. Get all potentially liquidatable subaccount IDs and attempt to liquidate them.
+	// 7. Get all potentially liquidatable subaccount IDs and attempt to liquidate them.
 	liquidatableSubaccountIds := keeper.DaemonLiquidationInfo.GetLiquidatableSubaccountIds()
 	subaccountsToDeleverage, err := keeper.LiquidateSubaccountsAgainstOrderbook(ctx, liquidatableSubaccountIds)
 	if err != nil {
@@ -221,14 +268,14 @@ func PrepareCheckState(
 		keeper.GetSubaccountsWithPositionsInFinalSettlementMarkets(ctx)...,
 	)
 
-	// 7. Deleverage subaccounts.
+	// 8. Deleverage subaccounts.
 	// TODO(CLOB-1052) - decouple steps 6 and 7 by using DaemonLiquidationInfo.NegativeTncSubaccounts
 	// as the input for this function.
 	if err := keeper.DeleverageSubaccounts(ctx, subaccountsToDeleverage); err != nil {
 		panic(err)
 	}
 
-	// 8. Gate withdrawals by inserting a zero-fill deleveraging operation into the operations queue if any
+	// 9. Gate withdrawals by inserting a zero-fill deleveraging operation into the operations queue if any
 	// of the negative TNC subaccounts still have negative TNC after liquidations and deleveraging steps.
 	negativeTncSubaccountIds := keeper.DaemonLiquidationInfo.GetNegativeTncSubaccountIds()
 	if err := keeper.GateWithdrawalsIfNegativeTncSubaccountSeen(ctx, negativeTncSubaccountIds); err != nil {
@@ -245,8 +292,12 @@ func PrepareCheckState(
 		types.GetInternalOperationsQueueTextString(newLocalValidatorOperationsQueue),
 	)
 
-	// Initialize new GRPC streams with orderbook snapshots, if any.
-	keeper.InitializeNewGrpcStreams(ctx)
+	// Initialize new streams with orderbook snapshots, if any.
+	keeper.InitializeNewStreams(
+		ctx,
+		// Use the subaccount snapshot at the top of function to initialize the streams.
+		subaccountSnapshots,
+	)
 
 	// Set per-orderbook gauges.
 	keeper.MemClob.SetMemclobGauges(ctx)

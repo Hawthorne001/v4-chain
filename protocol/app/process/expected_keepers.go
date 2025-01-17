@@ -2,7 +2,6 @@ package process
 
 import (
 	"context"
-	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -18,11 +17,6 @@ type ProcessPricesKeeper interface {
 		ctx sdk.Context,
 		marketPriceUpdates *pricestypes.MsgUpdateMarketPrices,
 		performNonDeterministicValidation bool,
-	) error
-
-	UpdateSmoothedPrices(
-		ctx sdk.Context,
-		linearInterpolateFunc func(v0 uint64, v1 uint64, ppm uint32) (uint64, error),
 	) error
 }
 
@@ -45,16 +39,6 @@ type ProcessStakingKeeper interface {
 // ProcessPerpetualKeeper defines the expected perpetual keeper used for `ProcessProposal`.
 type ProcessPerpetualKeeper interface {
 	MaybeProcessNewFundingTickEpoch(ctx sdk.Context)
-	GetSettlementPpm(
-		ctx sdk.Context,
-		perpetualId uint32,
-		quantums *big.Int,
-		index *big.Int,
-	) (
-		bigNetSettlementPpm *big.Int,
-		newFundingIndex *big.Int,
-		err error,
-	)
 	GetPerpetual(ctx sdk.Context, id uint32) (val perptypes.Perpetual, err error)
 }
 

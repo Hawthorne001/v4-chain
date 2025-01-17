@@ -2,7 +2,6 @@ package keeper_test
 
 import (
 	"fmt"
-	"github.com/dydxprotocol/v4-chain/protocol/lib/slinky"
 	"testing"
 
 	oracletypes "github.com/skip-mev/slinky/pkg/types"
@@ -13,8 +12,33 @@ import (
 	"github.com/dydxprotocol/v4-chain/protocol/x/prices/types"
 )
 
+func TestCurrencyPairIDStoreFunctions(t *testing.T) {
+	ctx, keeper, _, _, _, _, _ := keepertest.PricesKeepers(t)
+
+	currencyPair := oracletypes.CurrencyPair{
+		Base:  "BTC",
+		Quote: "USD",
+	}
+
+	// Add the currency pair ID to the store
+	marketID := uint32(1)
+	keeper.AddCurrencyPairIDToStore(ctx, marketID, currencyPair)
+
+	// Retrieve the currency pair ID from the store
+	storedMarketID, found := keeper.GetCurrencyPairIDFromStore(ctx, currencyPair)
+
+	require.True(t, found)
+	require.Equal(t, uint64(marketID), storedMarketID)
+
+	// Remove the currency pair ID from the store
+	keeper.RemoveCurrencyPairFromStore(ctx, currencyPair)
+
+	_, found = keeper.GetCurrencyPairIDFromStore(ctx, currencyPair)
+	require.False(t, found)
+}
+
 func TestGetCurrencyPairFromID(t *testing.T) {
-	ctx, keeper, _, _, _, mockTimeProvider := keepertest.PricesKeepers(t)
+	ctx, keeper, _, _, mockTimeProvider, _, _ := keepertest.PricesKeepers(t)
 	mockTimeProvider.On("Now").Return(constants.TimeT)
 
 	marketNumber := 10
@@ -27,11 +51,11 @@ func TestGetCurrencyPairFromID(t *testing.T) {
 		require.True(t, found)
 	}
 	_, found := keeper.GetCurrencyPairFromID(ctx, uint64(marketNumber+1))
-	require.True(t, !found)
+	require.False(t, found)
 }
 
 func TestIDForCurrencyPair(t *testing.T) {
-	ctx, keeper, _, _, _, mockTimeProvider := keepertest.PricesKeepers(t)
+	ctx, keeper, _, _, mockTimeProvider, _, _ := keepertest.PricesKeepers(t)
 	mockTimeProvider.On("Now").Return(constants.TimeT)
 
 	marketNumber := 10
@@ -51,11 +75,11 @@ func TestIDForCurrencyPair(t *testing.T) {
 		Base:  fmt.Sprint(marketNumber + 1),
 		Quote: fmt.Sprint(marketNumber + 1),
 	})
-	require.True(t, !found)
+	require.False(t, found)
 }
 
 func TestGetPriceForCurrencyPair(t *testing.T) {
-	ctx, keeper, _, _, _, mockTimeProvider := keepertest.PricesKeepers(t)
+	ctx, keeper, _, _, mockTimeProvider, _, _ := keepertest.PricesKeepers(t)
 	mockTimeProvider.On("Now").Return(constants.TimeT)
 
 	marketNumber := 10
@@ -79,20 +103,18 @@ func TestGetPriceForCurrencyPair(t *testing.T) {
 }
 
 func TestBadMarketData(t *testing.T) {
-	ctx, keeper, _, _, _, mockTimeProvider := keepertest.PricesKeepers(t)
+	ctx, keeper, _, _, mockTimeProvider, _, _ := keepertest.PricesKeepers(t)
 	mockTimeProvider.On("Now").Return(constants.TimeT)
 
 	_, err := keeper.CreateMarket(
 		ctx,
 		types.MarketParam{
-			Id:                 uint32(0),
-			Pair:               "00",
-			MinExchanges:       1,
-			MinPriceChangePpm:  1,
-			ExchangeConfigJson: "{}",
+			Id:                uint32(0),
+			Pair:              "00",
+			MinPriceChangePpm: 1,
 		},
 		types.MarketPrice{})
-	require.NoError(t, err)
+	require.Error(t, err)
 
 	_, found := keeper.GetCurrencyPairFromID(ctx, uint64(0))
 	require.False(t, found)
@@ -104,27 +126,13 @@ func TestBadMarketData(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestMarketPairToCurrencyPair(t *testing.T) {
-	testCases := []struct {
-		marketPair        string
-		currencyPairBase  string
-		currencyPairQuote string
-		shouldFail        bool
-	}{
-		{"0-0", "0", "0", false},
-		{"0/0", "", "", true},
-		{"00", "", "", true},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.marketPair, func(t *testing.T) {
-			cp, err := slinky.MarketPairToCurrencyPair(tc.marketPair)
-			if tc.shouldFail {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tc.currencyPairBase, cp.Base)
-				require.Equal(t, tc.currencyPairQuote, cp.Quote)
-			}
-		})
-	}
+func TestGetNumCurrencyPairs(t *testing.T) {
+	ctx, keeper, _, _, mockTimeProvider, _, _ := keepertest.PricesKeepers(t)
+	mockTimeProvider.On("Now").Return(constants.TimeT)
+
+	marketNumber := 10
+	_ = keepertest.CreateNMarkets(t, ctx, keeper, marketNumber)
+	cpCounter, err := keeper.GetNumCurrencyPairs(ctx)
+	require.NoError(t, err)
+	require.Equal(t, uint64(marketNumber), cpCounter)
 }
