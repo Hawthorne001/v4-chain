@@ -1,4 +1,4 @@
-protobuf>=4.23
+protobuf>=4.25.8
 grpcio-tools>=1.54
 grpcio>=1.54
 poetry>=1.5.1
