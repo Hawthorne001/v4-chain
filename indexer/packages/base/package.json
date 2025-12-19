@@ -39,7 +39,7 @@
     "@bugsnag/js": "^7.18.0",
     "@bugsnag/node": "^7.18.0",
     "@bugsnag/plugin-express": "^7.18.0",
-    "axios": "^1.2.1",
+    "axios": "^1.12.0",
     "big.js": "^6.2.1",
     "bignumber.js": "^9.0.2",
     "dotenv-flow": "^3.2.0",
