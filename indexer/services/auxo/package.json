@@ -20,7 +20,7 @@
   "dependencies": {
     "@aws-sdk/client-ecr": "^3.354.0",
     "@aws-sdk/client-ecs": "^3.353.0",
-    "@aws-sdk/client-lambda": "^3.353.0",
+    "@aws-sdk/client-lambda": "^3.529.0",
     "@dydxprotocol-indexer/base": "workspace:^0.0.1",
     "@milahu/patch-package": "6.4.14",
     "dotenv-flow": "^3.2.0",
