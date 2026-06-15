@@ -27,7 +27,7 @@
     "@milahu/patch-package": "6.4.14",
     "dotenv-flow": "^3.2.0",
     "kafkajs": "^2.2.4",
-    "lodash": "^4.17.21",
+    "lodash": "^4.17.23",
     "redis": "2.8.0",
     "long": "^5.2.1",
     "big.js": "^6.0.2"
