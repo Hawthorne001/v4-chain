@@ -24,7 +24,7 @@
     "@dydxprotocol-indexer/postgres": "workspace:^0.0.1",
     "@dydxprotocol-indexer/v4-protos": "workspace:^0.0.1",
     "@milahu/patch-package": "6.4.14",
-    "axios": "^1.2.1",
+    "axios": "^1.13.5",
     "body-parser": "^1.20.0",
     "bufferutil": "^4.0.9",
     "cors": "^2.8.5",
